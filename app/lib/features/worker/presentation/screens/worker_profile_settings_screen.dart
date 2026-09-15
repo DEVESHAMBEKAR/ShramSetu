@@ -5,7 +5,10 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import '../../data/repositories/mock_worker_repository.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:image_picker/image_picker.dart';
+import 'dart:io';
+import '../../../../core/repositories/i_storage_repository.dart';
 import 'worker_kyc_screen.dart';
 
 class WorkerProfileSettingsScreen extends StatefulWidget {
@@ -16,52 +19,91 @@ class WorkerProfileSettingsScreen extends StatefulWidget {
 }
 
 class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScreen> {
-  late MockWorkerRepository _repository;
+  late Future<WorkerProfile> _profileFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockWorkerRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
+  
+  Future<void> _pickAndUploadImage(WorkerProfile worker) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 800, maxHeight: 800);
+    
+    if (pickedFile != null) {
+      try {
+        final File file = File(pickedFile.path);
+        // Path in storage bucket: {worker_id}/avatar.ext
+        final storagePath = '${worker.id}/avatar';
+        
+        // Use StorageRepo to upload
+        final publicUrl = await DI.storageRepo.uploadFile(
+          bucket: StorageBucket.profileImages,
+          path: storagePath,
+          file: file,
+        );
+        
+        // Update database with new URL
+        await DI.workerRepo.updateProfileImage(worker.id, publicUrl);
+        
+        // Refresh UI
+        _refreshData();
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to upload image: $e')));
+        }
+      }
+    }
   }
 
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      _profileFuture = DI.workerRepo.getWorkerProfile(userId);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final worker = _repository.currentWorker;
+    return FutureBuilder<WorkerProfile>(
+      future: _profileFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final worker = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        title: Text('Profile & Settings', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.marginMobile),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildProfileCard(worker),
-            const SizedBox(height: AppSpacing.spacingLg),
-            Text('Account Settings', style: AppTypography.titleMd.copyWith(color: AppColors.onSurfaceVariant)),
-            const SizedBox(height: AppSpacing.spacingSm),
-            _buildSettingsList(worker),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildLogoutButton(),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
+        return Scaffold(
+          backgroundColor: AppColors.surface,
+          appBar: AppBar(
+            backgroundColor: AppColors.surface.withValues(alpha: 0.9),
+            elevation: 1,
+            title: Text('Profile & Settings', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
+          ),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppSpacing.marginMobile),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildProfileCard(worker),
+                const SizedBox(height: AppSpacing.spacingLg),
+                Text('Account Settings', style: AppTypography.titleMd.copyWith(color: AppColors.onSurfaceVariant)),
+                const SizedBox(height: AppSpacing.spacingSm),
+                _buildSettingsList(worker),
+                const SizedBox(height: AppSpacing.spacingLg),
+                _buildLogoutButton(),
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        );
+      }
     );
   }
 
@@ -72,14 +114,38 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
       child: Column(
         children: [
           Row(
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: const BoxDecoration(color: AppColors.surfaceContainerHigh, shape: BoxShape.circle),
-                child: const Icon(Icons.person, color: AppColors.outline, size: 36),
-              ),
-              const SizedBox(width: AppSpacing.spacingMd),
+              children: [
+                GestureDetector(
+                  onTap: () => _pickAndUploadImage(worker),
+                  child: Stack(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerHigh,
+                          shape: BoxShape.circle,
+                          image: worker.profileImage.isNotEmpty
+                              ? DecorationImage(image: NetworkImage(worker.profileImage), fit: BoxFit.cover)
+                              : null,
+                        ),
+                        child: worker.profileImage.isEmpty
+                            ? const Icon(Icons.person, color: AppColors.outline, size: 36)
+                            : null,
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                          child: const Icon(Icons.camera_alt, color: AppColors.onPrimary, size: 14),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.spacingMd),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,7 +227,7 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
     final isAvailable = worker.isAvailable;
     return SwitchListTile(
       value: isAvailable,
-      onChanged: (val) => _repository.toggleAvailability(),
+      onChanged: (val) async { await DI.workerRepo.updateWorkerAvailability(worker.id, val); _refreshData(); },
       activeColor: AppColors.onTertiaryContainer,
       secondary: Icon(isAvailable ? Icons.notifications_active : Icons.notifications_off, color: isAvailable ? AppColors.onTertiaryContainer : AppColors.outline),
       title: Text('Active Duty Status', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
@@ -185,4 +251,8 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
     );
   }
 }
+
+
+
+
 

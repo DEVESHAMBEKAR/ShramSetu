@@ -4,7 +4,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import '../../data/repositories/mock_worker_repository.dart';
+
 
 class WorkerEarningsScreen extends StatefulWidget {
   const WorkerEarningsScreen({super.key});
@@ -14,18 +14,18 @@ class WorkerEarningsScreen extends StatefulWidget {
 }
 
 class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
-  late MockWorkerRepository _repository;
+  // late MockWorkerRepository _repository;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockWorkerRepository();
-    _repository.addListener(_onRepositoryChanged);
+    // _repository = MockWorkerRepository();
+    
   }
 
   @override
   void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
+    
     super.dispose();
   }
 
@@ -35,7 +35,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final worker = _repository.currentWorker;
+    final worker = null; // _repository.currentWorker;
 
     return Scaffold(
       backgroundColor: AppColors.background,

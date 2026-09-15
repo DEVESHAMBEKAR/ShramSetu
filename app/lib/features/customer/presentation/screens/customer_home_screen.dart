@@ -1,15 +1,60 @@
 import '../../../../core/config/dependency_injection.dart';
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/customer_models.dart';
+import '../../data/models/customer_profile.dart';
 
 import 'worker_discovery_screen.dart';
 
-class CustomerHomeScreen extends StatelessWidget {
+class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
+
+  @override
+  State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
+}
+
+class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
+  CustomerProfile? _profile;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    final userId = Supabase.instance.client.auth.currentUser?.id;
+    if (userId == null) return;
+    final profile = await DI.userRepo.getCustomerProfile(userId);
+    if (mounted) {
+      setState(() {
+        _profile = profile;
+      });
+    }
+  }
+
+  String get _greetingName {
+    if (_profile == null || _profile!.fullName.isEmpty) return '';
+    // Use first name only for a friendly greeting
+    return ', ${_profile!.fullName.trim().split(' ').first}';
+  }
+
+  String get _timeGreeting {
+    final hour = DateTime.now().hour;
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  }
+
+  String get _locationDisplay {
+    final addr = _profile?.defaultAddress;
+    if (addr == null) return 'Add your location';
+    return addr.displayString;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +81,7 @@ class CustomerHomeScreen extends StatelessWidget {
       ),
     );
   }
+
 
   Widget _buildSliverAppBar() {
     return SliverAppBar(
@@ -176,7 +222,7 @@ class CustomerHomeScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      'Good morning, Ananya',
+                      '$_timeGreeting$_greetingName',
                       style: AppTypography.headlineLgMobile.copyWith(
                         color: AppColors.primary,
                         fontWeight: FontWeight.bold,
@@ -208,7 +254,7 @@ class CustomerHomeScreen extends StatelessWidget {
                   const SizedBox(width: AppSpacing.spacing3xs),
                   Expanded(
                     child: Text(
-                      'Kothrud, Pune, Maharashtra',
+                      _locationDisplay,
                       style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

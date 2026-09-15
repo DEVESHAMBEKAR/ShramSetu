@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
@@ -15,23 +16,21 @@ class AdminDashboardScreen extends StatefulWidget {
 }
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<dynamic>> _dataFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      _dataFuture = Future.wait([
+        DI.adminRepo.getDashboardStats(),
+        DI.adminRepo.getWorkers(),
+      ]);
+    });
   }
 
   void _showToast(String message) {
@@ -54,10 +53,22 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final stats = _repository.dashboardStats;
+    return FutureBuilder<List<dynamic>>(
+      future: _dataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        final stats = snapshot.data![0] as AdminDashboardStats;
+        final workers = snapshot.data![1] as List<WorkerProfile>;
+        final pending = workers.where((w) => w.verificationStatus == VerificationStatus.pending).toList();
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -109,7 +120,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             const SizedBox(height: AppSpacing.spacingLg),
             _buildFairWorkIndex(),
             const SizedBox(height: AppSpacing.spacingLg),
-            _buildVerificationQueue(),
+            _buildVerificationQueue(pending),
             const SizedBox(height: AppSpacing.spacingLg),
             _buildLiveDispute(),
             const SizedBox(height: AppSpacing.spacingLg),
@@ -120,6 +131,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ],
         ),
       ),
+    );
+      }
     );
   }
 
@@ -333,8 +346,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildVerificationQueue() {
-    final pending = _repository.pendingVerifications;
+  Widget _buildVerificationQueue(List<WorkerProfile> pending) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
       child: Column(
@@ -366,6 +378,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _viewDocuments(WorkerProfile worker) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (c) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final docs = await DI.adminRepo.getWorkerDocuments(worker.id);
+      Navigator.pop(context);
+      if (docs.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No documents found for this worker.')));
+        return;
+      }
+      
+      // Get signed URLs
+      List<String> urls = [];
+      for(var doc in docs) {
+        final path = doc['storage_path'];
+        final url = await DI.storageRepo.getSignedUrl(bucket: StorageBucket.workerDocuments, path: path, expiresIn: 3600);
+        urls.add('\: ');
+      }
+      
+      showDialog(
+        context: context,
+        builder: (c) => AlertDialog(
+          title: Text('Documents for '),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: urls.map((u) => Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: SelectableText(u, style: const TextStyle(fontSize: 12)),
+              )).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))
+          ]
+        )
+      );
+    } catch(e) {
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ')));
+    }
   }
 
   Widget _buildWorkerVerificationCard(WorkerProfile worker) {
@@ -433,7 +491,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    _repository.approveWorker(worker.id);
+                    () async { await DI.adminRepo.approveWorker(worker.id); _refreshData(); }();
                     _showToast('${worker.name} credentialed to ${worker.guildName}.');
                   },
                   icon: const Icon(Icons.task_alt, size: 16),
@@ -685,3 +743,4 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 }
+

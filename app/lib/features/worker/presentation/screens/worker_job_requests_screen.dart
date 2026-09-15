@@ -4,7 +4,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import '../../data/repositories/mock_worker_repository.dart';
+
 import 'worker_job_detail_screen.dart';
 
 class WorkerJobRequestsScreen extends StatefulWidget {
@@ -15,18 +15,18 @@ class WorkerJobRequestsScreen extends StatefulWidget {
 }
 
 class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
-  late MockWorkerRepository _repository;
+  // late MockWorkerRepository _repository;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockWorkerRepository();
-    _repository.addListener(_onRepositoryChanged);
+    // _repository = MockWorkerRepository();
+    
   }
 
   @override
   void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
+    
     super.dispose();
   }
 
@@ -36,7 +36,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final jobs = [..._repository.activeRequests, ..._repository.currentJobs];
+    final jobs = [];
 
     return Scaffold(
       backgroundColor: AppColors.surface,

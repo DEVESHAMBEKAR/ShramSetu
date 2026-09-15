@@ -5,7 +5,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import '../../data/repositories/mock_worker_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 
 class WorkerJobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -17,37 +17,41 @@ class WorkerJobDetailScreen extends StatefulWidget {
 }
 
 class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
-  late MockWorkerRepository _repository;
+  late Future<List<JobRequest>> _jobFuture;
   bool _otpVerified = false;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockWorkerRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
+  void _refreshData() {
+    setState(() {
+      _jobFuture = DI.workerRepo.getWorkerBookings();
+    });
   }
-
-  void _onRepositoryChanged() {
-    setState(() {});
-  }
-
-  JobRequest get _job => _repository.currentJobs.firstWhere(
-    (j) => j.id == widget.jobId,
-    orElse: () => _repository.activeRequests.firstWhere(
-      (j) => j.id == widget.jobId,
-      orElse: () => _repository.completedJobs.firstWhere((j) => j.id == widget.jobId)
-    )
-  );
 
   @override
   Widget build(BuildContext context) {
-    final job = _job;
+    return FutureBuilder<List<JobRequest>>(
+      future: _jobFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ${snapshot.error}')));
+        }
+        
+        final jobs = snapshot.data ?? [];
+        final job = jobs.firstWhere(
+          (j) => j.id == widget.jobId, 
+          orElse: () => JobRequest(
+            id: widget.jobId, customerId: '', customerName: 'Unknown', customerLocation: '', customerPhone: '', serviceName: '', date: '', time: '', baseAmount: 0, laborAllowance: 0, status: BookingStatus.pending, distanceKm: '', createdAt: ''
+          )
+        );
+
     
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -73,6 +77,8 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           ],
         ),
       ),
+    );
+      }
     );
   }
 
@@ -344,7 +350,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please verify OTP first')));
                 return;
               }
-              _repository.updateBookingStatus(job.id, nextStatus);
+              DI.workerRepo.updateBookingStatus(job.id, nextStatus).then((_) => _refreshData());
               if (nextStatus == BookingStatus.completed) {
                 Navigator.of(context).pop();
               }

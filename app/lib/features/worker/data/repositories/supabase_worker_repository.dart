@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+﻿import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_worker_repository.dart';
 import '../models/worker_models.dart';
 
@@ -40,10 +40,45 @@ class SupabaseWorkerRepository implements IWorkerRepository {
   }
 
   @override
-  Future<void> updateAvailability(bool isAvailable) async {
-    final userId = _supabase.auth.currentUser!.id;
-    await _supabase.from('workers').update({'is_available': isAvailable}).eq('id', userId);
+  Future<void> updateWorkerAvailability(String workerId, bool isAvailable) async {
+    await _supabase.from('workers').update({'is_available': isAvailable}).eq('id', workerId);
   }
+
+  @override
+  Future<void> updateProfileImage(String workerId, String imageUrl) async {
+    await _supabase.from('users').update({'avatar_url': imageUrl}).eq('id', workerId);
+  }
+
+  @override
+  Future<List<JobRequest>> getJobRequests(String workerId) async {
+    // Return all bookings mapped to workerId
+    final response = await _supabase.from('bookings').select('''
+      id, status, scheduled_date, scheduled_time, amount, notes, customer_id, created_at,
+      services(name),
+      users!customer_id(full_name, phone)
+    ''').eq('worker_id', workerId).order('created_at', ascending: false);
+
+    return (response as List).map((b) {
+      final cData = b['users'] ?? {};
+      return JobRequest(
+        id: b['id'],
+        customerId: b['customer_id'] ?? '',
+        customerName: cData['full_name'] ?? 'Unknown',
+        customerLocation: 'Local',
+        customerPhone: cData['phone'] ?? 'Unknown',
+        serviceName: b['services'] != null ? b['services']['name'] : 'Unknown',
+        date: b['scheduled_date'] ?? '',
+        time: b['scheduled_time'] ?? '',
+        baseAmount: (b['amount'] ?? 0).toDouble(),
+        laborAllowance: 0.0,
+        status: _mapBookingStatus(b['status']),
+        distanceKm: '0.0 km',
+        createdAt: b['created_at'] ?? '',
+      );
+    }).toList();
+  }
+
+
 
   @override
   Future<List<JobRequest>> getWorkerBookings() async {
@@ -85,6 +120,17 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     }).toList();
   }
 
+  BookingStatus _mapBookingStatus(String? status) {
+    switch (status) {
+      case 'accepted': return BookingStatus.accepted;
+      case 'onTheWay': return BookingStatus.onTheWay;
+      case 'inProgress': return BookingStatus.inProgress;
+      case 'completed': return BookingStatus.completed;
+      case 'cancelled': return BookingStatus.cancelled;
+      default: return BookingStatus.pending;
+    }
+  }
+
   @override
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
     await _supabase.from('bookings').update({'status': newStatus.name.toUpperCase()}).eq('id', bookingId);
@@ -95,5 +141,28 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     if (diff.inMinutes < 60) return '\m ago';
     if (diff.inHours < 24) return '\h ago';
     return '\d ago';
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getVerificationDocuments(String workerId) async {
+    return await _supabase.from('worker_verification_documents').select().eq('worker_id', workerId).order('created_at');
+  }
+
+  @override
+  Future<void> submitVerificationDocument(String workerId, String documentType, String storagePath, String fileName, String mimeType, int fileSize) async {
+    await _supabase.from('worker_verification_documents').insert({
+      'worker_id': workerId,
+      'document_type': documentType,
+      'storage_path': storagePath,
+      'file_name': fileName,
+      'mime_type': mimeType,
+      'file_size': fileSize,
+      'status': 'PENDING'
+    });
+  }
+
+  @override
+  Future<void> submitForVerification(String workerId) async {
+    await _supabase.from('workers').update({'worker_status': 'PENDING_VERIFICATION'}).eq('id', workerId);
   }
 }

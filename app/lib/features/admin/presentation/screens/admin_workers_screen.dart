@@ -3,7 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../../../worker/data/models/worker_models.dart';
 
 class AdminWorkersScreen extends StatefulWidget {
@@ -14,31 +14,36 @@ class AdminWorkersScreen extends StatefulWidget {
 }
 
 class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<WorkerProfile>> _workersFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      _workersFuture = DI.adminRepo.getWorkers();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final workers = _repository.workers;
+    return FutureBuilder<List<WorkerProfile>>(
+      future: _workersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final workers = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -109,7 +114,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                       Expanded(
                         child: OutlinedButton(
                           onPressed: () {
-                            _repository.rejectWorker(worker.id);
+                            () async { await DI.adminRepo.rejectWorker(worker.id); _refreshData(); }();
                           },
                           style: OutlinedButton.styleFrom(foregroundColor: AppColors.error),
                           child: const Text('Reject'),
@@ -119,7 +124,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
-                            _repository.approveWorker(worker.id);
+                            () async { await DI.adminRepo.approveWorker(worker.id); _refreshData(); }();
                           },
                           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
                           child: const Text('Approve'),
@@ -133,6 +138,8 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
         },
       ),
     );
+        }
+      );
   }
 
   Color _getVerifBgColor(VerificationStatus status) {

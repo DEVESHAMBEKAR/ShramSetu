@@ -58,8 +58,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
       if (!_isOtpSent) {
         // Step 1: Send OTP
         final phone = _phoneController.text.trim();
-        if (phone.length != 10) {
-          throw Exception('Please enter a valid 10-digit number.');
+        if (phone.length < 10) {
+          throw Exception('Please enter a valid phone number.');
         }
         await DI.authRepo.sendOtp(phone);
         setState(() {
@@ -81,15 +81,25 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
           final userId = user?.id ?? 'mock_user_id';
-          
+
+          // Upsert creates the user row if it doesn't exist yet (first login).
+          // full_name is left as placeholder — onboarding will replace it.
           await DI.userRepo.upsertUserProfile(
             userId: userId,
             role: 'CUSTOMER',
             phone: _phoneController.text.trim(),
           );
 
+          // Check whether the customer has completed their profile.
+          // New customers (or those with incomplete profiles) go to onboarding.
+          final isComplete = await DI.userRepo.isProfileComplete(userId);
+
           if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/customer/home');
+            if (isComplete) {
+              Navigator.of(context).pushReplacementNamed('/customer/home');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/customer/onboarding');
+            }
           }
         } else {
           throw Exception('Invalid OTP. Please try again. (Hint: use 123456 in mock mode)');
@@ -360,7 +370,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                     controller: _phoneController,
                     readOnly: _isOtpSent,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')), LengthLimitingTextInputFormatter(15)],
                     style: AppTypography.titleMd.copyWith(
                       color: AppColors.onSurface,
                       fontWeight: FontWeight.bold,

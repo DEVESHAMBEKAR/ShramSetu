@@ -3,7 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import '../../data/models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
 class AdminBookingsScreen extends StatefulWidget {
@@ -14,31 +15,36 @@ class AdminBookingsScreen extends StatefulWidget {
 }
 
 class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<JobRequest>> _bookingsFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      _bookingsFuture = DI.adminRepo.getBookings();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final bookings = _repository.bookings;
+    return FutureBuilder<List<JobRequest>>(
+      future: _bookingsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final bookings = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -111,7 +117,7 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                     Expanded(
                       child: OutlinedButton(
                         onPressed: booking.status == BookingStatus.inProgress ? () {
-                          _repository.updateBookingStatus(booking.id, BookingStatus.completed);
+                          () async { await DI.adminRepo.updateBookingStatus(booking.id, BookingStatus.completed); _refreshData(); }();
                         } : null,
                         style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
                         child: const Text('Mark Complete'),
@@ -125,6 +131,8 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
         },
       ),
     );
+        }
+      );
   }
 
   Color _getStatusColor(BookingStatus status) {

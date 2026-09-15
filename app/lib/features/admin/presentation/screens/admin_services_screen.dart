@@ -3,7 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/admin_models.dart';
 
 class AdminServicesScreen extends StatefulWidget {
@@ -14,46 +14,36 @@ class AdminServicesScreen extends StatefulWidget {
 }
 
 class _AdminServicesScreenState extends State<AdminServicesScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<AdminService>> _servicesFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
-  }
-
-  IconData _getIconData(String name) {
-    switch (name) {
-      case 'electric_bolt':
-        return Icons.electric_bolt;
-      case 'plumbing':
-        return Icons.plumbing;
-      case 'cleaning_services':
-        return Icons.cleaning_services;
-      case 'carpenter':
-        return Icons.handyman;
-      default:
-        return Icons.home_repair_service;
-    }
+  void _refreshData() {
+    setState(() {
+      _servicesFuture = DI.adminRepo.getServices();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final services = _repository.services;
+    return FutureBuilder<List<AdminService>>(
+      future: _servicesFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final services = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -101,7 +91,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen> {
                   activeThumbImage: null,
                   activeColor: AppColors.primary, // Actually let's just use activeColor for now since activeThumbColor isn't enough to style everything, but wait, the warning said "Use activeThumbColor instead".
                   onChanged: (val) {
-                    _repository.toggleServiceStatus(service.id);
+                    () async { await DI.adminRepo.toggleServiceStatus(service.id); _refreshData(); }();
                   },
                 ),
                 IconButton(
@@ -114,5 +104,19 @@ class _AdminServicesScreenState extends State<AdminServicesScreen> {
         },
       ),
     );
+        }
+      );
+  }
+
+  IconData _getIconData(String iconName) {
+    switch (iconName) {
+      case 'bolt': return Icons.bolt;
+      case 'plumbing': return Icons.plumbing;
+      case 'cleaning_services': return Icons.cleaning_services;
+      case 'format_paint': return Icons.format_paint;
+      case 'carpenter': return Icons.carpenter;
+      case 'ac_unit': return Icons.ac_unit;
+      default: return Icons.home_repair_service;
+    }
   }
 }

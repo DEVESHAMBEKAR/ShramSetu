@@ -1,15 +1,16 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
+import '../../../../core/repositories/i_admin_repository.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
-class MockAdminRepository extends ChangeNotifier {
+class MockAdminRepository implements IAdminRepository {
   static final MockAdminRepository _instance = MockAdminRepository._internal();
   factory MockAdminRepository() => _instance;
   MockAdminRepository._internal() {
     _initializeMockData();
   }
 
-  bool isAuthenticated = false;
+
 
   late AdminDashboardStats _dashboardStats;
   List<WorkerProfile> _workers = [];
@@ -17,36 +18,32 @@ class MockAdminRepository extends ChangeNotifier {
   List<PaymentRecord> _payments = [];
   List<Complaint> _complaints = [];
   List<WelfareRecord> _welfareRecords = [];
-  List<CustomerProfile> _customers = [];
+  List<AdminCustomerProfile> _customers = [];
   List<AdminService> _services = [];
 
-  AdminDashboardStats get dashboardStats => _dashboardStats;
-  List<WorkerProfile> get workers => _workers;
-  List<JobRequest> get bookings => _bookings;
-  List<PaymentRecord> get payments => _payments;
-  List<Complaint> get complaints => _complaints;
-  List<WelfareRecord> get welfareRecords => _welfareRecords;
-  List<CustomerProfile> get customers => _customers;
-  List<AdminService> get services => _services;
+  @override
+  Future<AdminDashboardStats> getDashboardStats() async => _dashboardStats;
+  @override
+  Future<List<WorkerProfile>> getWorkers() async => _workers;
+  @override
+  Future<List<JobRequest>> getBookings() async => _bookings;
+  @override
+  Future<List<PaymentRecord>> getPayments() async => _payments;
+  @override
+  Future<List<Complaint>> getComplaints() async => _complaints;
+  @override
+  Future<List<WelfareRecord>> getWelfareRecords() async => _welfareRecords;
+  @override
+  Future<List<AdminCustomerProfile>> getCustomers() async => _customers;
+  @override
+  Future<List<AdminService>> getServices() async => _services;
 
   List<WorkerProfile> get pendingVerifications => _workers.where((w) => w.verificationStatus == VerificationStatus.pending).toList();
 
-  Future<bool> login(String email, String password) async {
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (email == 'admin@shramsetu.demo' && password == 'admin123') {
-      isAuthenticated = true;
-      notifyListeners();
-      return true;
-    }
-    return false;
-  }
 
-  void logout() {
-    isAuthenticated = false;
-    notifyListeners();
-  }
 
-  void approveWorker(String workerId) {
+  @override
+  Future<void> approveWorker(String workerId) async {
     final index = _workers.indexWhere((w) => w.id == workerId);
     if (index != -1) {
       _workers[index] = _workers[index].copyWith(
@@ -54,11 +51,12 @@ class MockAdminRepository extends ChangeNotifier {
         isVerified: true,
       );
       _recalculateStats();
-      notifyListeners();
+      
     }
   }
 
-  void rejectWorker(String workerId) {
+  @override
+  Future<void> rejectWorker(String workerId) async {
     final index = _workers.indexWhere((w) => w.id == workerId);
     if (index != -1) {
       _workers[index] = _workers[index].copyWith(
@@ -67,11 +65,12 @@ class MockAdminRepository extends ChangeNotifier {
         isAvailable: false,
       );
       _recalculateStats();
-      notifyListeners();
+      
     }
   }
 
-  void updateComplaintStatus(String complaintId, ComplaintStatus newStatus) {
+  @override
+  Future<void> updateComplaintStatus(String complaintId, ComplaintStatus newStatus) async {
     final index = _complaints.indexWhere((c) => c.id == complaintId);
     if (index != -1) {
       final old = _complaints[index];
@@ -86,11 +85,12 @@ class MockAdminRepository extends ChangeNotifier {
         priority: old.priority,
         status: newStatus,
       );
-      notifyListeners();
+      
     }
   }
 
-  void toggleServiceStatus(String serviceId) {
+  @override
+  Future<void> toggleServiceStatus(String serviceId) async {
     final index = _services.indexWhere((s) => s.id == serviceId);
     if (index != -1) {
       final old = _services[index];
@@ -100,15 +100,16 @@ class MockAdminRepository extends ChangeNotifier {
         icon: old.icon,
         status: old.status == ServiceStatus.active ? ServiceStatus.inactive : ServiceStatus.active,
       );
-      notifyListeners();
+      
     }
   }
 
-  void updateBookingStatus(String bookingId, BookingStatus newStatus) {
+  @override
+  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
     final index = _bookings.indexWhere((b) => b.id == bookingId);
     if (index != -1) {
       _bookings[index] = _bookings[index].copyWith(status: newStatus);
-      notifyListeners();
+      
     }
   }
 
@@ -180,8 +181,8 @@ class MockAdminRepository extends ChangeNotifier {
     ];
 
     _customers = [
-      CustomerProfile(id: 'C1', name: 'Amit Patil', phone: '+91 9988776655', totalBookings: 5, lastBooking: DateTime.now().subtract(const Duration(days: 2)), status: 'Active'),
-      CustomerProfile(id: 'C2', name: 'Neha Sharma', phone: '+91 9988776656', totalBookings: 12, lastBooking: DateTime.now().subtract(const Duration(days: 10)), status: 'Active'),
+      AdminCustomerProfile(id: 'C1', name: 'Amit Patil', phone: '+91 9988776655', totalBookings: 5, lastBooking: DateTime.now().subtract(const Duration(days: 2)), status: 'Active'),
+      AdminCustomerProfile(id: 'C2', name: 'Neha Sharma', phone: '+91 9988776656', totalBookings: 12, lastBooking: DateTime.now().subtract(const Duration(days: 10)), status: 'Active'),
     ];
 
     _bookings = [
@@ -237,5 +238,13 @@ class MockAdminRepository extends ChangeNotifier {
     ];
 
     _recalculateStats();
+  }
+
+  @override
+  Future<void> suspendWorker(String workerId) async {}
+
+  @override
+  Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId) async {
+    return [];
   }
 }

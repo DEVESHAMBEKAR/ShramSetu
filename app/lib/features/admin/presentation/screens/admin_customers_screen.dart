@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import '../../data/models/admin_models.dart';
 
 class AdminCustomersScreen extends StatefulWidget {
   const AdminCustomersScreen({super.key});
@@ -13,20 +14,36 @@ class AdminCustomersScreen extends StatefulWidget {
 }
 
 class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<AdminCustomerProfile>> _customersFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _customersFuture = DI.adminRepo.getCustomers();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final customers = _repository.customers;
+    return FutureBuilder<List<AdminCustomerProfile>>(
+      future: _customersFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final customers = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -72,5 +89,7 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
         },
       ),
     );
+        }
+      );
   }
 }

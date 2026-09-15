@@ -85,7 +85,7 @@ class AdminDashboardStats {
   });
 }
 
-class CustomerProfile {
+class AdminCustomerProfile {
   final String id;
   final String name;
   final String phone;
@@ -93,7 +93,7 @@ class CustomerProfile {
   final DateTime lastBooking;
   final String status;
 
-  CustomerProfile({
+  AdminCustomerProfile({
     required this.id,
     required this.name,
     required this.phone,

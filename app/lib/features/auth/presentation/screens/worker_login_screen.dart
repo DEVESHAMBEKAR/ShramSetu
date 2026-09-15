@@ -58,8 +58,8 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       if (!_isOtpSent) {
         // Step 1: Send OTP
         final phone = _phoneController.text.trim();
-        if (phone.length != 10) {
-          throw Exception('Please enter a valid 10-digit number.');
+        if (phone.length < 10) {
+          throw Exception('Please enter a valid phone number.');
         }
         await DI.authRepo.sendOtp(phone);
         setState(() {
@@ -360,7 +360,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     controller: _phoneController,
                     readOnly: _isOtpSent,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
+                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')), LengthLimitingTextInputFormatter(15)],
                     style: AppTypography.titleMd.copyWith(
                       color: AppColors.onSurface,
                       fontWeight: FontWeight.bold,

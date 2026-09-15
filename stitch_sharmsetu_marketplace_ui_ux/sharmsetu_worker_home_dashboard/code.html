@@ -1,0 +1,352 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"><title>ShramSetu Worker</title><link href="https://fonts.googleapis.com" rel="preconnect"><link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Plus+Jakarta+Sans:wght@600;700&amp;display=swap" rel="stylesheet"><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"><style>@layer base{html,body{width:100vw;margin:0;padding:0;background-color:#f8f9fc;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { "colors": { "on-primary-fixed": "#071b3b", "on-tertiary-fixed-variant": "#00531b", "on-secondary-fixed-variant": "#842500", "outline-variant": "#c5c6cf", "secondary-fixed": "#ffdbd0", "surface-variant": "#e1e2e5", "secondary": "#ac3400", "tertiary-fixed-dim": "#7edb85", "error-container": "#ffdad6", "on-surface": "#191c1e", "on-background": "#191c1e", "inverse-surface": "#2e3133", "primary-container": "#1a2b4c", "tertiary": "#001d05", "on-error-container": "#93000a", "on-tertiary": "#ffffff", "primary-fixed": "#d8e2ff", "secondary-container": "#fd6a37", "primary-fixed-dim": "#b6c6f0", "background": "#f8f9fc", "surface-container": "#eceef0", "on-error": "#ffffff", "surface-container-highest": "#e1e2e5", "tertiary-fixed": "#99f89e", "on-primary-fixed-variant": "#364669", "on-tertiary-container": "#4aa556", "on-primary-container": "#8293ba", "inverse-primary": "#b6c6f0", "on-secondary-fixed": "#390b00", "on-secondary": "#ffffff", "inverse-on-surface": "#eff1f3", "surface-bright": "#f8f9fc", "secondary-fixed-dim": "#ffb59d", "on-surface-variant": "#44474e", "on-primary": "#ffffff", "surface-container-low": "#f2f4f6", "surface-dim": "#d8dadd", "error": "#ba1a1a", "surface-tint": "#4e5e82", "on-secondary-container": "#5e1800", "surface-container-high": "#e7e8eb", "outline": "#75777f", "on-tertiary-fixed": "#002106", "tertiary-container": "#00340e", "surface-container-lowest": "#ffffff", "primary": "#031636", "surface": "#f8f9fc" }, "borderRadius": { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" }, "spacing": { "spacing-4xl": "3rem", "gutter-desktop": "1.5rem", "spacing-3xs": "0.25rem", "margin-tablet": "2rem", "gutter-mobile": "1rem", "spacing-sm": "0.75rem", "margin-desktop": "3rem", "spacing-2xs": "0.375rem", "spacing-3xl": "2.5rem", "spacing-2xl": "2rem", "gutter-tablet": "1.5rem", "spacing-xl": "1.5rem", "touch-target-min": "3rem", "margin-mobile": "1rem", "spacing-xs": "0.5rem", "spacing-md": "1rem", "spacing-lg": "1.25rem", "spacing-4xs": "0.125rem" }, "fontFamily": { "currency-display": ["Plus Jakarta Sans"], "headline-md": ["Plus Jakarta Sans"], "body-sm": ["Inter"], "label-sm": ["Inter"], "title-lg": ["Inter"], "headline-lg-mobile": ["Plus Jakarta Sans"], "body-md": ["Inter"], "label-lg": ["Inter"], "headline-lg": ["Plus Jakarta Sans"], "display-lg-mobile": ["Plus Jakarta Sans"], "body-lg": ["Inter"], "headline-sm": ["Plus Jakarta Sans"], "display-lg": ["Plus Jakarta Sans"], "label-md": ["Inter"], "title-md": ["Inter"] }, "fontSize": { "currency-display": ["24px", {"lineHeight": "30px", "letterSpacing": "-0.01em", "fontWeight": "700"}], "headline-md": ["20px", {"lineHeight": "26px", "letterSpacing": "0em", "fontWeight": "600"}], "body-sm": ["13px", {"lineHeight": "18px", "letterSpacing": "0.01em", "fontWeight": "400"}], "label-sm": ["11px", {"lineHeight": "14px", "letterSpacing": "0.04em", "fontWeight": "600"}], "title-lg": ["17px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600"}], "headline-lg-mobile": ["22px", {"lineHeight": "28px", "letterSpacing": "-0.005em", "fontWeight": "700"}], "body-md": ["14px", {"lineHeight": "20px", "letterSpacing": "0.01em", "fontWeight": "400"}], "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.02em", "fontWeight": "600"}], "headline-lg": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}], "display-lg-mobile": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "700"}], "body-lg": ["16px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "400"}], "headline-sm": ["18px", {"lineHeight": "24px", "letterSpacing": "0em", "fontWeight": "600"}], "display-lg": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}], "label-md": ["12px", {"lineHeight": "16px", "letterSpacing": "0.03em", "fontWeight": "600"}], "title-md": ["15px", {"lineHeight": "22px", "letterSpacing": "0.005em", "fontWeight": "600"}] } } } }</script></head><body class="bg-surface font-body-md text-body-md text-on-surface flex flex-col min-h-screen"><header class="fixed top-0 w-full z-50 pt-safe bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]"><div class="h-20 px-margin-mobile flex items-center justify-between gap-spacing-xs"><div class="flex items-center gap-spacing-xs"><img alt="ShramSetu brand mark logo: A clean, memorable emblem representing a connecting bridge and skilled hands clasping in unity/community, rendered in deep navy and warm saffron orange with clean geometric lines.. Brand logo" class="h-8 w-auto object-contain" src="https://lh3.googleusercontent.com/aida/AEtjO1XIC3D2vo6k4_EjZm__9TMLxeoH06dgwtS1AIAscwycqSj0hN6SZiK4XJ2E6pobZ1z-jZnUk2n_IyXQcqBHsVfbdF1QwYOsqySxqIVf7NMGZyFAgQZZHia-hnPKUJotuDcw-BHRfbiChqgiESOW3nJFoYtlK83tVgBM6lIsTrnwHlx4BiMXGm2zkyl2iJzRWz7S-HxZP6_YsqhEzHQvxY8zr_JVmstbggkI7C8KHsndyrKNBRQLvwIL7EQ"><div class="flex flex-col"><div class="flex items-center gap-spacing-2xs"><span class="w-2 h-2 rounded-full bg-on-tertiary-container animate-pulse"></span><span class="font-label-sm text-label-sm text-on-surface-variant">Pune Plumbers Guild #128</span></div><div class="flex items-center gap-spacing-2xs"><span class="font-title-md text-title-md text-primary truncate max-w-[130px]">Home Dashboard</span></div></div></div><div class="flex items-center gap-spacing-3xs"><button aria-label="Language switch Marathi or English" class="min-h-[48px] min-w-[48px] px-spacing-xs flex items-center justify-center rounded-lg bg-surface-container text-on-surface font-label-md text-label-md"><span class="text-secondary font-bold mr-0.5">म</span>/EN</button><button aria-label="Emergency Union Helpline" class="min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg bg-secondary-container/15 text-secondary"><span class="material-symbols-outlined text-[22px]">support_agent</span></button><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center ml-spacing-3xs"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="flex flex-col relative w-full px-margin-mobile pt-20 pb-24 bg-surface flex-grow"><div class="flex flex-col w-full gap-spacing-md">
+<!-- Worker Header & Identity Card -->
+<section class="w-full bg-surface-container-lowest p-spacing-md rounded-xl shadow-sm flex flex-col gap-spacing-xs">
+<div class="flex items-start justify-between gap-spacing-sm">
+<div class="flex items-center gap-spacing-sm min-w-0">
+<div class="relative shrink-0">
+<img class="w-14 h-14 rounded-full object-cover shadow-sm" data-alt="A dignified close-up portrait of Rahul Patil, a confident 34-year-old Indian male plumber wearing a neat navy blue cooperative polo uniform and protective badge, smiling warmly against a clean workshop environment in soft natural light, conveying trust and craftsmanship." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAo50UE2TDpCrs0o9APTS_r4zhN7e_iEI76JZkY_6xhmXkf8YwnmzZ40CceO-8ajPaD6Zbg6W6j0w64zgwkkYGWcrWo6r6FcioBvYb-1EhemAfrZrnghpAqoDwb5ZVqHB9Zxahhh4_nl_apEk4e7NVa-klCmmnxKt1Rbe3t7NEkLaSy90ujsklxQflCjzgfayMkuMfb5TXCobG3HwSti1ixVIFgFzOFimU1Ck35ckMJ9H8Cxc44Lm3X_A">
+<span class="absolute bottom-0 right-0 w-4 h-4 bg-tertiary-fixed-dim rounded-full flex items-center justify-center text-on-tertiary-fixed shadow-sm">
+<span class="material-symbols-outlined text-[12px]" style="font-variation-settings: 'FILL' 1;">verified</span>
+</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-spacing-3xs flex-wrap">
+<span class="font-headline-sm text-headline-sm text-primary truncate">Namaste, Rahul Patil</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Master Plumber &amp; Pipe Specialist</span>
+<div class="flex items-center gap-spacing-2xs mt-spacing-4xs flex-wrap">
+<span class="inline-flex items-center gap-spacing-4xs bg-surface-container px-spacing-2xs py-spacing-4xs rounded-full text-primary font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[13px] text-secondary">workspace_premium</span>
+              ITI Certified
+            </span>
+<span class="inline-flex items-center gap-spacing-4xs bg-primary/5 px-spacing-2xs py-spacing-4xs rounded-full text-on-primary-fixed-variant font-label-sm text-label-sm">
+<span class="material-symbols-outlined text-[13px]">groups</span>
+              Guild #128
+            </span>
+</div>
+</div>
+</div>
+<button aria-label="Union verified status check" class="min-w-[48px] min-h-[48px] flex items-center justify-center rounded-lg bg-surface-container text-primary">
+<span class="material-symbols-outlined text-[24px]">id_card</span>
+</button>
+</div>
+<!-- Active Duty Status Toggle Banner -->
+<div class="mt-spacing-2xs w-full bg-tertiary-fixed/30 p-spacing-sm rounded-xl flex items-center justify-between gap-spacing-sm transition-colors duration-200" id="duty-toggle-container">
+<div class="flex items-center gap-spacing-xs min-w-0">
+<span class="w-3.5 h-3.5 rounded-full bg-on-tertiary-container animate-ping shrink-0" id="duty-indicator-dot"></span>
+<div class="flex flex-col min-w-0">
+<span class="font-label-lg text-label-lg text-tertiary-container font-bold tracking-tight truncate" id="duty-status-text">
+            ONLINE &amp; RECEIVING JOBS
+          </span>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">
+            Priority radius: Kothrud (3.5 km)
+          </span>
+</div>
+</div>
+<button aria-checked="true" aria-label="Toggle Online Duty Status" class="min-w-[56px] h-9 px-spacing-2xs rounded-full bg-primary flex items-center transition-all duration-200 justify-end cursor-pointer" id="duty-toggle-btn" role="switch">
+<span class="w-7 h-7 rounded-full bg-surface-container-lowest shadow-sm flex items-center justify-center text-primary" id="duty-toggle-thumb">
+<span class="material-symbols-outlined text-[16px] text-on-tertiary-container">check</span>
+</span>
+</button>
+</div>
+</section>
+<!-- Urgent Inbound Job Card -->
+<section class="w-full bg-surface-container-lowest p-spacing-md rounded-xl shadow-md flex flex-col gap-spacing-sm relative overflow-hidden" id="inbound-job-card">
+<div class="flex items-center justify-between gap-spacing-xs">
+<span class="inline-flex items-center gap-spacing-3xs bg-secondary/10 px-spacing-xs py-spacing-3xs rounded-full font-label-md text-label-md text-secondary font-bold">
+<span class="material-symbols-outlined text-[16px]">bolt</span>
+        New Urgent Request • Kothrud (1.8 km)
+      </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant flex items-center gap-spacing-4xs">
+<span class="material-symbols-outlined text-[14px]">timer</span>
+        4m ago
+      </span>
+</div>
+<div class="flex flex-col gap-spacing-3xs">
+<div class="flex items-start justify-between gap-spacing-xs">
+<div class="flex flex-col min-w-0">
+<h2 class="font-title-lg text-title-lg text-on-surface font-semibold truncate">Ananya Sharma</h2>
+<p class="font-body-sm text-body-sm text-on-surface-variant flex items-center gap-spacing-3xs mt-spacing-4xs">
+<span class="material-symbols-outlined text-[16px] text-secondary">location_on</span>
+<span class="truncate">Flat 402, Sai Shraddha Apts, Ideal Colony</span>
+</p>
+</div>
+<div class="text-right shrink-0">
+<span class="font-currency-display text-currency-display text-primary block">₹485</span>
+<span class="font-label-sm text-label-sm text-on-tertiary-container font-semibold">100% Payout</span>
+</div>
+</div>
+<div class="bg-surface-container-low p-spacing-xs rounded-lg flex flex-col gap-spacing-3xs mt-spacing-2xs">
+<div class="flex items-center gap-spacing-xs text-on-surface">
+<span class="material-symbols-outlined text-[18px] text-primary">plumbing</span>
+<span class="font-body-md text-body-md font-medium">Plumbing Inspection &amp; Tap Leakage Repair</span>
+</div>
+<div class="flex items-center gap-spacing-xs text-on-surface-variant">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span class="font-body-sm text-body-sm">Today • 11:00 AM – 12:00 PM</span>
+</div>
+<div class="font-label-sm text-label-sm text-on-surface-variant pt-spacing-3xs">
+          Base: ₹399 + Standard labor allowance: ₹86
+        </div>
+</div>
+</div>
+<!-- Escrow & Zero Commission Guarantee -->
+<div class="flex items-center gap-spacing-xs bg-tertiary-fixed/20 p-spacing-xs rounded-lg">
+<span class="material-symbols-outlined text-[20px] text-on-tertiary-container shrink-0">verified_user</span>
+<p class="font-body-sm text-body-sm text-on-tertiary-fixed-variant leading-tight">
+<strong>Zero platform commission.</strong> Direct UPI credit to your union-linked bank within 10 mins of OTP signoff.
+      </p>
+</div>
+<!-- Actions -->
+<div class="flex flex-col gap-spacing-xs mt-spacing-2xs">
+<button class="w-full min-h-[50px] bg-primary text-on-primary rounded-xl font-label-lg text-label-lg font-bold flex items-center justify-center gap-spacing-xs shadow-sm active:scale-[0.99] transition-transform" id="accept-job-btn">
+<span class="material-symbols-outlined text-[20px]">check_circle</span>
+        Accept Job (Tap to Confirm)
+      </button>
+<div class="grid grid-cols-2 gap-spacing-xs">
+<button class="w-full min-h-[48px] bg-surface-container text-on-surface rounded-xl font-label-md text-label-md font-medium flex items-center justify-center gap-spacing-3xs active:bg-surface-container-high" id="decline-job-btn">
+<span class="material-symbols-outlined text-[18px]">redo</span>
+          Pass to Guild
+        </button>
+<button class="w-full min-h-[48px] bg-surface-container text-on-surface rounded-xl font-label-md text-label-md font-medium flex items-center justify-center gap-spacing-3xs active:bg-surface-container-high">
+<span class="material-symbols-outlined text-[18px]">call</span>
+          Call Society Desk
+        </button>
+</div>
+</div>
+</section>
+<!-- Accepted Job Toast (Hidden by default) -->
+<div class="hidden w-full bg-on-tertiary-container text-on-tertiary p-spacing-md rounded-xl shadow-md flex items-center justify-between gap-spacing-sm" id="job-accepted-banner">
+<div class="flex items-center gap-spacing-xs">
+<span class="material-symbols-outlined text-[24px]">task_alt</span>
+<div class="flex flex-col">
+<span class="font-title-md text-title-md font-bold">Job Accepted!</span>
+<span class="font-body-sm text-body-sm">Navigation opened. Customer informed of arrival.</span>
+</div>
+</div>
+<button class="bg-surface-container-lowest text-primary px-spacing-sm py-spacing-xs rounded-lg font-label-sm text-label-sm font-semibold">
+      Open Map
+    </button>
+</div>
+<!-- Daily Quick Metrics Bento Grid -->
+<section class="w-full flex flex-col gap-spacing-xs">
+<div class="flex items-center justify-between px-spacing-4xs">
+<h3 class="font-title-md text-title-md text-primary font-semibold">Today's Performance</h3>
+<span class="font-label-sm text-label-sm text-on-surface-variant">Guild Cycle #44</span>
+</div>
+<div class="grid grid-cols-2 gap-spacing-xs w-full">
+<!-- Earnings Card -->
+<div class="bg-surface-container-lowest p-spacing-sm rounded-xl shadow-sm flex flex-col justify-between min-h-[128px]">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Today's Earnings</span>
+<span class="material-symbols-outlined text-[18px] text-on-tertiary-container">payments</span>
+</div>
+<div class="flex flex-col my-spacing-2xs">
+<span class="font-currency-display text-currency-display text-primary font-bold">₹1,850</span>
+<span class="font-label-sm text-label-sm text-on-tertiary-container font-semibold flex items-center gap-spacing-4xs">
+<span class="material-symbols-outlined text-[12px]">check</span>
+            3 jobs settled
+          </span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px] leading-tight truncate">Direct Union Escrow Payout</span>
+</div>
+<!-- Jobs Assigned Card -->
+<div class="bg-surface-container-lowest p-spacing-sm rounded-xl shadow-sm flex flex-col justify-between min-h-[128px]">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Jobs Dispatched</span>
+<span class="material-symbols-outlined text-[18px] text-primary">engineering</span>
+</div>
+<div class="flex flex-col my-spacing-2xs">
+<span class="font-headline-md text-headline-md text-primary font-bold">4 Assigned</span>
+<div class="w-full bg-surface-container-high h-1.5 rounded-full mt-spacing-2xs overflow-hidden flex">
+<div class="bg-on-tertiary-container h-full w-3/4"></div>
+<div class="bg-secondary h-full w-1/4"></div>
+</div>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px] leading-tight">3 Done • 1 In Queue</span>
+</div>
+<!-- Rating Card -->
+<div class="bg-surface-container-lowest p-spacing-sm rounded-xl shadow-sm flex flex-col justify-between min-h-[120px]">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Worker Rating</span>
+<span class="material-symbols-outlined text-[18px] text-secondary-container" style="font-variation-settings: 'FILL' 1;">star</span>
+</div>
+<div class="flex flex-col my-spacing-2xs">
+<div class="flex items-baseline gap-spacing-3xs">
+<span class="font-headline-md text-headline-md text-primary font-bold">4.88</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">/ 5.0</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px] mt-spacing-4xs">126 verified reviews</span>
+</div>
+<div class="flex items-center gap-spacing-4xs text-on-tertiary-container font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[14px]">thumb_up</span>
+          100% On-Time
+        </div>
+</div>
+<!-- Guild Standing Card -->
+<div class="bg-surface-container-lowest p-spacing-sm rounded-xl shadow-sm flex flex-col justify-between min-h-[120px]">
+<div class="flex items-center justify-between text-on-surface-variant">
+<span class="font-label-sm text-label-sm">Guild Rank</span>
+<span class="material-symbols-outlined text-[18px] text-secondary">military_tech</span>
+</div>
+<div class="flex flex-col my-spacing-2xs">
+<span class="font-headline-md text-headline-md text-secondary font-bold">Top 5%</span>
+<span class="font-body-sm text-body-sm text-on-surface-variant text-[11px] mt-spacing-4xs">Kothrud Cluster</span>
+</div>
+<span class="font-label-sm text-label-sm text-primary font-medium flex items-center gap-spacing-4xs truncate">
+<span class="material-symbols-outlined text-[13px]">shield</span>
+          Gold Badge Tier
+        </span>
+</div>
+</div>
+</section>
+<!-- Today's Completed Schedule Section -->
+<section class="w-full flex flex-col gap-spacing-xs mt-spacing-2xs">
+<div class="flex items-center justify-between px-spacing-4xs">
+<div class="flex items-center gap-spacing-2xs">
+<h3 class="font-title-md text-title-md text-primary font-semibold">Completed Today</h3>
+<span class="w-5 h-5 rounded-full bg-surface-container-high text-on-surface-variant font-label-sm text-label-sm flex items-center justify-center">2</span>
+</div>
+<a class="font-label-sm text-label-sm text-secondary font-semibold flex items-center" href="#">
+        Full History
+        <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+</a>
+</div>
+<!-- Completed Job Card 1 -->
+<div class="w-full bg-surface-container-lowest p-spacing-md rounded-xl shadow-sm flex items-center justify-between gap-spacing-sm">
+<div class="flex items-start gap-spacing-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed/30 flex items-center justify-center shrink-0 text-on-tertiary-container mt-spacing-4xs">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-spacing-2xs">
+<span class="font-title-md text-title-md text-on-surface font-semibold truncate">Rajesh Deshmukh</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">9:15 AM</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Kitchen Sink Clog • Pratik Nagar</span>
+<div class="flex items-center gap-spacing-xs mt-spacing-3xs">
+<span class="inline-flex items-center gap-spacing-4xs text-on-tertiary-container font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[13px]">account_balance_wallet</span>
+              Paid via UPI
+            </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">• Rating ★ 5.0</span>
+</div>
+</div>
+</div>
+<div class="text-right shrink-0">
+<span class="font-title-lg text-title-lg text-primary font-bold">₹650</span>
+<span class="block font-label-sm text-label-sm text-on-tertiary-container">Settled</span>
+</div>
+</div>
+<!-- Completed Job Card 2 -->
+<div class="w-full bg-surface-container-lowest p-spacing-md rounded-xl shadow-sm flex items-center justify-between gap-spacing-sm">
+<div class="flex items-start gap-spacing-sm min-w-0">
+<div class="w-10 h-10 rounded-full bg-tertiary-fixed/30 flex items-center justify-center shrink-0 text-on-tertiary-container mt-spacing-4xs">
+<span class="material-symbols-outlined text-[20px]">check</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-spacing-2xs">
+<span class="font-title-md text-title-md text-on-surface font-semibold truncate">Meera Joshi</span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">10:20 AM</span>
+</div>
+<span class="font-body-sm text-body-sm text-on-surface-variant truncate">Flush Valve Replacement • Karve Road</span>
+<div class="flex items-center gap-spacing-xs mt-spacing-3xs">
+<span class="inline-flex items-center gap-spacing-4xs text-on-tertiary-container font-label-sm text-label-sm font-semibold">
+<span class="material-symbols-outlined text-[13px]">account_balance_wallet</span>
+              Paid via UPI
+            </span>
+<span class="font-label-sm text-label-sm text-on-surface-variant">• Rating ★ 4.9</span>
+</div>
+</div>
+</div>
+<div class="text-right shrink-0">
+<span class="font-title-lg text-title-lg text-primary font-bold">₹420</span>
+<span class="block font-label-sm text-label-sm text-on-tertiary-container">Settled</span>
+</div>
+</div>
+</section>
+<!-- Cooperative Welfare Banner -->
+<section class="w-full bg-primary p-spacing-md rounded-xl text-on-primary shadow-sm flex flex-col gap-spacing-xs mt-spacing-2xs">
+<div class="flex items-start justify-between gap-spacing-sm">
+<div class="flex items-center gap-spacing-xs">
+<span class="w-9 h-9 rounded-lg bg-surface-container-lowest/15 flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[20px] text-tertiary-fixed">health_and_safety</span>
+</span>
+<div class="flex flex-col">
+<span class="font-title-md text-title-md font-bold text-on-primary">Cooperative Safety Net Active</span>
+<span class="font-label-sm text-label-sm text-on-primary-container">Pune District Trade Union Trust</span>
+</div>
+</div>
+<span class="bg-tertiary-container text-tertiary-fixed px-spacing-2xs py-spacing-4xs rounded text-label-sm font-semibold">
+        ACTIVE
+      </span>
+</div>
+<p class="font-body-sm text-body-sm text-on-primary-fixed leading-snug">
+      Insurance cover up to <strong>₹50,000</strong> active for today's shifts covering workplace injury, transit, and tool damages.
+    </p>
+<div class="flex items-center justify-between pt-spacing-xs mt-spacing-4xs bg-primary-container/40 p-spacing-xs rounded-lg">
+<div class="flex items-center gap-spacing-2xs min-w-0">
+<span class="material-symbols-outlined text-[18px] text-secondary-container">call</span>
+<span class="font-body-sm text-body-sm text-on-primary truncate">Union Helpline: 1800-209-4092</span>
+</div>
+<button aria-label="Call emergency support helpline" class="shrink-0 bg-secondary-container text-on-secondary-container px-spacing-xs py-spacing-3xs rounded font-label-sm text-label-sm font-bold active:opacity-90">
+        Call Now
+      </button>
+</div>
+</section>
+<!-- Interactive Logic for Dashboard Micro-Interactions -->
+<script>
+    (function initWorkerDashboard() {
+      const toggleBtn = document.getElementById('duty-toggle-btn');
+      const container = document.getElementById('duty-toggle-container');
+      const dot = document.getElementById('duty-indicator-dot');
+      const statusText = document.getElementById('duty-status-text');
+      const thumb = document.getElementById('duty-toggle-thumb');
+      let isOnline = true;
+
+      toggleBtn.addEventListener('click', function() {
+        isOnline = !isOnline;
+        if (isOnline) {
+          container.className = 'mt-spacing-2xs w-full bg-tertiary-fixed/30 p-spacing-sm rounded-xl flex items-center justify-between gap-spacing-sm transition-colors duration-200';
+          dot.className = 'w-3.5 h-3.5 rounded-full bg-on-tertiary-container animate-ping shrink-0';
+          statusText.className = 'font-label-lg text-label-lg text-tertiary-container font-bold tracking-tight truncate';
+          statusText.textContent = 'ONLINE & RECEIVING JOBS';
+          toggleBtn.className = 'min-w-[56px] h-9 px-spacing-2xs rounded-full bg-primary flex items-center justify-end transition-all duration-200 cursor-pointer';
+          toggleBtn.setAttribute('aria-checked', 'true');
+        } else {
+          container.className = 'mt-spacing-2xs w-full bg-surface-container-high p-spacing-sm rounded-xl flex items-center justify-between gap-spacing-sm transition-colors duration-200';
+          dot.className = 'w-3.5 h-3.5 rounded-full bg-outline shrink-0';
+          statusText.className = 'font-label-lg text-label-lg text-on-surface-variant font-bold tracking-tight truncate';
+          statusText.textContent = 'OFFLINE • ON BREAK';
+          toggleBtn.className = 'min-w-[56px] h-9 px-spacing-2xs rounded-full bg-surface-variant flex items-center justify-start transition-all duration-200 cursor-pointer';
+          toggleBtn.setAttribute('aria-checked', 'false');
+        }
+      });
+
+      const acceptBtn = document.getElementById('accept-job-btn');
+      const declineBtn = document.getElementById('decline-job-btn');
+      const inboundCard = document.getElementById('inbound-job-card');
+      const acceptedBanner = document.getElementById('job-accepted-banner');
+
+      acceptBtn.addEventListener('click', function() {
+        inboundCard.classList.add('opacity-40', 'pointer-events-none');
+        setTimeout(() => {
+          inboundCard.style.display = 'none';
+          acceptedBanner.classList.remove('hidden');
+        }, 300);
+      });
+
+      declineBtn.addEventListener('click', function() {
+        inboundCard.style.transition = 'opacity 0.25s ease, transform 0.25s ease';
+        inboundCard.style.opacity = '0';
+        inboundCard.style.transform = 'translateX(-20px)';
+        setTimeout(() => {
+          inboundCard.style.display = 'none';
+        }, 250);
+      });
+    })();
+  </script>
+</div></main><nav class="fixed bottom-0 w-full z-50 pb-safe bg-surface-container-lowest/95 backdrop-blur-xl shadow-[0_-1px_12px_rgba(0,0,0,0.05)]" data-active-classes="text-secondary font-semibold"><div class="flex items-center justify-around h-16 px-spacing-xs"><a aria-current="page" class="flex flex-col items-center justify-center min-w-[48px] min-h-[48px] px-spacing-xs transition-colors text-secondary font-semibold" data-path="home-dashboard" href="#"><span class="material-symbols-outlined text-[24px]">work</span><span class="font-label-sm text-label-sm mt-spacing-4xs">Home</span></a><a class="flex flex-col items-center justify-center min-w-[48px] min-h-[48px] px-spacing-xs text-on-surface-variant transition-colors" data-path="job-requests" href="#"><span class="material-symbols-outlined text-[24px]">event_available</span><span class="font-label-sm text-label-sm mt-spacing-4xs">Jobs</span></a><a class="flex flex-col items-center justify-center min-w-[48px] min-h-[48px] px-spacing-xs text-on-surface-variant transition-colors" data-path="worker-earnings" href="#"><span class="material-symbols-outlined text-[24px]">account_balance_wallet</span><span class="font-label-sm text-label-sm mt-spacing-4xs">Earnings</span></a><a class="flex flex-col items-center justify-center min-w-[48px] min-h-[48px] px-spacing-xs text-on-surface-variant transition-colors" data-path="worker-profile" href="#"><span class="material-symbols-outlined text-[24px]">account_circle</span><span class="font-label-sm text-label-sm mt-spacing-4xs">Profile</span></a></div></nav>
+
+</body></html>

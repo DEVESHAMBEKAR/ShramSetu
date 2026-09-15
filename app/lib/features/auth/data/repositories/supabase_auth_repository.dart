@@ -48,7 +48,7 @@ class SupabaseAuthRepository implements IAuthRepository {
       );
       return response.session != null;
     } catch (e) {
-      return false;
+      throw e;
     }
   }
 
@@ -61,7 +61,7 @@ class SupabaseAuthRepository implements IAuthRepository {
       );
       return true;
     } catch (e) {
-      return false;
+      throw e;
     }
   }
 

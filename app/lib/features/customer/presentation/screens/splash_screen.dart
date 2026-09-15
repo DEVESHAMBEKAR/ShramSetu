@@ -31,7 +31,16 @@ class _SplashScreenState extends State<SplashScreen> {
       final role = await DI.userRepo.getUserRole(user.id);
       if (mounted) {
         if (role == 'CUSTOMER') {
-          Navigator.of(context).pushReplacementNamed('/customer/home');
+          // Check if the customer has completed their profile.
+          // Returning customers who never finished onboarding are sent back.
+          final isComplete = await DI.userRepo.isProfileComplete(user.id);
+          if (mounted) {
+            if (isComplete) {
+              Navigator.of(context).pushReplacementNamed('/customer/home');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/customer/onboarding');
+            }
+          }
         } else if (role == 'WORKER') {
           Navigator.of(context).pushReplacementNamed('/worker/dashboard');
         } else if (role == 'ADMIN') {

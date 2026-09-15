@@ -3,7 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import '../../data/models/admin_models.dart';
 import '../../data/models/admin_models.dart';
 
 class AdminComplaintsScreen extends StatefulWidget {
@@ -14,31 +15,36 @@ class AdminComplaintsScreen extends StatefulWidget {
 }
 
 class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<Complaint>> _complaintsFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      _complaintsFuture = DI.adminRepo.getComplaints();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final complaints = _repository.complaints;
+    return FutureBuilder<List<Complaint>>(
+      future: _complaintsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final complaints = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -92,7 +98,7 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
                     width: double.infinity,
                     child: OutlinedButton(
                       onPressed: () {
-                        _repository.updateComplaintStatus(complaint.id, ComplaintStatus.resolved);
+                        () async { await DI.adminRepo.updateComplaintStatus(complaint.id, ComplaintStatus.resolved); _refreshData(); }();
                       },
                       style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary),
                       child: const Text('Mark Resolved'),
@@ -104,6 +110,8 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
         },
       ),
     );
+        }
+      );
   }
 
   Color _getStatusColor(ComplaintStatus status) {

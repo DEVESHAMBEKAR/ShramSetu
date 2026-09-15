@@ -3,7 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import '../../data/models/admin_models.dart';
 
 class AdminWelfareScreen extends StatefulWidget {
   const AdminWelfareScreen({super.key});
@@ -13,20 +14,36 @@ class AdminWelfareScreen extends StatefulWidget {
 }
 
 class _AdminWelfareScreenState extends State<AdminWelfareScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<WelfareRecord>> _recordsFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
+    _refreshData();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _recordsFuture = DI.adminRepo.getWelfareRecords();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final welfares = _repository.welfareRecords;
+    return FutureBuilder<List<WelfareRecord>>(
+      future: _recordsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final records = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -34,9 +51,9 @@ class _AdminWelfareScreenState extends State<AdminWelfareScreen> {
       ),
       body: ListView.builder(
         padding: const EdgeInsets.all(AppSpacing.marginMobile),
-        itemCount: welfares.length,
+        itemCount: records.length,
         itemBuilder: (context, index) {
-          final item = welfares[index];
+          final item = records[index];
           return Container(
             margin: const EdgeInsets.only(bottom: AppSpacing.spacingSm),
             padding: const EdgeInsets.all(AppSpacing.spacingMd),
@@ -74,5 +91,7 @@ class _AdminWelfareScreenState extends State<AdminWelfareScreen> {
         },
       ),
     );
+        }
+      );
   }
 }

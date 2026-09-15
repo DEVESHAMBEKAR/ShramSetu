@@ -3,7 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
-import '../../data/repositories/mock_admin_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import '../../data/models/admin_models.dart';
 import '../../data/models/admin_models.dart';
 
 class AdminPaymentsScreen extends StatefulWidget {
@@ -14,31 +15,36 @@ class AdminPaymentsScreen extends StatefulWidget {
 }
 
 class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
-  late MockAdminRepository _repository;
+  late Future<List<PaymentRecord>> _paymentsFuture;
 
   @override
   void initState() {
     super.initState();
-    _repository = MockAdminRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      _paymentsFuture = DI.adminRepo.getPayments();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final payments = _repository.payments;
+    return FutureBuilder<List<PaymentRecord>>(
+      future: _paymentsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ')));
+        }
+        
+        final payments = snapshot.data!;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
+        return Scaffold(
+          backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.surface.withValues(alpha: 0.9),
         elevation: 1,
@@ -92,6 +98,8 @@ class _AdminPaymentsScreenState extends State<AdminPaymentsScreen> {
         },
       ),
     );
+        }
+      );
   }
 
   Color _getStatusColor(PaymentStatus status) {

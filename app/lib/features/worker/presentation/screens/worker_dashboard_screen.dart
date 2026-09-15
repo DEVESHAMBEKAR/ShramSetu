@@ -1,10 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import '../../data/repositories/mock_worker_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'worker_job_detail_screen.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
@@ -15,55 +16,71 @@ class WorkerDashboardScreen extends StatefulWidget {
 }
 
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
-  late MockWorkerRepository _repository;
+  late Future<List<dynamic>> _dataFuture;
   
   @override
   void initState() {
     super.initState();
-    _repository = MockWorkerRepository();
-    _repository.addListener(_onRepositoryChanged);
+    _refreshData();
   }
 
-  @override
-  void dispose() {
-    _repository.removeListener(_onRepositoryChanged);
-    super.dispose();
-  }
-
-  void _onRepositoryChanged() {
-    setState(() {});
+  void _refreshData() {
+    setState(() {
+      final userId = Supabase.instance.client.auth.currentUser!.id;
+      _dataFuture = Future.wait([
+        DI.workerRepo.getWorkerProfile(userId),
+        DI.workerRepo.getWorkerBookings(),
+      ]);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final worker = _repository.currentWorker;
-    final activeRequests = _repository.activeRequests;
-    final completedJobs = _repository.completedJobs;
+    return FutureBuilder<List<dynamic>>(
+      future: _dataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError) {
+          return Scaffold(body: Center(child: Text('Error: ${snapshot.error}')));
+        }
 
-    return Scaffold(
-      backgroundColor: AppColors.surface,
-      appBar: _buildAppBar(worker),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.marginMobile),
-        child: Column(
-          children: [
-            _buildIdentityCard(worker),
-            const SizedBox(height: AppSpacing.spacingMd),
-            if (activeRequests.isNotEmpty && worker.isAvailable)
-              _buildInboundJobCard(activeRequests.first),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildDailyMetrics(worker),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildCompletedSchedule(completedJobs),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildWelfareBanner(),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
+        final worker = snapshot.data![0] as WorkerProfile;
+        final allBookings = snapshot.data![1] as List<JobRequest>;
+        
+        final activeRequests = allBookings.where((j) => j.status == BookingStatus.pending).toList();
+        final completedJobs = allBookings.where((j) => j.status == BookingStatus.completed).toList();
+
+        return Scaffold(
+          backgroundColor: AppColors.surface,
+          appBar: _buildAppBar(worker),
+          body: RefreshIndicator(
+            onRefresh: () async { _refreshData(); },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(AppSpacing.marginMobile),
+              child: Column(
+                children: [
+                  _buildIdentityCard(worker),
+                  const SizedBox(height: AppSpacing.spacingMd),
+                  if (activeRequests.isNotEmpty && worker.isAvailable)
+                    _buildInboundJobCard(activeRequests.first),
+                  const SizedBox(height: AppSpacing.spacingMd),
+                  _buildDailyMetrics(worker),
+                  const SizedBox(height: AppSpacing.spacingMd),
+                  _buildCompletedSchedule(completedJobs),
+                  const SizedBox(height: AppSpacing.spacingMd),
+                  _buildWelfareBanner(),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
     );
   }
-
   PreferredSizeWidget _buildAppBar(WorkerProfile worker) {
     return AppBar(
       backgroundColor: AppColors.surface.withValues(alpha: 0.9),
@@ -242,7 +259,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             ],
           ),
           GestureDetector(
-            onTap: () => _repository.toggleAvailability(),
+            onTap: () => () async { await DI.workerRepo.updateWorkerAvailability(worker.id, !worker.isAvailable); _refreshData(); }(),
             child: Container(
               width: 56,
               height: 36,
@@ -372,7 +389,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 const SizedBox(height: AppSpacing.spacingMd),
                 GestureDetector(
                   onTap: () {
-                    _repository.updateBookingStatus(request.id, BookingStatus.accepted);
+                    () async { await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.accepted); _refreshData(); }();
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (_) => WorkerJobDetailScreen(jobId: request.id)),
@@ -397,7 +414,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   children: [
                     Expanded(
                       child: GestureDetector(
-                        onTap: () => _repository.updateBookingStatus(request.id, BookingStatus.rejected),
+                        onTap: () => () async { await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected); _refreshData(); }(),
                         child: Container(
                           height: 48,
                           decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
@@ -674,3 +691,4 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     );
   }
 }
+

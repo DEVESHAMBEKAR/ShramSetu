@@ -5,6 +5,7 @@ import 'core/theme/app_theme.dart';
 import 'features/customer/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/customer_login_screen.dart';
 import 'features/customer/presentation/screens/onboarding_screen.dart';
+import 'features/customer/presentation/screens/customer_profile_onboarding_screen.dart';
 import 'features/customer/presentation/screens/customer_main_layout.dart';
 import 'features/worker/presentation/screens/worker_main_layout.dart';
 import 'features/admin/presentation/screens/admin_login_screen.dart';
@@ -33,6 +34,7 @@ class ShramSetuApp extends StatelessWidget {
         '/onboarding': (context) => const OnboardingScreen(),
         '/login/customer': (context) => const CustomerLoginScreen(),
         '/login/worker': (context) => const WorkerLoginScreen(),
+        '/customer/onboarding': (context) => const CustomerProfileOnboardingScreen(),
         '/customer/home': (context) => const CustomerMainLayout(),
         '/worker/dashboard': (context) => const WorkerMainLayout(),
         '/login/admin': (context) => const AdminLoginScreen(),
@@ -42,4 +44,3 @@ class ShramSetuApp extends StatelessWidget {
   }
 
 }
-
