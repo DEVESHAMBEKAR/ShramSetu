@@ -1,0 +1,382 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport">
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<style>
+    @layer base {
+      html, body {
+        width: 100vw;
+        margin: 0;
+        padding: 0;
+        background-color: #F7F7F8;
+      }
+      body {
+        overscroll-behavior: none;
+        font-family: 'Plus Jakarta Sans', sans-serif;
+      }
+      .pb-safe { padding-bottom: env(safe-area-inset-bottom, 16px); }
+      .pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+    }
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="bg-[#F7F7F8] text-[#111111] min-h-screen flex flex-col antialiased">
+<!-- Top Navigation Header -->
+<header class="fixed top-0 w-full z-50 pt-safe bg-white/95 backdrop-blur-md border-b border-[#EAEAEA]">
+<div class="h-14 px-4 flex items-center justify-between gap-3">
+<div class="flex items-center gap-2 min-w-0">
+<button aria-label="Go Back" class="w-9 h-9 -ml-1 flex items-center justify-center text-[#111111] hover:bg-[#F4F4F5] rounded-full transition-colors" onclick="history.back()">
+<span class="material-symbols-outlined text-[22px]">arrow_back</span>
+</button>
+<div class="flex items-center gap-2">
+<div class="w-7 h-7 rounded-lg bg-[#111111] text-white flex items-center justify-center font-extrabold text-[13px] tracking-tight">
+            SS
+          </div>
+<div>
+<span class="font-bold text-[15px] text-[#111111] tracking-tight leading-none block">ShramSetu</span>
+<span class="text-[11px] text-[#666666] leading-none block mt-0.5">Live Job Tracking</span>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-1.5">
+<button aria-label="Switch Language" class="h-8 px-2.5 flex items-center gap-1.5 rounded-full bg-[#F4F4F5] hover:bg-[#EAEAEA] text-[#111111] transition-colors border border-[#E5E5E7]">
+<span class="material-symbols-outlined text-[15px] text-[#555555]">translate</span>
+<span class="text-[11px] font-bold">मराठी / EN</span>
+</button>
+<button aria-label="Helpline Support" class="w-8 h-8 flex items-center justify-center text-[#555555] hover:text-[#111111] hover:bg-[#F4F4F5] rounded-full transition-colors">
+<span class="material-symbols-outlined text-[20px]">support_agent</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Main Content Body -->
+<main class="flex flex-col relative w-full pt-16 pb-safe bg-[#F7F7F8] min-h-screen px-4 space-y-3.5 max-w-lg mx-auto">
+<!-- Booking Reference & Emergency Bar -->
+<div class="pt-2 flex items-center justify-between">
+<div class="flex items-center gap-2">
+<span class="relative flex h-2.5 w-2.5">
+<span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4F26E9] opacity-75"></span>
+<span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#4F26E9]"></span>
+</span>
+<div>
+<span class="text-[11px] font-semibold text-[#666666] uppercase tracking-wider block leading-none">ORDER ID</span>
+<span class="text-[16px] font-extrabold text-[#111111] tracking-tight leading-tight">#SS-8942</span>
+</div>
+</div>
+<button aria-label="Urgent Helpline" class="h-8 px-3 bg-[#FEF3F2] text-[#B42318] border border-[#FECDCA] rounded-full flex items-center gap-1.5 text-[12px] font-bold active:scale-95 transition-transform shadow-xs" id="sosBtn">
+<span class="material-symbols-outlined text-[16px] text-[#D92D20]">shield</span>
+<span>Urgent Help</span>
+</button>
+</div>
+<!-- Urban Company Style Status Banner Card -->
+<section class="bg-white rounded-2xl p-4 border border-[#EAEAEA] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+<div class="flex items-center justify-between mb-3">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-bold bg-[#ECFDF3] text-[#027A48] border border-[#A6F4C5]">
+<span class="material-symbols-outlined text-[15px] text-[#027A48]">two_wheeler</span>
+          Worker On The Way
+        </span>
+<div class="flex items-baseline gap-1">
+<span class="text-[26px] font-extrabold text-[#111111] tracking-tight">12</span>
+<span class="text-[12px] font-semibold text-[#666666]">mins away</span>
+</div>
+</div>
+<h2 class="text-[16px] font-bold text-[#111111] leading-snug">Rahul Patil is en route from Kothrud Stand</h2>
+<div class="flex items-center gap-2 mt-2 pt-2.5 border-t border-[#F2F2F4] text-[#555555]">
+<div class="w-6 h-6 rounded-full bg-[#F4F4F5] flex items-center justify-center flex-shrink-0">
+<span class="material-symbols-outlined text-[15px] text-[#111111]">near_me</span>
+</div>
+<p class="text-[12px] font-medium text-[#444444] truncate">Heading toward Flat 402, Sai Shraddha Apts, Paud Road</p>
+</div>
+</section>
+<!-- Visual Route & Location Tracker -->
+<section class="bg-white rounded-2xl overflow-hidden border border-[#EAEAEA] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+<div class="relative w-full h-52 bg-[#E9ECEF]">
+<!-- Static Pune map background -->
+<div class="w-full h-full bg-cover bg-center" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuAad6N1kj-ssCW-zUmsIlu54xLR9e4MzqwV5K4nAe3NqntsFQLJJ-s0U9XZtro8UnpOHDSKgaWvT36TEbvu5x7QgtsmUlhILKFa_oQEkIgCSPyTfsm3Wc2E3kLROWaCd1GEZQmp14-4f6U5S9jR2ZG58wA4AHRzDfIVllFaCbVELWCKwq0ICpi7gkNmm4jahb5VHzJml7xZlzfcKGsrbVSZTR2YDeHoCE4UbRHj01pm1oALuMsQi5jKnA')"></div>
+<div class="absolute inset-0 bg-[#111111]/5 pointer-events-none"></div>
+<!-- Live Transit Badge Floating top left -->
+<div class="absolute top-3 left-3 bg-white/95 backdrop-blur-md px-2.5 py-1.5 rounded-lg shadow-sm border border-[#EAEAEA] flex items-center gap-1.5">
+<span class="w-2 h-2 rounded-full bg-[#F79009] animate-pulse"></span>
+<span class="text-[11px] font-semibold text-[#111111]">Moderate traffic on Karve Road</span>
+</div>
+<!-- Worker Pin Marker -->
+<div class="absolute top-1/2 left-1/3 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center">
+<div class="relative bg-[#111111] text-white p-0.5 rounded-full shadow-lg ring-2 ring-white">
+<img alt="Rahul Patil" class="w-8 h-8 rounded-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAMxbTrdmnyFegy8VHsBLv1TnMLwZIof2FN5lFwTANT_eNJ9N2zfEl8Gt3tRQu9BwoM_3yvhIt1O_CbGPucC8yt5TRYOFrHLA9fmX-HMwPkEpSGLxIlp2K2wQqennpxks6VoZQ9cc_DP6yGfE9qvxc0WpLDEYSYx5F8yfvUpFGjcs-G0Jwq1mG5V-wMGXo91JmtdhCRprROOA2V1PqPiunBgxkCvhr-_rVOM7gpzymYs0NwCT0G7QvaYQ">
+<div class="absolute -bottom-1 -right-1 bg-[#4F26E9] text-white w-4 h-4 rounded-full flex items-center justify-center text-[9px] shadow-sm">
+<span class="material-symbols-outlined text-[10px]">two_wheeler</span>
+</div>
+</div>
+<span class="mt-1 bg-[#111111] text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-md">Rahul (1.4 km)</span>
+</div>
+<!-- Destination Pin Marker -->
+<div class="absolute bottom-4 right-6 flex flex-col items-center">
+<div class="w-8 h-8 rounded-full bg-[#111111] text-white flex items-center justify-center shadow-lg ring-2 ring-white animate-bounce">
+<span class="material-symbols-outlined text-[18px]">home_pin</span>
+</div>
+<span class="mt-1 bg-white border border-[#EAEAEA] text-[10px] text-[#111111] font-bold px-2 py-0.5 rounded-full shadow-sm">Sai Shraddha</span>
+</div>
+</div>
+</section>
+<!-- Worker Trust & Communications Card -->
+<section class="bg-white rounded-2xl p-4 border border-[#EAEAEA] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+<div class="flex items-start justify-between gap-3">
+<div class="flex items-center gap-3">
+<div class="relative flex-shrink-0">
+<img alt="Rahul Patil" class="w-14 h-14 rounded-2xl object-cover border border-[#EAEAEA] shadow-xs" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBoMxnCFfaYXOUtlUT20_jp0CHCFg18ufEeB4bGvIdK_GitTGcTnzkRBOH2rT5-6fZfjT-IVxktNJaZ7SNG5JB2fLTNVxA-6qRHx_RlDkifuF1zucZcUquYhQjxOEAqYklJxBLF59UnSnwAgPwMTI_H8lT1sYxAdbE_e_Qg4T8H8HSDCG2mC4lh-Jv6NnxGFmT4o6W6DKmI8FLuEa7EzRMLJkm9MYvEQ8uxJR5aW5YQM45FuQUgrqRALQ">
+<span class="absolute -bottom-1 -right-1 bg-[#027A48] text-white rounded-full p-0.5 flex items-center justify-center ring-2 ring-white">
+<span class="material-symbols-outlined text-[13px]">check</span>
+</span>
+</div>
+<div>
+<div class="flex items-center gap-1.5">
+<h3 class="text-[17px] font-bold text-[#111111] tracking-tight">Rahul Patil</h3>
+</div>
+<div class="flex items-center gap-1.5 mt-0.5">
+<span class="text-[11px] font-semibold text-[#4F26E9] bg-[#F4F0FF] border border-[#E5DBFF] px-2 py-0.5 rounded-full">Guild Unit #128</span>
+<span class="text-[12px] text-[#666666]">Master Plumber</span>
+</div>
+<div class="flex items-center gap-1.5 mt-1">
+<span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-[#ECFDF3] text-[#027A48] text-[11px] font-bold">
+<span class="material-symbols-outlined text-[13px]" style="font-variation-settings: 'FILL' 1;">star</span> 4.88
+              </span>
+<span class="text-[11px] text-[#717680] font-medium">(342 verified jobs)</span>
+</div>
+</div>
+</div>
+<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-[#ECFDF3] text-[#027A48] border border-[#A6F4C5] flex-shrink-0">
+<span class="material-symbols-outlined text-[12px]">verified</span>
+          Govt KYC OK
+        </span>
+</div>
+<!-- Action Dialers / CTAs -->
+<div class="grid grid-cols-2 gap-2.5 mt-4">
+<a class="h-11 bg-[#111111] hover:bg-[#222222] text-white rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold active:scale-[0.98] transition-all shadow-sm" href="tel:+919800012345">
+<span class="material-symbols-outlined text-[18px]">call</span>
+<span>Call Rahul</span>
+</a>
+<a class="h-11 bg-[#F4F4F5] hover:bg-[#EAEAEA] text-[#111111] border border-[#E5E5E7] rounded-xl flex items-center justify-center gap-2 text-[13px] font-bold active:scale-[0.98] transition-all" href="sms:+919800012345?body=Hello%20Rahul,%20regarding%20booking%20SS-8942">
+<span class="material-symbols-outlined text-[18px] text-[#027A48]">chat</span>
+<span>WhatsApp / SMS</span>
+</a>
+</div>
+<!-- 4-Digit Escrow Release Security Box -->
+<div class="mt-4 p-3.5 rounded-xl bg-[#F8F9FA] border border-[#EAEAEA]">
+<div class="flex items-center justify-between mb-2">
+<div class="flex items-center gap-1.5 text-[#4F26E9] font-bold text-[12px]">
+<span class="material-symbols-outlined text-[16px]">lock</span>
+<span>Escrow Protection Code</span>
+</div>
+<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-[#ECFDF3] text-[#027A48] border border-[#A6F4C5]">
+            Payment Locked
+          </span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-xl bg-white border border-[#EAEAEA] shadow-xs">
+<div class="flex flex-col">
+<span class="text-[10px] text-[#666666] font-bold uppercase tracking-wider">Completion OTP</span>
+<div class="flex items-center gap-2 mt-1 tracking-[0.2em] text-[22px] font-extrabold text-[#111111]">
+<span class="w-8 h-9 flex items-center justify-center bg-[#F4F4F5] border border-[#E5E5E7] rounded-lg">8</span>
+<span class="w-8 h-9 flex items-center justify-center bg-[#F4F4F5] border border-[#E5E5E7] rounded-lg">4</span>
+<span class="w-8 h-9 flex items-center justify-center bg-[#F4F4F5] border border-[#E5E5E7] rounded-lg">9</span>
+<span class="w-8 h-9 flex items-center justify-center bg-[#F4F4F5] border border-[#E5E5E7] rounded-lg">2</span>
+</div>
+</div>
+<button aria-label="Copy OTP" class="w-10 h-10 rounded-xl bg-[#111111] hover:bg-[#262626] flex items-center justify-center text-white active:scale-90 transition-transform shadow-xs" id="copyOtpBtn">
+<span class="material-symbols-outlined text-[18px]">content_copy</span>
+</button>
+</div>
+<div class="flex items-start gap-2 text-[#555555] mt-2.5">
+<span class="material-symbols-outlined text-[15px] text-[#027A48] flex-shrink-0 mt-0.5">verified_user</span>
+<p class="text-[12px] leading-relaxed text-[#555555]">
+            Share this 4-digit code with Rahul <strong class="text-[#111111] font-bold">ONLY after</strong> job inspection and satisfaction.
+          </p>
+</div>
+</div>
+</section>
+<!-- Progress Timeline Tracker -->
+<section class="bg-white rounded-2xl p-4 border border-[#EAEAEA] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+<div class="flex items-center justify-between mb-4">
+<h3 class="text-[15px] font-bold text-[#111111] flex items-center gap-2">
+<span class="material-symbols-outlined text-[18px] text-[#4F26E9]">timeline</span>
+          Service Milestones
+        </h3>
+<span class="text-[11px] font-semibold text-[#666666]">Step 2 of 5</span>
+</div>
+<div class="relative flex flex-col gap-y-4">
+<!-- Milestone 1: Done -->
+<div class="flex items-start gap-3 relative">
+<div class="w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 z-10 bg-[#027A48] text-white shadow-xs">
+<span class="material-symbols-outlined text-[14px]">check</span>
+</div>
+<div class="flex-1 flex justify-between items-start">
+<div>
+<p class="text-[13px] font-bold text-[#111111]">Booking Confirmed</p>
+<p class="text-[11px] text-[#666666]">Assigned to Kothrud Union Pool</p>
+</div>
+<span class="text-[11px] font-medium text-[#717680]">10:15 AM</span>
+</div>
+<div class="absolute left-[11px] top-6 w-[2px] h-6 bg-[#027A48]"></div>
+</div>
+<!-- Milestone 2: Active / Current -->
+<div class="flex items-start gap-3 relative">
+<div class="w-6 h-6 rounded-full bg-[#4F26E9] text-white flex items-center justify-center flex-shrink-0 z-10 ring-4 ring-[#E5DBFF] shadow-xs">
+<span class="w-2 h-2 rounded-full bg-white animate-ping"></span>
+</div>
+<div class="flex-1 flex justify-between items-start">
+<div>
+<div class="flex items-center gap-1.5">
+<p class="text-[13px] font-bold text-[#4F26E9]">Worker Dispatched &amp; Travelling</p>
+</div>
+<p class="text-[11px] text-[#444444]">En route via Paud Phata bypass</p>
+</div>
+<span class="text-[11px] font-bold text-[#4F26E9]">10:40 AM</span>
+</div>
+<div class="absolute left-[11px] top-6 w-[2px] h-6 bg-[#EAEAEA]"></div>
+</div>
+<!-- Milestone 3: Pending -->
+<div class="flex items-start gap-3 relative">
+<div class="w-6 h-6 rounded-full bg-[#F4F4F5] text-[#999999] border border-[#E5E5E7] flex items-center justify-center flex-shrink-0 z-10">
+<span class="material-symbols-outlined text-[13px]">pin_drop</span>
+</div>
+<div class="flex-1 flex justify-between items-start">
+<div>
+<p class="text-[13px] font-semibold text-[#666666]">Arrived at Customer Location</p>
+<p class="text-[11px] text-[#999999]">Doorstep verification check</p>
+</div>
+<span class="text-[11px] text-[#999999]">Est 10:52 AM</span>
+</div>
+<div class="absolute left-[11px] top-6 w-[2px] h-6 bg-[#EAEAEA]"></div>
+</div>
+<!-- Milestone 4: Pending -->
+<div class="flex items-start gap-3 relative">
+<div class="w-6 h-6 rounded-full bg-[#F4F4F5] text-[#999999] border border-[#E5E5E7] flex items-center justify-center flex-shrink-0 z-10">
+<span class="material-symbols-outlined text-[13px]">handyman</span>
+</div>
+<div class="flex-1 flex justify-between items-start">
+<div>
+<p class="text-[13px] font-semibold text-[#666666]">Service Underway</p>
+<p class="text-[11px] text-[#999999]">Inspection &amp; pipe fitting repair</p>
+</div>
+<span class="text-[11px] text-[#999999]">Est 11:00 AM</span>
+</div>
+<div class="absolute left-[11px] top-6 w-[2px] h-6 bg-[#EAEAEA]"></div>
+</div>
+<!-- Milestone 5: Pending -->
+<div class="flex items-start gap-3 relative">
+<div class="w-6 h-6 rounded-full bg-[#F4F4F5] text-[#999999] border border-[#E5E5E7] flex items-center justify-center flex-shrink-0 z-10">
+<span class="material-symbols-outlined text-[13px]">verified</span>
+</div>
+<div class="flex-1 flex justify-between items-start">
+<div>
+<p class="text-[13px] font-semibold text-[#666666]">Inspection &amp; Escrow Payout</p>
+<p class="text-[11px] text-[#999999]">OTP exchange completes booking</p>
+</div>
+<span class="text-[11px] text-[#999999]">Est 11:35 AM</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Service Summary & Fare Escrow Card -->
+<section class="bg-white rounded-2xl p-4 border border-[#EAEAEA] shadow-[0_2px_12px_rgba(0,0,0,0.04)]">
+<div class="flex items-center justify-between border-b border-[#F2F2F4] pb-3 mb-3">
+<h4 class="text-[15px] font-bold text-[#111111]">Job &amp; Fare Summary</h4>
+<span class="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-[#ECFDF3] text-[#027A48] border border-[#A6F4C5]">
+          Safe Escrow Deposit
+        </span>
+</div>
+<div class="space-y-2">
+<div class="flex justify-between items-start">
+<div class="pr-3">
+<p class="text-[13px] font-bold text-[#111111]">Plumbing Inspection &amp; Tap Repair</p>
+<p class="text-[11px] text-[#666666]">Includes standard gasket replacement + pressure test</p>
+</div>
+<span class="text-[14px] font-bold text-[#111111] flex-shrink-0">₹450</span>
+</div>
+<div class="flex justify-between items-center text-[#666666]">
+<span class="text-[12px]">Cooperative Worker Insurance &amp; Safety Fund</span>
+<span class="text-[12px] font-medium">₹35</span>
+</div>
+<div class="flex justify-between items-baseline pt-2.5 border-t border-[#F2F2F4]">
+<div>
+<span class="text-[14px] font-bold text-[#111111] block">Total Amount Locked</span>
+<span class="text-[10px] font-semibold text-[#027A48]">100% Secure Escrow</span>
+</div>
+<span class="text-[22px] font-extrabold text-[#111111] tracking-tight">₹485</span>
+</div>
+</div>
+<!-- Action Buttons -->
+<div class="mt-4 pt-1 flex flex-col gap-2">
+<button class="w-full h-11 bg-[#F4F4F5] hover:bg-[#EAEAEA] text-[#111111] border border-[#E5E5E7] rounded-xl text-[13px] font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all" id="rescheduleBtn">
+<span class="material-symbols-outlined text-[17px]">calendar_month</span>
+<span>Need Help or Reschedule?</span>
+</button>
+<button class="w-full h-9 bg-transparent text-[#B42318] hover:bg-[#FEF3F2] rounded-xl text-[12px] font-semibold flex items-center justify-center gap-1.5 transition-colors" id="cancelBtn">
+<span class="material-symbols-outlined text-[15px]">cancel</span>
+<span>Cancel Booking (Free before worker arrives)</span>
+</button>
+</div>
+</section>
+<!-- Cooperative Assurance Footer Banner -->
+<section class="pb-6">
+<div class="bg-[#F4F0FF] border border-[#E5DBFF] p-3.5 rounded-2xl flex items-center gap-3">
+<div class="w-10 h-10 rounded-xl bg-white border border-[#E5DBFF] flex items-center justify-center text-[#4F26E9] flex-shrink-0 shadow-xs">
+<span class="material-symbols-outlined text-[22px]">diversity_3</span>
+</div>
+<div>
+<p class="text-[12px] font-bold text-[#4F26E9]">100% ShramSetu Cooperative Fair Guarantee</p>
+<p class="text-[11px] text-[#555555] leading-normal mt-0.5">
+            Zero commission exploitation. 100% of labour fees go directly to Shri Rahul Patil upon OTP release.
+          </p>
+</div>
+</div>
+</section>
+</main>
+<!-- Script Interactions -->
+<script>
+    // Quick OTP Copy Interaction
+    const copyOtpBtn = document.getElementById('copyOtpBtn');
+    if (copyOtpBtn) {
+      copyOtpBtn.addEventListener('click', () => {
+        navigator.clipboard?.writeText('8492');
+        const icon = copyOtpBtn.querySelector('.material-symbols-outlined');
+        if (icon) {
+          icon.textContent = 'check';
+          setTimeout(() => {
+            icon.textContent = 'content_copy';
+          }, 1800);
+        }
+      });
+    }
+
+    // Urgent helpline modal simulation
+    const sosBtn = document.getElementById('sosBtn');
+    if (sosBtn) {
+      sosBtn.addEventListener('click', () => {
+        alert('Connecting you directly to ShramSetu Rapid Dispatch Team (Pune District Central Office: 1800-419-7868)...');
+      });
+    }
+
+    // Reschedule & Support
+    const rescheduleBtn = document.getElementById('rescheduleBtn');
+    if (rescheduleBtn) {
+      rescheduleBtn.addEventListener('click', () => {
+        alert('Opening ShramSetu Cooperative Dispatch Desk. A coordinator will call you in under 2 minutes.');
+      });
+    }
+
+    // Cancellation reassurance
+    const cancelBtn = document.getElementById('cancelBtn');
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', () => {
+        const confirmCancel = confirm('Are you sure you want to cancel? Rahul has already travelled 2.1 km. Full refund of ₹485 will be credited instantly to your UPI.');
+        if (confirmCancel) {
+          alert('Booking cancelled. ₹485 escrow refund triggered to your source account.');
+        }
+      });
+    }
+  </script>
+</body></html>
