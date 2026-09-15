@@ -99,7 +99,7 @@ class MockCustomerRepository implements ICustomerRepository {
   final List<Map<String, dynamic>> _mockBookings = [];
 
   @override
-  Future<bool> createBooking({
+  Future<String?> createBooking({
     required String workerId,
     required String serviceId,
     required String scheduledDate,
@@ -109,20 +109,117 @@ class MockCustomerRepository implements ICustomerRepository {
     String? notes,
   }) async {
     await Future.delayed(const Duration(milliseconds: 1000));
+    final newId = 'bk_${DateTime.now().millisecondsSinceEpoch}';
+    final worker = workers.firstWhere((w) => w.id == workerId, orElse: () => workers.first);
+    final category = categories.firstWhere((c) => c.id == serviceId, orElse: () => categories.first);
+    
     _mockBookings.add({
-      'workerId': workerId,
-      'serviceId': serviceId,
-      'scheduledDate': scheduledDate,
-      'scheduledTime': scheduledTime,
-      'amount': amount,
-      'status': 'PENDING',
+      'id': newId,
+      'worker_id': workerId,
+      'service_id': serviceId,
+      'scheduled_date': scheduledDate,
+      'scheduled_time': scheduledTime,
+      'base_amount': amount,
+      'labor_allowance': 35.0,
+      'distance_km': 2.1,
+      'status': 'onTheWay',
+      'otp': '8492',
+      'notes': notes ?? '',
+      'services': {
+        'id': category.id,
+        'name': category.name,
+        'description': 'Certified repair & maintenance',
+        'category': 'Home Maintenance',
+      },
+      'workers': {
+        'id': worker.id,
+        'rating': worker.rating,
+        'completed_jobs': worker.jobsCompleted,
+        'location_tag': worker.locationTag,
+        'experience_years': 6,
+        'is_union_gold': true,
+        'is_coop_master': true,
+        'worker_status': 'ACTIVE',
+        'users': {
+          'full_name': worker.name,
+          'phone': '+91 98000 12345',
+          'avatar_url': worker.imageUrl,
+        }
+      },
+      'addresses': {
+        'id': 'mock_addr_1',
+        'address_line': 'Flat 402, Sai Shraddha Apts, Paud Road',
+        'area': 'Kothrud',
+        'city': 'Pune',
+        'state': 'Maharashtra',
+        'postal_code': '411038',
+      }
     });
-    return true;
+    return newId;
   }
 
   @override
   Future<List<Map<String, dynamic>>> getCustomerBookings() async {
     await Future.delayed(const Duration(milliseconds: 500));
     return _mockBookings;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getBookingDetails(String bookingId) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final match = _mockBookings.firstWhere(
+      (b) => b['id'] == bookingId,
+      orElse: () => {
+        'id': bookingId,
+        'status': 'onTheWay',
+        'scheduled_date': '2023-11-01',
+        'scheduled_time': '10:00 AM',
+        'base_amount': 450.0,
+        'labor_allowance': 35.0,
+        'distance_km': 1.4,
+        'otp': '8492',
+        'notes': 'Tap leakage repair',
+        'services': {
+          'id': 'c1',
+          'name': 'Plumbing Inspection & Tap Leakage Repair',
+          'description': 'Includes standard gasket replacement + pressure test',
+          'category': 'Plumbing',
+        },
+        'workers': {
+          'id': 'w1',
+          'rating': 4.8,
+          'completed_jobs': 342,
+          'location_tag': 'Kothrud Stand',
+          'experience_years': 8,
+          'is_union_gold': true,
+          'is_coop_master': true,
+          'worker_status': 'ACTIVE',
+          'users': {
+            'full_name': 'Rahul Patil',
+            'phone': '+91 98000 12345',
+            'avatar_url': 'https://lh3.googleusercontent.com/aida-public/AB6AXuBoMxnCFfaYXOUtlUT20_jp0CHCFg18ufEeB4bGvIdK_GitTGcTnzkRBOH2rT5-6fZfjT-IVxktNJaZ7SNG5JB2fLTNVxA-6qRHx_RlDkifuF1zucZcUquYhQjxOEAqYklJxBLF59UnSnwAgPwMTI_H8lT1sYxAdbE_e_Qg4T8H8HSDCG2mC4lh-Jv6NnxGFmT4o6W6DKmI8FLuEa7EzRMLJkm9MYvEQ8uxJR5aW5YQM45FuQUgrqRALQ',
+          }
+        },
+        'addresses': {
+          'id': 'addr_1',
+          'address_line': 'Flat 402, Sai Shraddha Apts, Paud Road',
+          'area': 'Kothrud',
+          'city': 'Pune',
+          'state': 'Maharashtra',
+          'postal_code': '411038',
+        }
+      },
+    );
+    return match;
+  }
+
+  @override
+  Future<bool> cancelBooking(String bookingId, {String? reason}) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    final index = _mockBookings.indexWhere((b) => b['id'] == bookingId);
+    if (index != -1) {
+      _mockBookings[index]['status'] = 'cancelled';
+    }
+    return true;
   }
 }

@@ -7,8 +7,8 @@ abstract class ICustomerRepository {
   /// Fetch active, verified workers providing a specific service
   Future<List<Worker>> getEligibleWorkers(String serviceId);
 
-  /// Create a booking
-  Future<bool> createBooking({
+  /// Create a booking and return the created booking ID
+  Future<String?> createBooking({
     required String workerId,
     required String serviceId,
     required String scheduledDate,
@@ -20,4 +20,10 @@ abstract class ICustomerRepository {
 
   /// Get the authenticated customer's booking history
   Future<List<Map<String, dynamic>>> getCustomerBookings();
+
+  /// Get full detailed information for a specific booking
+  Future<Map<String, dynamic>?> getBookingDetails(String bookingId);
+
+  /// Cancel a booking if permitted by the state machine
+  Future<bool> cancelBooking(String bookingId, {String? reason});
 }

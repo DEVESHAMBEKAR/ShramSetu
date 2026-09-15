@@ -428,18 +428,17 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   final time = bookingFlowState.selectedTime ?? '10:00 AM';
                   final address = bookingFlowState.address ?? '';
                   
-                  await DI.customerRepo.createBooking(
+                  final newBookingId = await DI.customerRepo.createBooking(
                     workerId: workerId,
                     serviceId: categoryId,
                     scheduledDate: date,
                     scheduledTime: time,
-                    
                     amount: total.toDouble(),
                   );
                   
                   if (mounted) {
                     Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const BookingConfirmationScreen()),
+                      MaterialPageRoute(builder: (_) => BookingConfirmationScreen(bookingId: newBookingId)),
                       (route) => false,
                     );
                   }

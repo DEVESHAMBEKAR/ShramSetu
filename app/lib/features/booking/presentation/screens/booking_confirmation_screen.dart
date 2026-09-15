@@ -4,14 +4,21 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/booking_models.dart';
+import '../../../customer/presentation/screens/customer_live_tracking_screen.dart';
 
 class BookingConfirmationScreen extends StatelessWidget {
-  const BookingConfirmationScreen({super.key});
+  final String? bookingId;
+
+  const BookingConfirmationScreen({super.key, this.bookingId});
 
   @override
   Widget build(BuildContext context) {
-    final worker = bookingFlowState.selectedWorker!;
-    
+    final worker = bookingFlowState.selectedWorker;
+    final workerName = worker?.name ?? 'Rahul Patil';
+    final serviceName = bookingFlowState.selectedCategory?.name ?? 'Plumbing Service';
+    final date = bookingFlowState.selectedDate ?? 'Today';
+    final time = bookingFlowState.selectedTime ?? '10:00 AM';
+
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
@@ -24,11 +31,18 @@ class BookingConfirmationScreen extends StatelessWidget {
               Container(
                 width: 80,
                 height: 80,
-                decoration: BoxDecoration(color: AppColors.tertiaryFixed, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)]),
+                decoration: BoxDecoration(
+                  color: AppColors.tertiaryFixed,
+                  shape: BoxShape.circle,
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 10)],
+                ),
                 child: const Icon(Icons.check, size: 40, color: AppColors.onTertiaryFixedVariant),
               ),
               const SizedBox(height: AppSpacing.spacingLg),
-              Text('Booking Confirmed!', style: AppTypography.displayLgMobile.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
+              Text(
+                'Booking Confirmed!',
+                style: AppTypography.displayLgMobile.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: AppSpacing.spacingXs),
               Text(
                 'Your payment is safely reserved in Escrow.',
@@ -38,7 +52,10 @@ class BookingConfirmationScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.spacing2xl),
               Container(
                 padding: const EdgeInsets.all(AppSpacing.spacingMd),
-                decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLowest,
+                  borderRadius: AppRadius.radiusXl,
+                ),
                 child: Column(
                   children: [
                     Row(
@@ -54,8 +71,8 @@ class BookingConfirmationScreen extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                              Text('Plumbing Service', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                              Text(workerName, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                              Text(serviceName, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
                             ],
                           ),
                         ),
@@ -69,7 +86,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text('Date & Time', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                            Text('${bookingFlowState.selectedDate} • ${bookingFlowState.selectedTime}', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+                            Text('$date • $time', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
                           ],
                         ),
                         Column(
@@ -85,16 +102,48 @@ class BookingConfirmationScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
+              if (bookingId != null && bookingId!.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.secondary,
+                      foregroundColor: AppColors.onSecondary,
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      elevation: 2,
+                    ),
+                    onPressed: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute(
+                          builder: (_) => CustomerLiveTrackingScreen(bookingId: bookingId!),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.near_me, size: 20),
+                    label: Text(
+                      'Track Live Job',
+                      style: AppTypography.labelLg.copyWith(color: AppColors.onSecondary, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.spacingSm),
+              ],
               GestureDetector(
                 onTap: () {
-                  // Reset state (we skip doing it perfectly for UI demo, but conceptually this happens here)
                   Navigator.of(context).pushNamedAndRemoveUntil('/customer/home', (route) => false);
                 },
                 child: Container(
                   height: 52,
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLowest,
+                    borderRadius: AppRadius.radiusLg,
+                  ),
                   alignment: Alignment.center,
-                  child: Text('Return to Home', style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  child: Text(
+                    'Return to Home',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ),
             ],

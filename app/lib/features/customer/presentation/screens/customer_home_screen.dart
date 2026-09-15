@@ -9,6 +9,7 @@ import '../../data/models/customer_models.dart';
 import '../../data/models/customer_profile.dart';
 
 import 'worker_discovery_screen.dart';
+import 'customer_live_tracking_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   const CustomerHomeScreen({super.key});
@@ -19,22 +20,32 @@ class CustomerHomeScreen extends StatefulWidget {
 
 class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   CustomerProfile? _profile;
+  Map<String, dynamic>? _activeBooking;
 
   @override
   void initState() {
     super.initState();
-    _loadProfile();
+    _loadData();
   }
 
-  Future<void> _loadProfile() async {
+  Future<void> _loadData() async {
     final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) return;
-    final profile = await DI.userRepo.getCustomerProfile(userId);
-    if (mounted) {
-      setState(() {
-        _profile = profile;
-      });
+    if (userId != null) {
+      final profile = await DI.userRepo.getCustomerProfile(userId);
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+        });
+      }
     }
+    try {
+      final bookings = await DI.customerRepo.getCustomerBookings();
+      if (mounted && bookings.isNotEmpty) {
+        setState(() {
+          _activeBooking = bookings.first;
+        });
+      }
+    } catch (_) {}
   }
 
   String get _greetingName {
@@ -459,6 +470,20 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildRecentBookingTracker() {
+    final booking = _activeBooking;
+    final bookingId = booking?['id']?.toString();
+    final status = booking?['status']?.toString() ?? 'completed';
+    final serviceData = booking?['services'] as Map<String, dynamic>?;
+    final workerData = booking?['workers'] as Map<String, dynamic>?;
+    final workerUserData = workerData?['users'] as Map<String, dynamic>?;
+
+    final serviceName = serviceData?['name']?.toString() ?? 'Deep Kitchen Cleaning';
+    final workerName = workerUserData?['full_name']?.toString() ?? 'Sunita Jadhav';
+    final amount = (booking?['base_amount'] as num?)?.toDouble() ?? 850.0;
+    final dateStr = booking?['scheduled_date']?.toString() ?? '14 Oct';
+
+    final isLive = status != 'completed' && status != 'cancelled' && status != 'rejected';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
       child: Container(
@@ -477,12 +502,25 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.check_circle_outline, size: 18, color: AppColors.onTertiaryContainer),
+                    Icon(
+                      isLive ? Icons.sensors : Icons.check_circle_outline,
+                      size: 18,
+                      color: isLive ? AppColors.secondary : AppColors.onTertiaryContainer,
+                    ),
                     const SizedBox(width: AppSpacing.spacing2xs),
-                    Text('Recent Booking', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+                    Text(
+                      isLive ? 'Active Job in Progress' : 'Recent Booking',
+                      style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
-                Text('Completed on 14 Oct', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                Text(
+                  isLive ? status.toUpperCase() : 'Completed on $dateStr',
+                  style: AppTypography.labelSm.copyWith(
+                    color: isLive ? AppColors.secondary : AppColors.onSurfaceVariant,
+                    fontWeight: isLive ? FontWeight.bold : FontWeight.normal,
+                  ),
+                ),
               ],
             ),
             Padding(
@@ -490,54 +528,76 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Deep Kitchen Cleaning', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                      Text('Worker: Sunita Jadhav • Pune Central Co-op', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(serviceName, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                        Text('Worker: $workerName • Pune Central Co-op', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                      ],
+                    ),
                   ),
-                  Text('₹850', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  Text('₹${amount.toStringAsFixed(0)}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 ],
               ),
             ),
             Row(
               children: [
                 Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceContainerHigh,
-                      borderRadius: AppRadius.radiusXl,
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.receipt_long, size: 18, color: AppColors.primary),
-                        const SizedBox(width: AppSpacing.spacing3xs),
-                        Text('Receipt', style: AppTypography.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                      ],
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pushNamed(context, '/customer/home');
+                    },
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerHigh,
+                        borderRadius: AppRadius.radiusXl,
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.receipt_long, size: 18, color: AppColors.primary),
+                          const SizedBox(width: AppSpacing.spacing3xs),
+                          Text('Receipt', style: AppTypography.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: AppSpacing.spacingXs),
                 Expanded(
-                  child: Container(
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: AppRadius.radiusXl,
-                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)],
-                    ),
-                    alignment: Alignment.center,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.replay, size: 18, color: AppColors.onPrimary),
-                        const SizedBox(width: AppSpacing.spacing3xs),
-                        Text('Re-book', style: AppTypography.labelMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                      ],
+                  child: GestureDetector(
+                    onTap: () {
+                      if (bookingId != null && bookingId.isNotEmpty) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CustomerLiveTrackingScreen(bookingId: bookingId),
+                          ),
+                        );
+                      }
+                    },
+                    child: Container(
+                      height: 48,
+                      decoration: BoxDecoration(
+                        color: isLive ? AppColors.secondary : AppColors.primary,
+                        borderRadius: AppRadius.radiusXl,
+                        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)],
+                      ),
+                      alignment: Alignment.center,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(isLive ? Icons.near_me : Icons.replay, size: 18, color: AppColors.onPrimary),
+                          const SizedBox(width: AppSpacing.spacing3xs),
+                          Text(
+                            isLive ? 'Track Live' : 'Re-book',
+                            style: AppTypography.labelMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
