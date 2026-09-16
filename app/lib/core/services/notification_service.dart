@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -33,22 +33,39 @@ class NotificationService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp();
+    // Firebase Messaging has no background handler support on web (requires HTTPS + service worker)
+    // On web, Firebase still works for foreground messages but background is skipped
+    if (!kIsWeb) {
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp();
+        }
+        _isFirebaseAvailable = true;
+
+        // Register background handler (native only)
+        FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+
+        // Register message listeners
+        _setupMessageListeners();
+
+        debugPrint('[NotificationService] Firebase initialized successfully.');
+      } catch (e) {
+        _isFirebaseAvailable = false;
+        debugPrint('[NotificationService] Firebase unavailable ($e). Operating in fallback mode.');
       }
-      _isFirebaseAvailable = true;
-
-      // Register background handler
-      FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-      // Register message listeners
-      _setupMessageListeners();
-
-      debugPrint('[NotificationService] Firebase initialized successfully.');
-    } catch (e) {
-      _isFirebaseAvailable = false;
-      debugPrint('[NotificationService] Firebase unavailable ($e). Operating in fallback mode.');
+    } else {
+      // On web: attempt foreground-only Firebase (no background handler)
+      try {
+        if (Firebase.apps.isEmpty) {
+          await Firebase.initializeApp();
+        }
+        _isFirebaseAvailable = true;
+        _setupMessageListeners();
+        debugPrint('[NotificationService] Firebase (web foreground-only) initialized.');
+      } catch (e) {
+        _isFirebaseAvailable = false;
+        debugPrint('[NotificationService] Firebase web unavailable ($e). Operating in fallback mode.');
+      }
     }
 
     _isInitialized = true;

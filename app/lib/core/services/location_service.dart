@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart';
+// geocoding has no web support — imported only on non-web platforms
+import 'package:geocoding/geocoding.dart' if (dart.library.html) 'package:app/core/services/geocoding_web_stub.dart';
 
 /// Status of location permission & hardware state.
 enum LocationPermissionStatus {

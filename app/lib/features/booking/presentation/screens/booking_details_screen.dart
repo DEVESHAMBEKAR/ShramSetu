@@ -1,4 +1,5 @@
 import '../../../../core/config/dependency_injection.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -19,20 +20,22 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   String _paymentMode = 'upi';
   bool _isSubmitting = false;
   String? _pendingBookingId;
-  late Razorpay _razorpay;
+  Razorpay? _razorpay;
 
   @override
   void initState() {
     super.initState();
-    _razorpay = Razorpay();
-    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
-    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
-    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    if (!kIsWeb) {
+      _razorpay = Razorpay();
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+      _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+      _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+    }
   }
 
   @override
   void dispose() {
-    _razorpay.clear();
+    _razorpay?.clear();
     super.dispose();
   }
 
@@ -549,23 +552,36 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
                           _pendingBookingId = newBookingId;
 
-                          // Step 2: Create Razorpay order via Edge Function
-                          // Amount comes from DB, not from client-side calculation
-                          final orderResult = await DI.paymentRepo.createPaymentOrder(newBookingId);
+                          if (kIsWeb) {
+                            // Web: Razorpay SDK not supported — proceed directly to confirmation
+                            // In production, integrate Razorpay Web SDK via JavaScript interop
+                            if (!mounted) return;
+                            final bookingId = _pendingBookingId!;
+                            _pendingBookingId = null;
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => BookingConfirmationScreen(bookingId: bookingId),
+                              ),
+                              (route) => false,
+                            );
+                          } else {
+                            // Mobile: Step 2 — Create Razorpay order via Edge Function
+                            final orderResult = await DI.paymentRepo.createPaymentOrder(newBookingId);
 
-                          // Step 3: Open Razorpay checkout
-                          final options = <String, dynamic>{
-                            'key': orderResult.keyId,
-                            'amount': orderResult.amountPaise,
-                            'currency': orderResult.currency,
-                            'order_id': orderResult.orderId,
-                            'name': 'ShramSetu',
-                            'description': 'Cooperative Escrow Payment',
-                            'prefill': {'contact': '', 'email': ''},
-                            'theme': {'color': '#5B2EFF'},
-                          };
-                          _razorpay.open(options);
-                          // Payment result handled by _handlePaymentSuccess / _handlePaymentError
+                            // Step 3: Open Razorpay checkout
+                            final options = <String, dynamic>{
+                              'key': orderResult.keyId,
+                              'amount': orderResult.amountPaise,
+                              'currency': orderResult.currency,
+                              'order_id': orderResult.orderId,
+                              'name': 'ShramSetu',
+                              'description': 'Cooperative Escrow Payment',
+                              'prefill': {'contact': '', 'email': ''},
+                              'theme': {'color': '#5B2EFF'},
+                            };
+                            _razorpay!.open(options);
+                            // Payment result handled by _handlePaymentSuccess / _handlePaymentError
+                          }
                         } catch (e) {
                           _pendingBookingId = null;
                           if (mounted) {
@@ -580,7 +596,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                     : const Icon(Icons.lock_outline, size: 16, color: AppColors.tertiaryFixed),
                 label: Text(
-                  _isSubmitting ? 'Processing...' : 'Pay via Razorpay',
+                  _isSubmitting
+                      ? 'Processing...'
+                      : (kIsWeb ? 'Confirm Booking' : 'Pay via Razorpay'),
                   style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
