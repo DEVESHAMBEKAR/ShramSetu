@@ -6,7 +6,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
 
@@ -31,7 +30,8 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'mock-worker-id';
+    final user = await DI.authRepo.getCurrentUser();
+    final userId = user?.id ?? 'mock-worker-id';
     _worker = await DI.workerRepo.getWorkerProfile(userId);
     _documents = await DI.workerRepo.getVerificationDocuments(_worker?.id ?? userId);
     if (mounted) setState(() => _isLoading = false);
@@ -54,7 +54,8 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
         final fileName = picked.name;
         final ext = picked.extension?.toLowerCase() ?? 'jpg';
         final mimeType = ext == 'pdf' ? 'application/pdf' : 'image/$ext';
-        final workerId = _worker?.id ?? Supabase.instance.client.auth.currentUser?.id ?? 'worker';
+        final user = await DI.authRepo.getCurrentUser();
+        final workerId = _worker?.id ?? user?.id ?? 'worker';
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final storagePath = '$workerId/$docType-$timestamp.$ext';
 
@@ -95,7 +96,8 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
   Future<void> _submitVerification() async {
     setState(() => _isUploading = true);
     try {
-      final workerId = _worker?.id ?? Supabase.instance.client.auth.currentUser?.id ?? 'worker';
+      final user = await DI.authRepo.getCurrentUser();
+      final workerId = _worker?.id ?? user?.id ?? 'worker';
       await DI.workerRepo.submitForVerification(workerId);
       await _loadData();
       if (mounted) {

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../../shared/widgets/map_location_picker_screen.dart';
 
@@ -39,6 +39,53 @@ class _CustomerProfileOnboardingScreenState
   Uint8List? _selectedImageBytes;
   bool _isSaving = false;
   String? _errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExistingProfile();
+  }
+
+  Future<void> _loadExistingProfile() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser().timeout(const Duration(seconds: 3));
+      final userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      if (userId != null) {
+        final profile = await DI.userRepo.getCustomerProfile(userId).timeout(const Duration(seconds: 3));
+        if (profile != null && mounted) {
+          setState(() {
+            if (profile.fullName.isNotEmpty && _nameController.text.isEmpty) {
+              _nameController.text = profile.fullName;
+            }
+            final addr = profile.defaultAddress;
+            if (addr != null) {
+              if (_addressLineController.text.isEmpty && addr.addressLine.isNotEmpty) {
+                _addressLineController.text = addr.addressLine;
+              }
+              if (_areaController.text.isEmpty && addr.area.isNotEmpty) {
+                _areaController.text = addr.area;
+              }
+              if (_cityController.text.isEmpty && addr.city.isNotEmpty) {
+                _cityController.text = addr.city;
+              }
+              if (_stateController.text.isEmpty && addr.state.isNotEmpty) {
+                _stateController.text = addr.state;
+              }
+              if (_postalCodeController.text.isEmpty && addr.postalCode.isNotEmpty) {
+                _postalCodeController.text = addr.postalCode;
+              }
+              if (_latitude == null && addr.latitude != null) {
+                _latitude = addr.latitude;
+              }
+              if (_longitude == null && addr.longitude != null) {
+                _longitude = addr.longitude;
+              }
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   void dispose() {
@@ -75,7 +122,7 @@ class _CustomerProfileOnboardingScreenState
   Future<void> _fetchCurrentLocation() async {
     setState(() => _isDetectingLocation = true);
     try {
-      final result = await DI.locationService.getCurrentPosition();
+      final result = await DI.locationService.getCurrentPosition().timeout(const Duration(seconds: 6));
       if (!mounted) return;
 
       if (result.isSuccess && result.coordinates != null) {
@@ -88,7 +135,7 @@ class _CustomerProfileOnboardingScreenState
         final address = await DI.locationService.reverseGeocode(
           coords.latitude,
           coords.longitude,
-        );
+        ).timeout(const Duration(seconds: 4));
 
         if (mounted && address != null) {
           setState(() {
@@ -185,71 +232,105 @@ class _CustomerProfileOnboardingScreenState
       _errorMessage = null;
     });
 
-    final userId = Supabase.instance.client.auth.currentUser?.id;
-    if (userId == null) {
-      setState(() {
-        _errorMessage = 'Session expired. Please log in again.';
-        _isSaving = false;
-      });
-      return;
-    }
-
-    String? avatarUrl;
-
-    // Step 1 (optional): Upload profile image if selected
-    if (_selectedImageBytes != null) {
+    try {
+      String? userId;
       try {
-        avatarUrl = await DI.storageRepo.uploadFile(
-          bucket: StorageBucket.profileImages,
-          path: '$userId/avatar.jpg',
-          fileBytes: _selectedImageBytes!,
-          mimeType: 'image/jpeg',
-        );
+        final user = await DI.authRepo.getCurrentUser().timeout(const Duration(seconds: 3));
+        userId = user?.id;
       } catch (_) {
-        // Image upload is optional — proceed without it
-        avatarUrl = null;
+        userId = null;
       }
-    }
 
-    // Step 2: Save profile name (+ avatar if uploaded)
-    try {
-      await DI.userRepo.updateCustomerProfile(
-        userId: userId,
-        fullName: _nameController.text.trim(),
-        avatarUrl: avatarUrl,
-      );
+      if (userId == null && AppConfig.useMockData) {
+        userId = 'mock_customer_01';
+      }
+
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = 'Session expired. Please log in again.';
+            _isSaving = false;
+          });
+        }
+        return;
+      }
+
+      String? avatarUrl;
+
+      // Step 1 (optional): Upload profile image if selected
+      if (_selectedImageBytes != null) {
+        try {
+          avatarUrl = await DI.storageRepo.uploadFile(
+            bucket: StorageBucket.profileImages,
+            path: '$userId/avatar.jpg',
+            fileBytes: _selectedImageBytes!,
+            mimeType: 'image/jpeg',
+          ).timeout(const Duration(seconds: 4));
+        } catch (_) {
+          // Image upload is optional — proceed without it
+          avatarUrl = null;
+        }
+      }
+
+      // Step 2: Save profile name (+ avatar if uploaded)
+      try {
+        await DI.userRepo.updateCustomerProfile(
+          userId: userId,
+          fullName: _nameController.text.trim(),
+          avatarUrl: avatarUrl,
+        ).timeout(const Duration(seconds: 4));
+      } catch (e) {
+        if (!AppConfig.useMockData) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Could not save your profile. Please try again.';
+              _isSaving = false;
+            });
+          }
+          return;
+        }
+      }
+
+      // Step 3: Save address with coordinates
+      try {
+        await DI.userRepo.createAddress(
+          userId: userId,
+          addressLine: _addressLineController.text.trim(),
+          area: _areaController.text.trim(),
+          city: _cityController.text.trim(),
+          state: _stateController.text.trim(),
+          postalCode: _postalCodeController.text.trim(),
+          label: 'Home',
+          latitude: _latitude,
+          longitude: _longitude,
+        ).timeout(const Duration(seconds: 4));
+      } catch (e) {
+        if (!AppConfig.useMockData) {
+          if (mounted) {
+            setState(() {
+              _errorMessage = 'Could not save your address. Please try again.';
+              _isSaving = false;
+            });
+          }
+          return;
+        }
+      }
+
+      // All done — navigate to home
+      if (mounted) {
+        Navigator.of(context).pushReplacementNamed('/customer/home');
+      }
     } catch (e) {
-      setState(() {
-        _errorMessage = 'Could not save your profile. Please try again.';
-        _isSaving = false;
-      });
-      return;
-    }
-
-    // Step 3: Save address with coordinates
-    try {
-      await DI.userRepo.createAddress(
-        userId: userId,
-        addressLine: _addressLineController.text.trim(),
-        area: _areaController.text.trim(),
-        city: _cityController.text.trim(),
-        state: _stateController.text.trim(),
-        postalCode: _postalCodeController.text.trim(),
-        label: 'Home',
-        latitude: _latitude,
-        longitude: _longitude,
-      );
-    } catch (e) {
-      setState(() {
-        _errorMessage = 'Could not save your address. Please try again.';
-        _isSaving = false;
-      });
-      return;
-    }
-
-    // All done — navigate to home
-    if (mounted) {
-      Navigator.of(context).pushReplacementNamed('/customer/home');
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'An unexpected error occurred. Please try again.';
+          _isSaving = false;
+        });
+      }
+    } finally {
+      if (mounted && _isSaving) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

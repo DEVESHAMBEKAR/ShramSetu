@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -247,13 +246,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 subtitle: const Text('Detect coordinates and reverse geocode address'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final userId = Supabase.instance.client.auth.currentUser?.id;
+                  final user = await DI.authRepo.getCurrentUser();
+                  final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
                   if (userId == null) return;
                   
-                  final result = await DI.locationService.getCurrentPosition();
+                  final result = await DI.locationService.getCurrentPosition().timeout(const Duration(seconds: 6));
                   if (result.isSuccess && result.coordinates != null) {
                     final coords = result.coordinates!;
-                    final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude);
+                    final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude).timeout(const Duration(seconds: 4));
                     if (geo != null) {
                       await DI.userRepo.createAddress(
                         userId: userId,
@@ -285,8 +285,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 subtitle: const Text('Pinpoint your exact location visually'),
                 onTap: () async {
                   Navigator.pop(ctx);
-                  final userId = Supabase.instance.client.auth.currentUser?.id;
-                  if (userId == null) return;
+                  final user = await DI.authRepo.getCurrentUser();
+                  final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+                  if (userId == null || !mounted) return;
 
                   final currentAddr = _profile?.defaultAddress;
                   final mapRes = await Navigator.push<LocationPickerResult>(

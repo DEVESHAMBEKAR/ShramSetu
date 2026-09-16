@@ -4,7 +4,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/models/payment_models.dart';
 import '../../../../core/config/dependency_injection.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class WorkerEarningsScreen extends StatefulWidget {
   const WorkerEarningsScreen({super.key});
@@ -25,10 +24,16 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
   }
 
   void _loadData() {
-    final user = Supabase.instance.client.auth.currentUser;
-    final workerId = user?.id ?? 'worker-1';
-    _workerFuture = DI.workerRepo.getWorkerProfile(workerId);
-    _paymentsFuture = DI.paymentRepo.getWorkerReleasedPayments(workerId);
+    _workerFuture = () async {
+      final user = await DI.authRepo.getCurrentUser();
+      final workerId = user?.id ?? 'worker-1';
+      return DI.workerRepo.getWorkerProfile(workerId);
+    }();
+    _paymentsFuture = () async {
+      final user = await DI.authRepo.getCurrentUser();
+      final workerId = user?.id ?? 'worker-1';
+      return DI.paymentRepo.getWorkerReleasedPayments(workerId);
+    }();
   }
 
   @override

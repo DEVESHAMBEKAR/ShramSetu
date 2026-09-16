@@ -7,7 +7,6 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../../shared/widgets/map_location_picker_screen.dart';
@@ -71,8 +70,11 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
 
   void _refreshData() {
     setState(() {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
-      _profileFuture = DI.workerRepo.getWorkerProfile(userId);
+      _profileFuture = () async {
+        final user = await DI.authRepo.getCurrentUser();
+        final userId = user?.id ?? 'mock-worker-id';
+        return DI.workerRepo.getWorkerProfile(userId);
+      }();
     });
   }
 

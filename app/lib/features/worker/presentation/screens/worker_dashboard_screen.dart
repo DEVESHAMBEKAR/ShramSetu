@@ -4,7 +4,6 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'worker_job_detail_screen.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
@@ -38,12 +37,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
 
   void _refreshData() {
     setState(() {
-      final currentUser = Supabase.instance.client.auth.currentUser;
-      final userId = currentUser?.id ?? 'mock-worker-id';
-      _dataFuture = Future.wait([
-        DI.workerRepo.getWorkerProfile(userId),
-        DI.workerRepo.getWorkerBookings(),
-      ]);
+      _dataFuture = () async {
+        final currentUser = await DI.authRepo.getCurrentUser();
+        final userId = currentUser?.id ?? 'mock-worker-id';
+        return Future.wait([
+          DI.workerRepo.getWorkerProfile(userId),
+          DI.workerRepo.getWorkerBookings(),
+        ]);
+      }();
     });
   }
 

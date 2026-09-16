@@ -118,5 +118,40 @@ void main() {
       expect(returningProfile.defaultAddress!.area, 'Wakad');
       expect(returningProfile.isComplete, isTrue, reason: 'Returning customer must directly login and fetch details');
     });
+
+    test('5. Customer onboarding save executes swiftly without hanging or timing out', () async {
+      final stopwatch = Stopwatch()..start();
+      const testPhone = '9777888999';
+      await authRepo.verifyOtp(testPhone, '123456');
+      final user = await authRepo.getCurrentUser();
+      expect(user, isNotNull);
+
+      // Save name
+      await userRepo.updateCustomerProfile(
+        userId: user!.id,
+        fullName: 'Sneha Kulkarni',
+      );
+
+      // Save address
+      await userRepo.createAddress(
+        userId: user.id,
+        addressLine: '101 Mayflower Apts',
+        area: 'Baner',
+        city: 'Pune',
+        state: 'Maharashtra',
+        postalCode: '411045',
+        latitude: 18.5590,
+        longitude: 73.7868,
+      );
+
+      stopwatch.stop();
+      expect(stopwatch.elapsedMilliseconds, lessThan(1000), reason: 'Save operation must complete in under 1 second');
+
+      final profile = await userRepo.getCustomerProfile(user.id);
+      expect(profile, isNotNull);
+      expect(profile!.fullName, 'Sneha Kulkarni');
+      expect(profile.defaultAddress?.area, 'Baner');
+      expect(profile.defaultAddress?.latitude, 18.5590);
+    });
   });
 }
