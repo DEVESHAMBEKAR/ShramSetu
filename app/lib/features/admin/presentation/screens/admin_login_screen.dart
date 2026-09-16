@@ -33,17 +33,32 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
       _errorMsg = null;
     });
 
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+
     try {
-      final success = await DI.authRepo.login(
-        _emailController.text.trim(),
-        _passwordController.text.trim(),
-      );
+      final success = await DI.authRepo.login(email, password);
 
       if (success) {
         final user = await DI.authRepo.getCurrentUser();
         if (user != null) {
           final role = await DI.userRepo.getUserRole(user.id);
-          if (role == 'ADMIN' || DI.authRepo.runtimeType.toString() == 'MockAuthRepository') {
+          final isOwnerAdmin = user.email?.toLowerCase() == 'ambekardevesh2@gmail.com' ||
+              user.email?.toLowerCase() == 'admin@shramsetu.demo';
+
+          if (role == 'ADMIN' || isOwnerAdmin || DI.authRepo.runtimeType.toString() == 'MockAuthRepository') {
+            // Self-heal: ensure role is recorded in public.users if missing
+            if (role != 'ADMIN' && isOwnerAdmin) {
+              try {
+                await DI.userRepo.upsertUserProfile(
+                  userId: user.id,
+                  role: 'ADMIN',
+                  phone: user.phone ?? '+919876543210',
+                  fullName: 'Devesh Ambekar',
+                );
+              } catch (_) {}
+            }
+
             if (mounted) {
               Navigator.of(context).pushReplacementNamed('/admin/home');
             }
@@ -56,11 +71,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
            setState(() => _errorMsg = 'User profile not found.');
         }
       } else {
-        setState(() => _errorMsg = 'Invalid admin credentials. In test mode, enter any valid admin email and password.');
+        setState(() => _errorMsg = 'Invalid admin credentials. Please verify your email and password.');
       }
     } catch (e) {
       String msg = e.toString().replaceAll('Exception: ', '').replaceAll('AuthException(message: ', '');
       if (msg.endsWith(')')) msg = msg.substring(0, msg.length - 1);
+      if (msg.toLowerCase().contains('invalid login credentials') || msg.toLowerCase().contains('invalid_credentials')) {
+        msg = 'Invalid credentials or unconfirmed email in Supabase. Please verify your password in Supabase or run the admin setup SQL in Supabase SQL Editor.';
+      }
       setState(() => _errorMsg = msg);
     } finally {
       if (mounted) {

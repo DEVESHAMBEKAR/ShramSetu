@@ -27,7 +27,7 @@ class SupabaseCustomerRepository implements ICustomerRepository {
       return (response as List).map((row) => ServiceCategory(
         id: row['id'],
         name: row['name'],
-        iconData: row['icon_name'] ?? 'handyman',
+        iconData: row['icon_name'] ?? row['icon_data'] ?? 'handyman',
       )).toList();
     } catch (e) {
       throw Exception('Failed to load active services: $e');
