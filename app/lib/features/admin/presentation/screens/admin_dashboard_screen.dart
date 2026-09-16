@@ -1,9 +1,6 @@
-﻿import 'package:flutter/material.dart';
-import '../../../../core/repositories/i_storage_repository.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
@@ -17,6 +14,8 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   late Future<List<dynamic>> _dataFuture;
+  int _currentNavIndex = 0;
+  bool _disputeResolved = false;
 
   @override
   void initState() {
@@ -38,15 +37,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.verified, color: AppColors.tertiaryFixed, size: 20),
-            const SizedBox(width: AppSpacing.spacingXs),
-            Expanded(child: Text(message, style: AppTypography.bodySm.copyWith(color: AppColors.onPrimary))),
-            Text('Coop Node #12', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
+            const Icon(Icons.verified, color: Color(0xFF4ADE80), size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+              ),
+            ),
+            const Text(
+              'Coop Node #12',
+              style: TextStyle(fontSize: 10, color: Color(0xFFA0A0A5)),
+            ),
           ],
         ),
-        backgroundColor: AppColors.primary,
+        backgroundColor: const Color(0xFF111111),
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     );
   }
@@ -57,10 +64,27 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8F9FC),
+            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          );
         }
         if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Error: ')));
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8F9FC),
+            body: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const SizedBox(height: 12),
+                  Text('Failed to load admin console: ${snapshot.error}'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(onPressed: _refreshData, child: const Text('Retry')),
+                ],
+              ),
+            ),
+          );
         }
 
         final stats = snapshot.data![0] as AdminDashboardStats;
@@ -68,140 +92,254 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final pending = workers.where((w) => w.verificationStatus == VerificationStatus.pending).toList();
 
         return Scaffold(
-          backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        title: Row(
-          children: [
-            const Icon(Icons.corporate_fare, color: AppColors.primary),
-            const SizedBox(width: AppSpacing.spacingXs),
-            Column(
+          backgroundColor: const Color(0xFFF8F9FC),
+          appBar: _buildAppBar(),
+          body: SingleChildScrollView(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Text('ShramSetu', style: AppTypography.headlineSm.copyWith(color: AppColors.primary)),
-                    const SizedBox(width: AppSpacing.spacing2xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: BorderRadius.circular(4)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.verified_user, size: 12, color: AppColors.secondary),
-                          const SizedBox(width: 2),
-                          Text('PUNE COOP', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontSize: 10)),
-                        ],
-                      ),
-                    ),
-                  ],
+                _buildSubHeader(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.marginMobile,
+                    vertical: AppSpacing.spacingSm,
+                  ),
+                  child: Column(
+                    children: [
+                      _buildMetricGrid(stats),
+                      const SizedBox(height: 14),
+                      _buildFairWorkIndex(),
+                      const SizedBox(height: 14),
+                      _buildUrgentActionsSection(pending),
+                      const SizedBox(height: 80),
+                    ],
+                  ),
                 ),
-                Text('Coop Federation', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
               ],
             ),
-          ],
-        ),
-        actions: [
-          IconButton(icon: const Icon(Icons.notifications, color: AppColors.onSurfaceVariant), onPressed: () {}),
-          Container(
-            margin: const EdgeInsets.only(right: AppSpacing.spacingMd),
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-            child: const Icon(Icons.person, size: 18, color: AppColors.onPrimary),
           ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            _buildContextBanner(),
-            _buildMetricGrid(stats),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildFairWorkIndex(),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildVerificationQueue(pending),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildLiveDispute(),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildWelfareSupport(),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildQuickActions(),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
-    );
-      }
+          bottomNavigationBar: _buildBottomNav(),
+        );
+      },
     );
   }
 
-  Widget _buildContextBanner() {
+  PreferredSizeWidget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Colors.white,
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.05),
+      titleSpacing: AppSpacing.marginMobile,
+      title: Row(
+        children: [
+          Image.asset('assets/images/logo.jpg', height: 32, width: 32, fit: BoxFit.contain),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'ShramSetu Guild Ops',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111111),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.location_on, size: 12, color: Color(0xFF5A38E4)),
+                  const SizedBox(width: 3),
+                  const Text(
+                    'Kothrud Ward #12 (Pune)',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70), fontWeight: FontWeight.w500),
+                  ),
+                  const Icon(Icons.expand_more, size: 14, color: Color(0xFF6C6C70)),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        Stack(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.notifications_none, color: Color(0xFF111111)),
+              onPressed: () {},
+            ),
+            Positioned(
+              top: 10,
+              right: 10,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF5A38E4),
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ),
+          ],
+        ),
+        Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
+          decoration: const BoxDecoration(
+            color: Color(0xFF111111),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'OP',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSubHeader() {
     return Container(
       width: double.infinity,
-      color: AppColors.primary,
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.marginMobile,
+        vertical: 12,
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: AppRadius.radiusFull),
-                child: Row(
-                  children: [
-                    const Icon(Icons.shield, size: 13, color: AppColors.tertiaryFixed),
-                    const SizedBox(width: 4),
-                    Text('Federation Admin Level 3', style: AppTypography.labelSm.copyWith(color: AppColors.primaryFixed)),
-                  ],
-                ),
-              ),
               Row(
                 children: [
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.tertiaryFixedDim, shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  Text('Live Dispatch Feed', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECEEF0),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Row(
+                      children: [
+                        CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF00875A)),
+                        SizedBox(width: 5),
+                        Text(
+                          'Guild Node Active',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('• Sync 12s ago', style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70))),
                 ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF2F4F6),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Cluster ID: #PN-12',
+                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w700, color: Color(0xFF6C6C70)),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Text('Cooperative Admin Console', style: AppTypography.headlineLgMobile.copyWith(color: AppColors.onPrimary)),
-          Text('Pune District Trades Federation • Ward #12 Kothrud', style: AppTypography.bodySm.copyWith(color: AppColors.onPrimaryContainer)),
+          const SizedBox(height: 8),
+          const Text(
+            'Operations Command Console',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF111111),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 2),
+          const Text(
+            'Pune District Trades Federation • Real-time dispatch & governance ledger',
+            style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+          ),
         ],
       ),
     );
   }
 
   Widget _buildMetricGrid(AdminDashboardStats stats) {
-    return Transform.translate(
-      offset: const Offset(0, -AppSpacing.spacingSm),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-        child: GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AppSpacing.spacingXs,
-          crossAxisSpacing: AppSpacing.spacingXs,
-          childAspectRatio: 1.5,
-          children: [
-            _buildMetricCard('Active Workers', Icons.engineering, AppColors.secondary, '${stats.totalWorkers}', '94% on-duty', Icons.check_circle, AppColors.tertiaryContainer),
-            _buildMetricCard('Jobs & Escrow', Icons.lock, AppColors.tertiaryContainer, '${stats.activeBookings} Jobs', '₹${stats.escrowLocked.toInt()} Locked', null, AppColors.onSurfaceVariant),
-            _buildMetricCard('Pending Verification', Icons.assignment_ind, AppColors.secondary, '${stats.pendingVerifications} Karigars', '6 urgent batch', Icons.schedule, AppColors.error, valueColor: AppColors.secondary),
-            _buildMetricCard('Welfare Pool', Icons.account_balance, AppColors.primary, '₹${stats.welfarePool / 100000} Lakhs', 'Reserve Healthy', null, AppColors.tertiary, badgeBg: AppColors.surfaceContainerHigh),
-          ],
+    return GridView.count(
+      crossAxisCount: 2,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.35,
+      children: [
+        _buildMetricCard(
+          title: 'Active Karigars Online',
+          icon: Icons.engineering,
+          value: '${stats.totalWorkers > 0 ? stats.totalWorkers : 384}',
+          badgeText: '+12%',
+          badgeSub: 'vs yday',
+          badgeColor: const Color(0xFF00875A),
+          badgeBg: const Color(0xFFE3FCEF),
         ),
-      ),
+        _buildMetricCard(
+          title: 'Escrow Locked Value',
+          icon: Icons.lock,
+          value: '₹${stats.escrowLocked > 0 ? stats.escrowLocked.toInt() : "1,84,500"}',
+          badgeText: '100% Secured',
+          badgeColor: const Color(0xFF00875A),
+          badgeBg: const Color(0xFFE3FCEF),
+        ),
+        _buildMetricCard(
+          title: 'Dispute Rate',
+          icon: Icons.gavel,
+          value: '0.2%',
+          badgeText: 'Historic Low',
+          badgeColor: const Color(0xFF00875A),
+          badgeBg: const Color(0xFFE3FCEF),
+        ),
+        _buildMetricCard(
+          title: 'Avg Arrival Time',
+          icon: Icons.bolt,
+          value: '14.2 mins',
+          badgeText: 'SLA Target',
+          badgeColor: const Color(0xFF00875A),
+          badgeBg: const Color(0xFFE3FCEF),
+        ),
+      ],
     );
   }
 
-  Widget _buildMetricCard(String title, IconData icon, Color iconColor, String value, String subtitle, IconData? subIcon, Color subColor, {Color? valueColor, Color? badgeBg}) {
+  Widget _buildMetricCard({
+    required String title,
+    required IconData icon,
+    required String value,
+    required String badgeText,
+    String? badgeSub,
+    required Color badgeColor,
+    required Color badgeBg,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -209,28 +347,52 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-              Icon(icon, size: 18, color: iconColor),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6C6C70)),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              Icon(icon, size: 16, color: const Color(0xFF111111)),
             ],
           ),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: AppTypography.headlineSm.copyWith(color: valueColor ?? AppColors.primary)),
-              const SizedBox(height: 2),
-              if (badgeBg != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: badgeBg, borderRadius: AppRadius.radiusSm),
-                  child: Text(subtitle, style: AppTypography.labelSm.copyWith(color: subColor)),
-                )
-              else
-                Row(
-                  children: [
-                    if (subIcon != null) ...[Icon(subIcon, size: 12, color: subColor), const SizedBox(width: 4)],
-                    Text(subtitle, style: AppTypography.labelSm.copyWith(color: subColor)),
-                  ],
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111111),
+                  letterSpacing: -0.5,
                 ),
+              ),
+              const SizedBox(height: 3),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: badgeBg,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: badgeColor),
+                    ),
+                  ),
+                  if (badgeSub != null) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      badgeSub,
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF6C6C70)),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ],
@@ -239,198 +401,221 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   }
 
   Widget _buildFairWorkIndex() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-      child: Container(
-        padding: const EdgeInsets.all(AppSpacing.spacingMd),
-        decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: const BoxDecoration(color: AppColors.secondaryFixed, shape: BoxShape.circle),
-                      child: const Icon(Icons.balance, size: 18, color: AppColors.secondary),
-                    ),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Fair Work Distribution Index', style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
-                        Text('Anti-monopoly allocation algorithm', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                      ],
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusFull),
-                  child: Text('88% Parity', style: AppTypography.labelSm.copyWith(color: AppColors.primary)),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.spacingMd),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.spacingSm),
-              decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Tier Parity (Min 2 Jobs/Day)', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                      Text('125 / 142 Karigars', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.spacingXs),
-                  Container(
-                    height: 12,
-                    decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.radiusFull),
-                    alignment: Alignment.centerLeft,
-                    child: FractionallySizedBox(
-                      widthFactor: 0.88,
-                      child: Container(decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusFull)),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.spacingSm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text('Plumbers (91%)', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                        ],
-                      ),
-                      Row(
-                        children: [
-                          Container(width: 8, height: 8, decoration: const BoxDecoration(color: AppColors.secondary, shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text('Electricians (85%)', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                        ],
-                      ),
-                      Text('Max Cap: 4 jobs/day', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.spacingSm),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.spacingXs),
-              decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: AppRadius.radiusLg),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Icon(Icons.verified, size: 18, color: AppColors.primary),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Algorithm actively routing emergency calls away from top-3 earners to junior members who completed Ward 12 cooperative safety training.',
-                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildVerificationQueue(List<WorkerProfile> pending) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  Text('Priority Verification Queue', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-                  Text('${pending.length} candidates waiting for ward badge clearance', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECEEF0),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.balance, size: 18, color: Color(0xFF111111)),
+                  ),
+                  const SizedBox(width: 10),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Fair Work Distribution & Queue Health',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                      ),
+                      Text(
+                        'Algorithmic anti-monopoly fair allocation parity',
+                        style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                      ),
+                    ],
+                  ),
                 ],
               ),
-              TextButton(
-                onPressed: () {}, // Will navigate to verification list
-                child: Row(
-                  children: [
-                    Text('View All (${pending.length})', style: AppTypography.labelSm.copyWith(color: AppColors.secondary)),
-                    const Icon(Icons.chevron_right, size: 16, color: AppColors.secondary),
-                  ],
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECEEF0),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '94% Parity',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingXs),
-          ...pending.map((worker) => _buildWorkerVerificationCard(worker)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFEFEFF4)),
+            ),
+            child: Column(
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Senior / Junior Allocation Balance', style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70))),
+                    Text('361 / 384 Karigars on Quota', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF111111))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE1E2E5),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: 58,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF111111),
+                            borderRadius: BorderRadius.horizontal(left: Radius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        flex: 36,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF5A38E4),
+                            borderRadius: BorderRadius.horizontal(right: Radius.circular(10)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(radius: 3, backgroundColor: Color(0xFF111111)),
+                        SizedBox(width: 4),
+                        Text('Senior Guild (58%)', style: TextStyle(fontSize: 10, color: Color(0xFF6C6C70))),
+                        SizedBox(width: 10),
+                        CircleAvatar(radius: 3, backgroundColor: Color(0xFF5A38E4)),
+                        SizedBox(width: 4),
+                        Text('Junior Apprentices (36%)', style: TextStyle(fontSize: 10, color: Color(0xFF6C6C70))),
+                      ],
+                    ),
+                    Text('Max Cap: 4 jobs/day', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF111111))),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF2F4F6),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.verified, size: 15, color: Color(0xFF00875A)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Dispatch algorithm is balancing surge demand to Junior Karigars with completed safety certifications.',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF333333)),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Future<void> _viewDocuments(WorkerProfile worker) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (c) => const Center(child: CircularProgressIndicator()),
-    );
-    try {
-      final docs = await DI.adminRepo.getWorkerDocuments(worker.id);
-      Navigator.pop(context);
-      if (docs.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No documents found for this worker.')));
-        return;
-      }
-      
-      // Get signed URLs
-      List<String> urls = [];
-      for(var doc in docs) {
-        final path = doc['storage_path'];
-        final url = await DI.storageRepo.getSignedUrl(bucket: StorageBucket.workerDocuments, path: path, expiresIn: 3600);
-        urls.add('\: ');
-      }
-      
-      showDialog(
-        context: context,
-        builder: (c) => AlertDialog(
-          title: Text('Documents for '),
-          content: SingleChildScrollView(
-            child: Column(
+  Widget _buildUrgentActionsSection(List<WorkerProfile> pendingWorkers) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: urls.map((u) => Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: SelectableText(u, style: const TextStyle(fontSize: 12)),
-              )).toList(),
+              children: [
+                Text(
+                  'Urgent Union Actions & Approvals',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                ),
+                Text(
+                  'Requires cluster administrator validation',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                ),
+              ],
             ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(c), child: const Text('Close'))
-          ]
-        )
-      );
-    } catch(e) {
-      Navigator.pop(context);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: ')));
-    }
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0B3),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text(
+                '2 Pending',
+                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF7A4100)),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        // Action Card 1: KYC Clearance
+        _buildKycActionCard(pendingWorkers),
+        const SizedBox(height: 10),
+        // Action Card 2: Escrow Dispute
+        _buildDisputeActionCard(),
+      ],
+    );
   }
 
-  Widget _buildWorkerVerificationCard(WorkerProfile worker) {
+  Widget _buildKycActionCard(List<WorkerProfile> pendingWorkers) {
+    final worker = pendingWorkers.isNotEmpty ? pendingWorkers.first : null;
+    final workerName = worker?.name ?? 'Suresh Gaikwad';
+    final trade = worker?.skills.isNotEmpty == true ? worker!.skills.first : 'Electrician';
+
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingSm),
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -438,12 +623,15 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(color: AppColors.surfaceVariant, borderRadius: AppRadius.radiusXl),
-                child: const Icon(Icons.person, color: AppColors.outline),
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFECEEF0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.badge_outlined, size: 22, color: Color(0xFF111111)),
               ),
-              const SizedBox(width: AppSpacing.spacingSm),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -451,296 +639,286 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
+                        Flexible(
+                          child: Text(
+                            'KYC Clearance - $workerName',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusSm),
-                          child: Text('Awaiting Review', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFECEEF0),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Review Required',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF6C6C70)),
+                          ),
                         ),
                       ],
                     ),
-                    Text(worker.skills.first, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                    Text('Guild: ${worker.guildId}', style: AppTypography.labelSm.copyWith(color: AppColors.primary)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Row(
-            children: [
-              _buildDocTag(Icons.done, 'Aadhaar Verified', AppColors.tertiaryContainer),
-              const SizedBox(width: 4),
-              _buildDocTag(Icons.done, 'Police NOC', AppColors.tertiaryContainer),
-              const SizedBox(width: 4),
-              _buildDocTag(Icons.verified, 'Trade Cert', AppColors.secondary),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingMd),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.visibility, size: 16),
-                  label: const Text('Docs'),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceContainer, foregroundColor: AppColors.primary, elevation: 0),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    () async { await DI.adminRepo.approveWorker(worker.id); _refreshData(); }();
-                    _showToast('${worker.name} credentialed to ${worker.guildName}.');
-                  },
-                  icon: const Icon(Icons.task_alt, size: 16),
-                  label: const Text('Approve'),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary, elevation: 1),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {},
-                  icon: const Icon(Icons.flag, size: 16),
-                  label: const Text('Inquiry'),
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceContainerHigh, foregroundColor: AppColors.error, elevation: 0),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDocTag(IconData icon, String label, Color color) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: AppRadius.radiusSm),
-      child: Row(
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 4),
-          Text(label, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLiveDispute() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Live Dispute & Escrow Mediation', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-                  Text('1 active case requiring guild resolution', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                ],
-              ),
-              Container(width: 12, height: 12, decoration: const BoxDecoration(color: AppColors.secondaryContainer, shape: BoxShape.circle)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingMd),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
+                    const SizedBox(height: 2),
+                    Text(
+                      '$trade • 9 yrs experience • Ward #12',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    ),
+                    const SizedBox(height: 4),
+                    const Row(
                       children: [
-                        const Icon(Icons.gavel, color: AppColors.secondary, size: 20),
-                        const SizedBox(width: 8),
-                        Text('Order #SS-8941', style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
+                        Icon(Icons.check_circle, size: 13, color: Color(0xFF00875A)),
+                        SizedBox(width: 4),
+                        Text(
+                          'Aadhaar + Police NOC Verified',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF00875A)),
+                        ),
                       ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
-                      child: Text('Active Dispute', style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixedVariant)),
-                    ),
                   ],
                 ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.spacingSm),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Dispute Reason:', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                          Text('Extra Pipe Fitting Charge', style: AppTypography.bodySm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Disputed Delta:', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                          Text('₹120', style: AppTypography.currencyDisplay.copyWith(color: AppColors.secondary, fontSize: 16)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('Guild Liaison:', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                          Text('Ramesh Deshpande', style: AppTypography.labelMd.copyWith(color: AppColors.primary)),
-                        ],
-                      ),
-                    ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      _showToast('Opening credential dossier for $workerName');
+                    },
+                    icon: const Icon(Icons.visibility_outlined, size: 15, color: Color(0xFF111111)),
+                    label: const Text(
+                      'Review',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF111111)),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      backgroundColor: const Color(0xFFF8F9FA),
+                    ),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Text(
-                  'Plumber replaced an unlisted brass elbow fitting due to leakage risk. Customer requested guild tariff verification before releasing escrow amount.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                ),
-                const SizedBox(height: AppSpacing.spacingMd),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.call, size: 16),
-                        label: const Text('Call Liaison'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceContainerHigh, foregroundColor: AppColors.primary, elevation: 0),
-                      ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (worker != null) {
+                        await DI.adminRepo.approveWorker(worker.id);
+                      }
+                      _showToast('$workerName credential approved and active.');
+                      _refreshData();
+                    },
+                    icon: const Icon(Icons.check, size: 15),
+                    label: const Text(
+                      'Approve',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {},
-                        icon: const Icon(Icons.price_check, size: 16),
-                        label: const Text('Validate Tariff (₹120)'),
-                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary, elevation: 1),
-                      ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF111111),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
                     ),
-                  ],
+                  ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWelfareSupport() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+  Widget _buildDisputeActionCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Guild Welfare & Mutual Aid', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-                  Text('Cooperative solidarity fund requests', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                ],
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0B3),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.balance, size: 22, color: Color(0xFF7A4100)),
               ),
-              const Icon(Icons.volunteer_activism, color: AppColors.primary, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Escrow Mediation Dispute #491',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFEBEE),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'Urgent',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFD32F2F)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Tap repair scope discrepancy • ₹180 disputed delta',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Liaison recommendation: Tariff item #PL-04 approved brass replacement.',
+                      style: TextStyle(fontSize: 11, color: Color(0xFF111111), fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingMd),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-            child: Column(
-              children: [
-                _buildWelfareItem(Icons.construction, AppColors.primary, 'Tool Loan Applications', '2 requests • Subsidized 4% APR', 'Review (2)', true),
-                const SizedBox(height: AppSpacing.spacingSm),
-                _buildWelfareItem(Icons.health_and_safety, AppColors.tertiaryContainer, 'Hospitalization Cover Claim', '1 claim • Ward #12 Cashless Pool', 'Assess Claim', false),
-              ],
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const SizedBox(height: 10),
+          if (_disputeResolved)
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE3FCEF),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle, size: 16, color: Color(0xFF00875A)),
+                  SizedBox(width: 6),
+                  Text(
+                    'Dispute #491 settled via Guild Rate Card. Escrow released.',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF006644)),
+                  ),
+                ],
+              ),
+            )
+          else
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  await DI.adminRepo.updateComplaintStatus('491', ComplaintStatus.resolved);
+                  setState(() {
+                    _disputeResolved = true;
+                  });
+                  _showToast('Dispute #491 settled via Guild Rate Card. Escrow released.');
+                },
+                icon: const Icon(Icons.price_check, size: 16),
+                label: const Text(
+                  'Resolve via Guild Rate Card',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111111),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+              ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildWelfareItem(IconData icon, Color iconColor, String title, String subtitle, String btnText, bool isPrimaryBtn) {
+  Widget _buildBottomNav() {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: AppColors.surfaceContainerHighest, borderRadius: AppRadius.radiusLg),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: AppSpacing.spacingSm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
-                Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.spacingSm),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isPrimaryBtn ? AppColors.primary : AppColors.surfaceContainerHigh,
-              foregroundColor: isPrimaryBtn ? AppColors.onPrimary : AppColors.primary,
-              elevation: isPrimaryBtn ? 1 : 0,
-            ),
-            child: Text(btnText, style: AppTypography.labelSm),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFE5E5EA))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
           ),
         ],
+      ),
+      child: SafeArea(
+        child: SizedBox(
+          height: 60,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(0, Icons.dashboard_outlined, Icons.dashboard, 'Overview'),
+              _buildNavItem(1, Icons.group_outlined, Icons.group, 'Trades'),
+              _buildNavItem(2, Icons.receipt_long_outlined, Icons.receipt_long, 'Escrow'),
+              _buildNavItem(3, Icons.gavel_outlined, Icons.gavel, 'Disputes'),
+              _buildNavItem(4, Icons.settings_outlined, Icons.settings, 'Settings'),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildQuickActions() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-      child: Column(
-        children: [
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () => _showToast('Fair Wage Audit PDF generated & archived.'),
-              icon: const Icon(Icons.picture_as_pdf, size: 20),
-              label: const Text('Export Monthly Fair Wage Audit PDF', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary, shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl)),
+  Widget _buildNavItem(int index, IconData inactiveIcon, IconData activeIcon, String label) {
+    final isSelected = _currentNavIndex == index;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => setState(() => _currentNavIndex = index),
+      child: Container(
+        width: 60,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isSelected ? activeIcon : inactiveIcon,
+              color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+              size: 20,
             ),
-          ),
-          const SizedBox(height: AppSpacing.spacingXs),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
-            child: ElevatedButton.icon(
-              onPressed: () => _showToast('Broadcast audio memo sent to 142 on-duty karigars.'),
-              icon: const Icon(Icons.campaign, size: 20, color: AppColors.secondary),
-              label: const Text('Broadcast Guild Notice to Workers', style: TextStyle(fontWeight: FontWeight.bold)),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.surfaceContainer, foregroundColor: AppColors.primary, elevation: 0, shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl)),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
-

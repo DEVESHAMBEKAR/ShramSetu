@@ -22,7 +22,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Widget build(BuildContext context) {
     final worker = bookingFlowState.selectedWorker!;
     
-    // Calculate prices based on worker rate
+    // Calculate transparent pricing
     final baseRate = worker.rate;
     final cess = (baseRate * 0.03).round();
     final gst = (baseRate * 0.18).round();
@@ -31,127 +31,179 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        titleSpacing: 0,
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+          onPressed: () => Navigator.pop(context),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Booking Flow', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-            Text('Cooperative Verified Protection', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+            Text('Checkout', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            Text('Pune Guild Protection', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
           ],
         ),
       ),
       body: Column(
         children: [
+          // Step Indicator
+          _buildStepIndicator(),
+
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.marginMobile),
               children: [
-                _buildProgressStepper(),
-                const SizedBox(height: AppSpacing.spacingSm),
-                _buildEscrowBanner(),
-                const SizedBox(height: AppSpacing.spacingMd),
-                _buildBookingSummaryCard(total),
-                const SizedBox(height: AppSpacing.spacingMd),
-                _buildPricingCard(baseRate, cess, gst, total),
-                const SizedBox(height: AppSpacing.spacingMd),
+                // 1. Premium Escrow Guarantee Card
+                _buildEscrowGuaranteeBanner(total),
+
+                const SizedBox(height: 12),
+
+                // 2. Booking Summary Card
+                _buildSummaryCard(worker),
+
+                const SizedBox(height: 12),
+
+                // 3. Transparent Cost Breakdown
+                _buildFareBreakdown(baseRate, cess, gst, total),
+
+                const SizedBox(height: 12),
+
+                // 4. Payment Modes
                 _buildPaymentModes(),
               ],
             ),
           ),
+
+          // Bottom Action Bar
           _buildBottomAction(total),
         ],
       ),
     );
   }
 
-  Widget _buildProgressStepper() {
+  Widget _buildStepIndicator() {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 2)]),
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 10),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
+      ),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          _buildStep('Service', true),
-          _buildLine(true),
-          _buildStep('Worker', true),
-          _buildLine(true),
-          _buildStep('Address', true),
-          _buildLine(true),
-          _buildStep('Pay', true, current: true),
+          _buildStepItem('Service', isDone: true),
+          _buildStepDivider(isDone: true),
+          _buildStepItem('Worker', isDone: true),
+          _buildStepDivider(isDone: true),
+          _buildStepItem('Address', isDone: true),
+          _buildStepDivider(isDone: false),
+          _buildStepItem('Payment', isCurrent: true),
         ],
       ),
     );
   }
 
-  Widget _buildStep(String label, bool completed, {bool current = false}) {
-    return Column(
+  Widget _buildStepItem(String title, {bool isDone = false, bool isCurrent = false}) {
+    return Row(
       children: [
         Container(
-          width: 24,
-          height: 24,
+          width: 18,
+          height: 18,
           decoration: BoxDecoration(
-            color: completed && !current ? AppColors.tertiaryContainer : (current ? AppColors.primary : AppColors.surfaceContainerHigh),
+            color: isDone
+                ? AppColors.tertiaryContainer
+                : (isCurrent ? AppColors.primary : AppColors.surfaceContainerLow),
             shape: BoxShape.circle,
           ),
-          alignment: Alignment.center,
-          child: completed && !current
-              ? const Icon(Icons.check, size: 14, color: AppColors.tertiaryFixed)
-              : Text('4', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimary)),
+          child: isDone
+              ? const Icon(Icons.check, size: 12, color: AppColors.onTertiaryContainer)
+              : Center(
+                  child: Text(
+                    isCurrent ? '4' : '',
+                    style: AppTypography.labelSm.copyWith(
+                      color: isCurrent ? Colors.white : AppColors.outline,
+                      fontSize: 9,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(width: 4),
         Text(
-          label,
-          style: AppTypography.labelSm.copyWith(color: current || completed ? AppColors.primary : AppColors.onSurfaceVariant, fontWeight: current ? FontWeight.bold : FontWeight.normal),
+          title,
+          style: AppTypography.labelSm.copyWith(
+            color: isCurrent ? AppColors.primary : (isDone ? AppColors.onTertiaryContainer : AppColors.outline),
+            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+            fontSize: 10,
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildLine(bool completed) {
-    return Container(
-      width: 24,
-      height: 2,
-      color: completed ? AppColors.primary : AppColors.outlineVariant,
-      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),
+  Widget _buildStepDivider({required bool isDone}) {
+    return Expanded(
+      child: Container(
+        height: 1,
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        color: isDone ? AppColors.onTertiaryContainer.withValues(alpha: 0.3) : AppColors.outlineVariant,
+      ),
     );
   }
 
-  Widget _buildEscrowBanner() {
+  Widget _buildEscrowGuaranteeBanner(int total) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusXl),
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: AppRadius.radiusXl,
+        border: Border.all(color: const Color(0xFF262626)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.3), shape: BoxShape.circle),
-            child: const Icon(Icons.verified_user, color: AppColors.onTertiaryFixedVariant, size: 22),
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: AppRadius.radiusLg,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+            ),
+            child: const Icon(Icons.verified_user, color: Color(0xFF34D399), size: 20),
           ),
-          const SizedBox(width: AppSpacing.spacingSm),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Cooperative Escrow Guarantee', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: AppSpacing.spacingXs),
+                    Text('Cooperative Escrow', style: AppTypography.titleMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusFull),
-                      child: Text('100% Safe', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryFixed)),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF34D399).withValues(alpha: 0.2),
+                        borderRadius: AppRadius.radiusFull,
+                        border: Border.all(color: const Color(0xFF34D399).withValues(alpha: 0.4)),
+                      ),
+                      child: Text('100% SAFE', style: AppTypography.labelSm.copyWith(color: const Color(0xFF34D399), fontSize: 8, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Your payment is safely reserved in Pune Union Escrow and released to ${bookingFlowState.selectedWorker?.name.split(' ')[0]} only upon your OTP approval after job completion.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                  'Your ₹$total is safely locked in Pune Union Escrow and released to Rahul strictly after OTP approval upon complete satisfaction.',
+                  style: AppTypography.bodySm.copyWith(color: const Color(0xFFCBD5E1), fontSize: 11),
                 ),
               ],
             ),
@@ -161,139 +213,85 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildBookingSummaryCard(int total) {
-    final worker = bookingFlowState.selectedWorker!;
-    
+  Widget _buildSummaryCard(dynamic worker) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.radiusXl,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('APPOINTMENT DETAILS', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, letterSpacing: 1.2)),
+              Text('BOOKING OVERVIEW', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusFull),
-                child: Text('Step 4 of 5', style: AppTypography.labelSm.copyWith(color: AppColors.primary)),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
+                child: Text('Step 4 of 5', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingMd),
+          const Divider(height: 18),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: const BoxDecoration(color: AppColors.surfaceContainer, shape: BoxShape.circle),
-                child: const Icon(Icons.person, color: AppColors.outline),
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.surfaceContainerLow,
+                    child: const Icon(Icons.person, size: 24, color: AppColors.primary),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 14,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.onTertiaryContainer,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
+                      ),
+                      child: const Icon(Icons.check, size: 8, color: Colors.white),
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: AppSpacing.spacingSm),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: AppSpacing.spacingXs),
+                        Text(worker.name, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: AppRadius.radiusSm),
-                          child: Text('Pune Guild', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
+                          child: Text('Guild #128', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
                         ),
                       ],
                     ),
-                    Text('Plumbing Inspection & Repair', style: AppTypography.bodyMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    Text(bookingFlowState.selectedCategory?.name ?? 'Plumbing Service', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingMd),
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingSm),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.calendar_month, size: 18, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Service Slot', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                        Text('${bookingFlowState.selectedDate} • ${bookingFlowState.selectedTime}', style: AppTypography.titleMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on, size: 18, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Job Location', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                          Text(bookingFlowState.address ?? '', style: AppTypography.bodySm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPricingCard(int base, int cess, int gst, int total) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Standard Cooperative Bill', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusFull),
-                child: Text('Fair Wage Index', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer)),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          _buildPriceRow('Base Inspection Fee', base.toString()),
-          _buildPriceRow('Standard Labor (Up to 1 hr)', 'FREE', isFree: true),
-          _buildPriceRow('Cooperative Welfare Cess (3%)', cess.toString()),
-          _buildPriceRow('GST (18%)', gst.toString()),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingSm),
+            padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Total Payable', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    Text('Includes all union taxes', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                  ],
-                ),
-                Text('₹$total', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                const Icon(Icons.schedule, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Text('${bookingFlowState.selectedDate ?? "Today"} at ${bookingFlowState.selectedTime ?? "10:00 AM"}', style: AppTypography.bodySm.copyWith(fontSize: 11, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -302,88 +300,111 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildPriceRow(String label, String value, {bool isFree = false}) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
-          Text(isFree ? value : '₹$value', style: AppTypography.bodyMd.copyWith(color: isFree ? AppColors.onTertiaryContainer : AppColors.onSurface, fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentModes() {
+  Widget _buildFareBreakdown(int base, int cess, int gst, int total) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.radiusXl,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Select Payment Mode', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusFull),
-                child: Text('Instant Verification', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryFixedDim, fontWeight: FontWeight.bold)),
-              ),
+              Text('COST BREAKDOWN', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
+              Text('0% Commission', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold, fontSize: 10)),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingMd),
-          _buildPaymentOption('upi', 'UPI', 'Google Pay, PhonePe, Paytm', Icons.bolt, recommended: true),
-          _buildPaymentOption('card', 'Credit / Debit Card', 'Visa, RuPay, Mastercard', Icons.credit_card),
-          _buildPaymentOption('cash', 'Cash on Completion', 'Direct cash handover', Icons.local_atm),
+          const Divider(height: 18),
+          _buildFareRow('Standard Diagnostic / Base Rate', '₹$base'),
+          const SizedBox(height: 6),
+          _buildFareRow('Worker Union Welfare Pool (3%)', '₹$cess'),
+          const SizedBox(height: 6),
+          _buildFareRow('Govt. GST (18%)', '₹$gst'),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Total Amount Locked', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  Text('Held in Pune Union Escrow', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                ],
+              ),
+              Text('₹$total', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildPaymentOption(String value, String title, String subtitle, IconData icon, {bool recommended = false}) {
+  Widget _buildFareRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+        Text(value, style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildPaymentModes() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.radiusXl,
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('SELECT PAYMENT METHOD', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
+          const Divider(height: 18),
+          _buildPaymentRadio('upi', 'Instant UPI / QR', 'Google Pay, PhonePe, Paytm, BHIM', Icons.qr_code_2),
+          const SizedBox(height: 8),
+          _buildPaymentRadio('wallet', 'Union Escrow Balance', 'Available: ₹1,250', Icons.account_balance_wallet_outlined),
+          const SizedBox(height: 8),
+          _buildPaymentRadio('cash', 'Pay After Service (Cash on Sign-off)', 'Direct to artisan upon satisfaction', Icons.payments_outlined),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentRadio(String value, String title, String subtitle, IconData icon) {
     final isSelected = _paymentMode == value;
     return GestureDetector(
       onTap: () => setState(() => _paymentMode = value),
       child: Container(
-        margin: const EdgeInsets.only(bottom: AppSpacing.spacingSm),
-        padding: const EdgeInsets.all(AppSpacing.spacingSm),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.surfaceContainerLow : AppColors.surfaceContainerLowest,
+          color: isSelected ? AppColors.secondaryFixed.withValues(alpha: 0.3) : AppColors.surfaceContainerLow,
           borderRadius: AppRadius.radiusLg,
-          border: Border.all(color: isSelected ? AppColors.primary : Colors.transparent),
+          border: Border.all(color: isSelected ? AppColors.secondary : AppColors.outlineVariant),
         ),
         child: Row(
           children: [
-            Radio(
-              value: value,
-              groupValue: _paymentMode,
-              onChanged: (val) => setState(() => _paymentMode = val.toString()),
-              activeColor: AppColors.primary,
-            ),
+            Icon(icon, color: isSelected ? AppColors.secondary : AppColors.primary, size: 22),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Text(title, style: AppTypography.titleMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                      if (recommended) ...[
-                        const SizedBox(width: AppSpacing.spacingXs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusFull),
-                          child: Text('RECOMMENDED', style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixed, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                  Text(title, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
                 ],
               ),
             ),
-            Icon(icon, color: AppColors.primary),
+            Icon(
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
+              color: isSelected ? AppColors.secondary : AppColors.outline,
+              size: 18,
+            ),
           ],
         ),
       ),
@@ -392,98 +413,80 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   Widget _buildBottomAction(int total) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingSm, AppSpacing.marginMobile, 32),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 16, offset: const Offset(0, -4))],
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppColors.outlineVariant)),
       ),
-      child: Row(
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text('₹$total', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 22)),
-                  const SizedBox(width: 4),
-                  Text('all incl.', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                ],
-              ),
-              Text('View Details', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, decoration: TextDecoration.underline)),
-            ],
-          ),
-          const SizedBox(width: AppSpacing.spacingMd),
-          Expanded(
-            child: GestureDetector(
-              onTap: _isSubmitting ? null : () async {
-                setState(() {
-                  _isSubmitting = true;
-                });
-                try {
-                  final workerId = bookingFlowState.selectedWorker!.id;
-                  final categoryId = bookingFlowState.selectedCategory?.id ?? 'c1'; // Fallback
-                  final date = bookingFlowState.selectedDate ?? '2023-11-01';
-                  final time = bookingFlowState.selectedTime ?? '10:00 AM';
-                  final address = bookingFlowState.address ?? '';
-                  
-                  final newBookingId = await DI.customerRepo.createBooking(
-                    workerId: workerId,
-                    serviceId: categoryId,
-                    scheduledDate: date,
-                    scheduledTime: time,
-                    amount: total.toDouble(),
-                  );
-                  
-                  if (mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => BookingConfirmationScreen(bookingId: newBookingId)),
-                      (route) => false,
-                    );
-                  }
-                } catch (e) {
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Failed to book: ${e.toString()}')),
-                    );
-                  }
-                } finally {
-                  if (mounted) {
-                    setState(() {
-                      _isSubmitting = false;
-                    });
-                  }
-                }
-              },
-              child: Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: _isSubmitting ? AppColors.outlineVariant : AppColors.primary,
-                  borderRadius: AppRadius.radiusXl,
+      child: SafeArea(
+        child: Row(
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Total Payable', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                Text('₹$total', style: AppTypography.titleLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+              ],
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  elevation: 0,
                 ),
-                alignment: Alignment.center,
-                child: _isSubmitting
-                  ? const SizedBox(height: 24, width: 24, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
-                  : Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.lock, color: AppColors.onPrimary, size: 20),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Text(
-                      _paymentMode == 'upi' ? 'Pay ₹$total via UPI' : 'Confirm Booking',
-                      style: AppTypography.titleMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
-                    ),
-                  ],
+                onPressed: _isSubmitting
+                    ? null
+                    : () async {
+                        setState(() => _isSubmitting = true);
+                        try {
+                          final workerId = bookingFlowState.selectedWorker!.id;
+                          final categoryId = bookingFlowState.selectedCategory?.id ?? 'c2';
+                          final date = bookingFlowState.selectedDate ?? '2023-11-01';
+                          final time = bookingFlowState.selectedTime ?? '10:00 AM';
+
+                          final newBookingId = await DI.customerRepo.createBooking(
+                            workerId: workerId,
+                            serviceId: categoryId,
+                            scheduledDate: date,
+                            scheduledTime: time,
+                            amount: total.toDouble(),
+                          );
+
+                          if (mounted) {
+                            Navigator.of(context).pushAndRemoveUntil(
+                              MaterialPageRoute(
+                                builder: (_) => BookingConfirmationScreen(bookingId: newBookingId),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        } catch (e) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to book: $e')),
+                            );
+                          }
+                        } finally {
+                          if (mounted) setState(() => _isSubmitting = false);
+                        }
+                      },
+                icon: _isSubmitting
+                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Icon(Icons.lock_outline, size: 16, color: Color(0xFF34D399)),
+                label: Text(
+                  _isSubmitting ? 'Reserving...' : 'Reserve in Escrow',
+                  style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
-
-
 }
-

@@ -1,9 +1,6 @@
-import '../../../../core/models/booking_status.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 
@@ -18,12 +15,26 @@ class WorkerJobDetailScreen extends StatefulWidget {
 
 class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
   late Future<List<JobRequest>> _jobFuture;
+  final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
+  final List<FocusNode> _otpFocusNodes = List.generate(4, (_) => FocusNode());
   bool _otpVerified = false;
+  bool _hardwareBillAdded = false;
 
   @override
   void initState() {
     super.initState();
     _refreshData();
+  }
+
+  @override
+  void dispose() {
+    for (var c in _otpControllers) {
+      c.dispose();
+    }
+    for (var f in _otpFocusNodes) {
+      f.dispose();
+    }
+    super.dispose();
   }
 
   void _refreshData() {
@@ -32,108 +43,259 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     });
   }
 
+  void _onOtpChanged(int index, String value) {
+    if (value.isNotEmpty) {
+      if (index < 3) {
+        _otpFocusNodes[index + 1].requestFocus();
+      } else {
+        _otpFocusNodes[index].unfocus();
+        final code = _otpControllers.map((c) => c.text).join();
+        if (code.length == 4) {
+          setState(() {
+            _otpVerified = true;
+          });
+        }
+      }
+    } else {
+      if (index > 0) {
+        _otpFocusNodes[index - 1].requestFocus();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<JobRequest>>(
       future: _jobFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8F9FC),
+            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+          );
         }
         if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Error: ${snapshot.error}')));
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8F9FC),
+            body: Center(child: Text('Error loading job: ${snapshot.error}')),
+          );
         }
-        
+
         final jobs = snapshot.data ?? [];
         final job = jobs.firstWhere(
-          (j) => j.id == widget.jobId, 
+          (j) => j.id == widget.jobId,
           orElse: () => JobRequest(
-            id: widget.jobId, customerId: '', customerName: 'Unknown', customerLocation: '', customerPhone: '', serviceName: '', date: '', time: '', baseAmount: 0, laborAllowance: 0, status: BookingStatus.pending, distanceKm: '', createdAt: ''
-          )
+            id: widget.jobId,
+            customerId: '',
+            customerName: 'Ananya Sharma',
+            customerLocation: 'Flat 402, Sai Shraddha Apts, Ideal Colony, Paud Road, Kothrud, Pune - 411038',
+            customerPhone: '+919876543210',
+            serviceName: 'Plumbing Inspection & Tap Leakage Repair',
+            date: 'Today',
+            time: '11:00 AM – 12:00 PM',
+            baseAmount: 399,
+            laborAllowance: 86,
+            status: BookingStatus.inProgress,
+            distanceKm: '1.8 KM',
+            createdAt: '10 mins ago',
+          ),
         );
 
-    
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        title: Text('Job Detail View', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.marginMobile),
-        child: Column(
-          children: [
-            _buildStatusStrip(job.status),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildCustomerCard(job),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildProgressTimeline(job.status),
-            const SizedBox(height: AppSpacing.spacingMd),
-            if (job.status != BookingStatus.completed) _buildActionArea(job),
-            const SizedBox(height: AppSpacing.spacingMd),
-            _buildBillingBreakdown(job),
-            const SizedBox(height: 80),
-          ],
-        ),
-      ),
-    );
-      }
+        return Scaffold(
+          backgroundColor: const Color(0xFFF8F9FC),
+          appBar: _buildHeader(job),
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.marginMobile,
+              vertical: AppSpacing.spacingSm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildCustomerCard(job),
+                const SizedBox(height: 12),
+                _buildServiceTimeline(job.status),
+                const SizedBox(height: 12),
+                _buildActionAndOtpSection(job),
+                const SizedBox(height: 12),
+                _buildSettlementCard(job),
+                const SizedBox(height: 12),
+                _buildLiaisonCard(),
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildStatusStrip(BookingStatus status) {
-    String label = '';
-    Color color = AppColors.primaryContainer;
-    Color textColor = AppColors.onPrimary;
-
-    switch (status) {
-      case BookingStatus.pending: label = 'Pending Accept'; break;
-      case BookingStatus.accepted: label = 'Accepted'; break;
-      case BookingStatus.onTheWay: label = 'Travelling'; break;
-      case BookingStatus.arrived: label = 'Arrived'; break;
-      case BookingStatus.inProgress: label = 'In Progress'; break;
-      case BookingStatus.completed: 
-        label = 'Completed'; 
-        color = AppColors.tertiaryContainer;
-        break;
-      default: label = 'Unknown';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingMd, vertical: AppSpacing.spacingXs),
-      decoration: BoxDecoration(color: color, borderRadius: AppRadius.radiusXl),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+  PreferredSizeWidget _buildHeader(JobRequest job) {
+    return AppBar(
+      backgroundColor: Colors.white.withValues(alpha: 0.95),
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.05),
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back, color: Color(0xFF111111)),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              if (status != BookingStatus.completed)
-                Container(
-                  width: 12,
-                  height: 12,
-                  margin: const EdgeInsets.only(right: AppSpacing.spacingXs),
-                  decoration: const BoxDecoration(color: AppColors.secondaryContainer, shape: BoxShape.circle),
+              Text(
+                'Job #${job.id.length > 8 ? job.id.substring(0, 7).toUpperCase() : job.id.toUpperCase()}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111111),
+                  letterSpacing: -0.2,
                 ),
-              Text('Active Job #${widget.jobId.toUpperCase()}', style: AppTypography.labelMd.copyWith(color: textColor, letterSpacing: 1.2)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3FCEF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(radius: 3, backgroundColor: Color(0xFF00875A)),
+                    SizedBox(width: 4),
+                    Text(
+                      'LIVE',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF00875A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLowest.withValues(alpha: 0.15), borderRadius: AppRadius.radiusFull),
-            child: Text(label, style: AppTypography.labelSm.copyWith(color: textColor)),
+          Text(
+            job.serviceName,
+            style: const TextStyle(
+              fontSize: 11,
+              color: Color(0xFF6C6C70),
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
+      actions: [
+        Container(
+          margin: const EdgeInsets.only(right: 8),
+          child: OutlinedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.support_agent, size: 16, color: Color(0xFF111111)),
+            label: const Text(
+              'Help',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111111),
+              ),
+            ),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: Color(0xFFE5E5EA)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+            ),
+          ),
+        ),
+        Container(
+          width: 32,
+          height: 32,
+          margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
+          decoration: const BoxDecoration(
+            color: Color(0xFF111111),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: const Text(
+            'RP',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 11,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildCustomerCard(JobRequest job) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00875A),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _getStatusTitle(job.status).toUpperCase(),
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                ),
+                child: const Text(
+                  'ShramSetu Partner',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6C6C70),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -143,80 +305,122 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   children: [
                     Row(
                       children: [
-                        Text(job.customerName, style: AppTypography.titleLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                        const SizedBox(width: AppSpacing.spacing2xs),
-                        const Icon(Icons.verified, size: 18, color: AppColors.onTertiaryContainer),
+                        Text(
+                          job.customerName,
+                          style: const TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111111),
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        const Icon(Icons.verified, size: 16, color: Color(0xFF00875A)),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(job.serviceName, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text(
+                      job.serviceName,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6C6C70),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.schedule, size: 14, color: Color(0xFF111111)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${job.date}, ${job.time}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF111111),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
               Container(
                 width: 48,
                 height: 48,
-                decoration: const BoxDecoration(color: AppColors.surfaceContainer, shape: BoxShape.circle),
-                child: const Icon(Icons.person, color: AppColors.outline),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFFF8F9FA),
+                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                ),
+                child: const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingSm),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-            child: Column(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFEFEFF4)),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    const Icon(Icons.schedule, size: 20, color: AppColors.secondary),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Text('${job.date}, ${job.time}', style: AppTypography.labelLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(Icons.location_on, size: 20, color: AppColors.outline),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Expanded(
-                      child: Text(job.customerLocation, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                const Icon(Icons.location_on, size: 16, color: Color(0xFF6C6C70)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    job.customerLocation,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF333333),
+                      height: 1.3,
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusLg),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.call, size: 20, color: AppColors.onPrimary),
-                      const SizedBox(width: 8),
-                      Text('Call Customer', style: AppTypography.labelLg.copyWith(color: AppColors.onPrimary)),
-                    ],
+                child: SizedBox(
+                  height: 44,
+                  child: ElevatedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.call, size: 16),
+                    label: const Text(
+                      'Call Customer',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF111111),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: AppSpacing.spacingSm),
+              const SizedBox(width: 10),
               Expanded(
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusLg),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.navigation, size: 20, color: AppColors.secondary),
-                      const SizedBox(width: 8),
-                      Text('Open in Maps', style: AppTypography.labelLg.copyWith(color: AppColors.onSurface)),
-                    ],
+                child: SizedBox(
+                  height: 44,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.navigation, size: 16, color: Color(0xFF111111)),
+                    label: const Text(
+                      'Open in Maps',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111111)),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: Colors.white,
+                    ),
                   ),
                 ),
               ),
@@ -227,36 +431,133 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     );
   }
 
-  Widget _buildProgressTimeline(BookingStatus currentStatus) {
+  Widget _buildServiceTimeline(BookingStatus status) {
+    final stepIndex = _getStepIndex(status);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Job Progress Timeline', style: AppTypography.titleMd.copyWith(color: AppColors.onSurface)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'SERVICE TIMELINE',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  Text(
+                    'Step ${stepIndex + 1} of 5 active',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                  ),
+                ],
+              ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.secondaryFixed.withValues(alpha: 0.5), borderRadius: AppRadius.radiusFull),
-                child: Text('Tracking', style: AppTypography.labelSm.copyWith(color: AppColors.secondary)),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3FCEF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _getStatusBadgeText(status),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF00875A),
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingMd),
-          _buildTimelineItem('Job Accepted', Icons.check, true, currentStatus == BookingStatus.accepted),
-          _buildTimelineItem('Travelling', Icons.check, currentStatus.index >= BookingStatus.onTheWay.index, currentStatus == BookingStatus.onTheWay),
-          _buildTimelineItem('Arrived at Location', Icons.location_on, currentStatus.index >= BookingStatus.arrived.index, currentStatus == BookingStatus.arrived),
-          _buildTimelineItem('Work in Progress', Icons.build, currentStatus.index >= BookingStatus.inProgress.index, currentStatus == BookingStatus.inProgress),
-          _buildTimelineItem('Completed & Settled', Icons.verified, currentStatus.index >= BookingStatus.completed.index, currentStatus == BookingStatus.completed, isLast: true),
+          const SizedBox(height: 16),
+          _buildTimelineStep(
+            title: 'Job Accepted',
+            subtitle: 'Assigned to Partner Rahul Patil',
+            time: '10:15 AM',
+            isCompleted: stepIndex > 0,
+            isCurrent: stepIndex == 0,
+            icon: Icons.check,
+          ),
+          _buildTimelineStep(
+            title: 'Started Travel',
+            subtitle: 'Departed from Kothrud Stand',
+            time: '10:40 AM',
+            isCompleted: stepIndex > 1,
+            isCurrent: stepIndex == 1,
+            icon: Icons.directions_car,
+          ),
+          _buildTimelineStep(
+            title: 'Arrived at Location',
+            subtitle: 'Checked in at Sai Shraddha Apts',
+            time: '11:00 AM',
+            isCompleted: stepIndex > 2,
+            isCurrent: stepIndex == 2,
+            icon: Icons.location_on,
+          ),
+          _buildTimelineStep(
+            title: 'Repair in Progress',
+            subtitle: 'Tap spindle dismantle & gasket replace',
+            time: '11:10 AM',
+            isCompleted: stepIndex > 3,
+            isCurrent: stepIndex == 3,
+            icon: Icons.build,
+          ),
+          _buildTimelineStep(
+            title: 'Completion & Settlement',
+            subtitle: 'Customer OTP verification required',
+            time: 'Pending',
+            isCompleted: stepIndex == 4,
+            isCurrent: stepIndex == 4,
+            icon: Icons.lock,
+            isLast: true,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildTimelineItem(String title, IconData icon, bool isCompleted, bool isCurrent, {bool isLast = false}) {
+  Widget _buildTimelineStep({
+    required String title,
+    required String subtitle,
+    required String time,
+    required bool isCompleted,
+    required bool isCurrent,
+    required IconData icon,
+    bool isLast = false,
+  }) {
+    Color iconBg;
+    Color iconColor;
+    if (isCompleted) {
+      iconBg = const Color(0xFF00875A);
+      iconColor = Colors.white;
+    } else if (isCurrent) {
+      iconBg = const Color(0xFF111111);
+      iconColor = Colors.white;
+    } else {
+      iconBg = const Color(0xFFF0F0F4);
+      iconColor = const Color(0xFFA0A0A5);
+    }
+
     return IntrinsicHeight(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -264,37 +565,77 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           Column(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
-                  color: isCompleted ? (isCurrent ? AppColors.secondaryContainer : AppColors.tertiaryContainer) : AppColors.surfaceContainerHigh,
+                  color: iconBg,
                   shape: BoxShape.circle,
-                  border: isCurrent ? Border.all(color: AppColors.secondaryFixed.withValues(alpha: 0.5), width: 4) : null,
                 ),
-                child: Icon(icon, size: 16, color: isCompleted ? AppColors.onPrimary : AppColors.outline),
+                child: Icon(icon, size: 13, color: iconColor),
               ),
-              if (!isLast) Expanded(child: Container(width: 2, color: isCompleted && !isCurrent ? AppColors.tertiaryContainer : AppColors.surfaceVariant)),
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 1.5,
+                    color: isCompleted ? const Color(0xFF00875A) : const Color(0xFFE5E5EA),
+                  ),
+                ),
             ],
           ),
-          const SizedBox(width: AppSpacing.spacingMd),
+          const SizedBox(width: 12),
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.spacingLg),
+              padding: EdgeInsets.only(bottom: isLast ? 0 : 16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(title, style: AppTypography.labelLg.copyWith(color: isCompleted ? (isCurrent ? AppColors.secondary : AppColors.onSurface) : AppColors.outline, fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal)),
-                      if (isCurrent) ...[
-                        const SizedBox(width: AppSpacing.spacingXs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.secondary, borderRadius: AppRadius.radiusSm),
-                          child: Text('CURRENT', style: AppTypography.labelSm.copyWith(color: AppColors.onSecondary)),
-                        ),
-                      ],
+                      Row(
+                        children: [
+                          Text(
+                            title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                              color: isCurrent || isCompleted ? const Color(0xFF111111) : const Color(0xFFA0A0A5),
+                            ),
+                          ),
+                          if (isCurrent) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF111111),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                'CURRENT',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      Text(
+                        time,
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isCurrent || isCompleted ? const Color(0xFF6C6C70) : const Color(0xFFA0A0A5),
+                    ),
                   ),
                 ],
               ),
@@ -305,185 +646,182 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     );
   }
 
-  Widget _buildActionArea(JobRequest job) {
-    String actionText = '';
-    IconData actionIcon = Icons.play_circle;
-    BookingStatus nextStatus = job.status;
-
-    switch (job.status) {
-      case BookingStatus.accepted:
-        actionText = 'Start Journey';
-        actionIcon = Icons.directions_car;
-        nextStatus = BookingStatus.onTheWay;
-        break;
-      case BookingStatus.onTheWay:
-        actionText = 'Mark as Arrived';
-        actionIcon = Icons.location_on;
-        nextStatus = BookingStatus.arrived;
-        break;
-      case BookingStatus.arrived:
-        actionText = 'Start Work at Customer Site';
-        actionIcon = Icons.play_circle;
-        nextStatus = BookingStatus.inProgress;
-        break;
-      case BookingStatus.inProgress:
-        actionText = 'Complete Work (Req. OTP)';
-        actionIcon = Icons.verified;
-        nextStatus = BookingStatus.completed;
-        break;
-      default:
-        break;
-    }
+  Widget _buildActionAndOtpSection(JobRequest job) {
+    final nextStatus = _getNextStatus(job.status);
+    final actionLabel = _getActionLabel(job.status);
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-      child: Column(
-        children: [
-          if (job.status == BookingStatus.inProgress) ...[
-            _buildOtpSection(),
-            const SizedBox(height: AppSpacing.spacingMd),
-          ],
-          GestureDetector(
-            onTap: () {
-              if (job.status == BookingStatus.inProgress && !_otpVerified) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please verify OTP first')));
-                return;
-              }
-              DI.workerRepo.updateBookingStatus(job.id, nextStatus).then((_) => _refreshData());
-              if (nextStatus == BookingStatus.completed) {
-                Navigator.of(context).pop();
-              }
-            },
-            child: Container(
-              height: 52,
-              decoration: BoxDecoration(color: (job.status == BookingStatus.inProgress && !_otpVerified) ? AppColors.surfaceContainerHigh : AppColors.secondary, borderRadius: AppRadius.radiusXl),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(actionIcon, color: AppColors.onSecondary, size: 22),
-                  const SizedBox(width: AppSpacing.spacingXs),
-                  Text(actionText, style: AppTypography.labelLg.copyWith(color: AppColors.onSecondary, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildOtpSection() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusXl),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.pin, color: AppColors.secondary, size: 20),
-                  const SizedBox(width: 4),
-                  Text('Customer Escrow Release OTP', style: AppTypography.titleMd.copyWith(color: AppColors.onSurface)),
-                ],
-              ),
-              Text('4 Digits', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingXs),
-          Text('Ask customer for completion OTP after they inspect your plumbing repair.', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-          const SizedBox(height: AppSpacing.spacingSm),
-          if (_otpVerified)
-            Container(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacingXs),
-              decoration: BoxDecoration(color: AppColors.tertiaryFixed, borderRadius: AppRadius.radiusSm),
-              alignment: Alignment.center,
-              child: Text('✓ OTP Verified! Funds releasing to Bank Account', style: AppTypography.labelMd.copyWith(color: AppColors.onTertiaryFixedVariant)),
-            )
-          else
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(4, (index) => Container(
-                width: 56,
-                height: 56,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusLg, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-                alignment: Alignment.center,
-                child: TextField(
-                  textAlign: TextAlign.center,
-                  keyboardType: TextInputType.number,
-                  maxLength: 1,
-                  decoration: const InputDecoration(counterText: '', border: InputBorder.none),
-                  style: AppTypography.currencyDisplay,
-                  onChanged: (val) {
-                    if (val.isNotEmpty && index == 3) {
-                      setState(() => _otpVerified = true);
+          if (actionLabel.isNotEmpty) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (job.status == BookingStatus.inProgress && !_otpVerified) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please verify customer OTP first before completing job.')),
+                    );
+                    return;
+                  }
+                  await DI.workerRepo.updateBookingStatus(job.id, nextStatus);
+                  _refreshData();
+                  if (nextStatus == BookingStatus.completed) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Job successfully completed! Payout queued to Bank account.')),
+                      );
+                      Navigator.of(context).pop();
                     }
-                  },
+                  }
+                },
+                icon: Icon(
+                  job.status == BookingStatus.inProgress ? Icons.check_circle : Icons.play_circle_outline,
+                  size: 18,
                 ),
-              )),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBillingBreakdown(JobRequest job) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Cooperative Escrow Breakdown', style: AppTypography.titleMd.copyWith(color: AppColors.onSurface)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.3), borderRadius: AppRadius.radiusFull),
-                child: Row(
-                  children: [
-                    const Icon(Icons.lock, size: 14, color: AppColors.onTertiaryContainer),
-                    const SizedBox(width: 4),
-                    Text('Escrow Locked', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer)),
-                  ],
+                label: Text(
+                  actionLabel,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111111),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Base Visit & Inspection Fee', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
-              Text('₹${job.baseAmount.toInt()}.00', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 4),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Skill & Labor Allowance', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
-              Text('₹${job.laborAllowance.toInt()}.00', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.spacingMd),
+            ),
+            const SizedBox(height: 14),
+          ],
           Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingSm),
-            decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusXl),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFBFBFD),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFEAEAEA)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Total Cooperative Payout', style: AppTypography.titleMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                    Text('0% Commission Deducted', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
+                    const Row(
+                      children: [
+                        Icon(Icons.key, size: 16, color: Color(0xFF111111)),
+                        SizedBox(width: 6),
+                        Text(
+                          'Customer Completion OTP',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111111),
+                          ),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE5E5EA),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        '4 DIGITS',
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF6C6C70),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                Text('₹${job.totalAmount.toInt()}.00', style: AppTypography.currencyDisplay.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold, fontSize: 20)),
+                const SizedBox(height: 6),
+                Text(
+                  'Enter the 4-digit code provided by ${job.customerName} after job inspection. Upon submission, ₹${job.totalAmount.toInt()}.00 will be instantly transferred via UPI.',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70), height: 1.35),
+                ),
+                const SizedBox(height: 12),
+                if (_otpVerified)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3FCEF),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.check_circle, size: 16, color: Color(0xFF00875A)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'OTP Verified! Instant NEFT payout queued to Rahul Patil (**4910)',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF006644),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(4, (i) {
+                      return Container(
+                        width: 48,
+                        height: 48,
+                        margin: const EdgeInsets.symmetric(horizontal: 5),
+                        child: TextField(
+                          controller: _otpControllers[i],
+                          focusNode: _otpFocusNodes[i],
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          maxLength: 1,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111111),
+                          ),
+                          decoration: InputDecoration(
+                            counterText: '',
+                            contentPadding: EdgeInsets.zero,
+                            filled: true,
+                            fillColor: Colors.white,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              borderSide: const BorderSide(color: Color(0xFF111111), width: 1.5),
+                            ),
+                          ),
+                          onChanged: (val) => _onOtpChanged(i, val),
+                        ),
+                      );
+                    }),
+                  ),
               ],
             ),
           ),
@@ -491,5 +829,337 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       ),
     );
   }
-}
 
+  Widget _buildSettlementCard(JobRequest job) {
+    final extraCost = _hardwareBillAdded ? 140 : 0;
+    final total = job.totalAmount.toInt() + extraCost;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'TARIFF & ESCROW SETTLEMENT',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111111),
+                  letterSpacing: 0.5,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3FCEF),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified_user, size: 12, color: Color(0xFF00875A)),
+                    SizedBox(width: 3),
+                    Text(
+                      'Escrow Secured',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF00875A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildSettlementRow('Base Visit & Inspection Fee', '₹${job.baseAmount.toInt()}.00'),
+          const Divider(height: 16, color: Color(0xFFF0F0F4)),
+          _buildSettlementRow('Skill & Labor Allowance', '₹${job.laborAllowance.toInt()}.00'),
+          if (_hardwareBillAdded) ...[
+            const Divider(height: 16, color: Color(0xFFF0F0F4)),
+            _buildSettlementRow('Extra Brass Valve & Washer Ring', '+ ₹140.00', isHighlight: true),
+          ],
+          const SizedBox(height: 12),
+          if (!_hardwareBillAdded)
+            SizedBox(
+              width: double.infinity,
+              height: 40,
+              child: OutlinedButton.icon(
+                onPressed: () {
+                  setState(() {
+                    _hardwareBillAdded = true;
+                  });
+                },
+                icon: const Icon(Icons.receipt_long, size: 16, color: Color(0xFF111111)),
+                label: const Text(
+                  '+ Add Hardware Parts Bill',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111111),
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFFE5E5EA)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  backgroundColor: const Color(0xFFF8F9FA),
+                ),
+              ),
+            ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'GUARANTEED PAYOUT',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFFA0A0A5),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      'Instant Direct UPI • Rahul Patil',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFFE5E5EA),
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '₹$total.00',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSettlementRow(String label, String value, {bool isHighlight = false}) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: isHighlight ? const Color(0xFF7A4100) : const Color(0xFF6C6C70),
+            fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 12,
+            color: isHighlight ? const Color(0xFF7A4100) : const Color(0xFF111111),
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLiaisonCard() {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8F9FA),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.shield, size: 16, color: Color(0xFF111111)),
+                  SizedBox(width: 6),
+                  Text(
+                    'ShramSetu Guild On-Duty Liaison',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3FCEF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Available',
+                  style: TextStyle(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF00875A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Facing technical blockers or dispute on site? Kothrud ward senior union coordinator is available for immediate assistance.',
+            style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70), height: 1.3),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              border: Border.all(color: const Color(0xFFE5E5EA)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.phone_in_talk, size: 15, color: Color(0xFF111111)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Call Kothrud Ward Liaison',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111111),
+                      ),
+                    ),
+                  ],
+                ),
+                Icon(Icons.chevron_right, size: 16, color: Color(0xFF6C6C70)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  int _getStepIndex(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+      case BookingStatus.accepted:
+        return 0;
+      case BookingStatus.onTheWay:
+        return 1;
+      case BookingStatus.arrived:
+        return 2;
+      case BookingStatus.inProgress:
+        return 3;
+      case BookingStatus.completed:
+        return 4;
+      default:
+        return 0;
+    }
+  }
+
+  String _getStatusTitle(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return 'Pending Acceptance';
+      case BookingStatus.accepted:
+        return 'Job Accepted';
+      case BookingStatus.onTheWay:
+        return 'Travelling to Site';
+      case BookingStatus.arrived:
+        return 'Arrived at Doorstep';
+      case BookingStatus.inProgress:
+        return 'In Progress • Scheduled Visit';
+      case BookingStatus.completed:
+        return 'Completed & Settled';
+      default:
+        return 'Scheduled Visit';
+    }
+  }
+
+  String _getStatusBadgeText(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+      case BookingStatus.accepted:
+        return 'Dispatched';
+      case BookingStatus.onTheWay:
+        return 'In Transit';
+      case BookingStatus.arrived:
+      case BookingStatus.inProgress:
+        return 'On Site';
+      case BookingStatus.completed:
+        return 'Completed';
+      default:
+        return 'Active';
+    }
+  }
+
+  BookingStatus _getNextStatus(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+      case BookingStatus.accepted:
+        return BookingStatus.onTheWay;
+      case BookingStatus.onTheWay:
+        return BookingStatus.arrived;
+      case BookingStatus.arrived:
+        return BookingStatus.inProgress;
+      case BookingStatus.inProgress:
+        return BookingStatus.completed;
+      default:
+        return BookingStatus.completed;
+    }
+  }
+
+  String _getActionLabel(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+      case BookingStatus.accepted:
+        return 'Start Journey to Customer';
+      case BookingStatus.onTheWay:
+        return 'Mark as Arrived at Location';
+      case BookingStatus.arrived:
+        return 'Mark as: Started Work at Customer Site';
+      case BookingStatus.inProgress:
+        return 'Complete Work (Req. Customer OTP)';
+      default:
+        return '';
+    }
+  }
+}

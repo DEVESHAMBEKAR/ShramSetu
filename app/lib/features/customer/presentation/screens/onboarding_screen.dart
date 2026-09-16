@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_radius.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -13,22 +10,31 @@ class OnboardingScreen extends StatefulWidget {
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
   String _selectedRole = 'customer'; // 'customer' or 'worker'
-  String _selectedLanguage = 'en'; // 'en', 'mr', 'hi'
+  String _selectedLanguage = 'en'; // 'en', 'hi', 'mr'
 
   void _handleContinue() {
     if (_selectedRole == 'customer') {
       Navigator.of(context).pushReplacementNamed('/login/customer');
-    } else if (_selectedRole == 'worker') {
-      Navigator.of(context).pushReplacementNamed('/login/worker');
     } else {
-      Navigator.of(context).pushReplacementNamed('/login/admin');
+      Navigator.of(context).pushReplacementNamed('/login/worker');
+    }
+  }
+
+  String get _buttonText {
+    switch (_selectedLanguage) {
+      case 'hi':
+        return 'आगे बढ़ें (Continue)';
+      case 'mr':
+        return 'पुढे सुरू ठेवा (Continue)';
+      default:
+        return 'Continue / Next';
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: const Color(0xFFF7F7F8),
       body: SafeArea(
         child: Column(
           children: [
@@ -36,44 +42,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(
                   horizontal: AppSpacing.marginMobile,
+                  vertical: AppSpacing.spacingSm,
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const SizedBox(height: AppSpacing.spacingMd),
-                    _buildHeroHeader(),
-                    const SizedBox(height: AppSpacing.spacingLg),
-                    _buildIllustrationCard(),
-                    const SizedBox(height: AppSpacing.spacingMd),
-                    Text(
-                      'Choose Your Language',
-                      style: AppTypography.headlineLgMobile.copyWith(
-                        color: AppColors.onSurface,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacing4xs),
-                    Text(
-                      'आपली भाषा निवडा • अपनी भाषा चुनें',
-                      style: AppTypography.titleMd.copyWith(
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacing3xs),
-                    Text(
-                      'Select your preferred language for service booking and direct cooperative customer support.',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.bodySm.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacingMd),
-                    _buildRoleSelector(),
-                    const SizedBox(height: AppSpacing.spacingLg),
-                    _buildLanguageOptions(),
-                    const SizedBox(height: AppSpacing.spacingXl),
-                    _buildTrustBanner(),
-                    const SizedBox(height: AppSpacing.spacingLg),
+                    _buildHeader(),
+                    const SizedBox(height: 14),
+                    _buildHeroBanner(),
+                    const SizedBox(height: 16),
+                    _buildTitle(),
+                    const SizedBox(height: 14),
+                    _buildRoleSegmentedControl(),
+                    const SizedBox(height: 14),
+                    _buildLanguageCards(),
+                    const SizedBox(height: 14),
+                    _buildFeaturesStrip(),
+                    const SizedBox(height: 12),
                     _buildAudioPill(),
-                    const SizedBox(height: AppSpacing.spacing3xl),
+                    const SizedBox(height: 16),
                   ],
                 ),
               ),
@@ -85,100 +72,125 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildHeroHeader() {
+  Widget _buildHeader() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFF111111),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.08),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              child: const Icon(Icons.handshake_outlined, color: Colors.white, size: 20),
+            ),
+            const SizedBox(width: 10),
+            const Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ShramSetu',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111111),
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                Text(
+                  'National Workers & Trade Cooperative',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF71717A),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
         Container(
-          width: 40,
-          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: AppRadius.radiusXl,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 4,
-                offset: const Offset(0, 2),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFFEAEAEA)),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF00875A)),
+              SizedBox(width: 5),
+              Text(
+                'Pune • Live',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF71717A),
+                ),
               ),
             ],
           ),
-          child: const Icon(Icons.handshake_outlined, color: AppColors.onPrimary, size: 24),
-        ),
-        const SizedBox(width: AppSpacing.spacingXs),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'ShramSetu',
-              style: AppTypography.headlineSm.copyWith(
-                color: AppColors.primary,
-                letterSpacing: -0.5,
-              ),
-            ),
-            Text(
-              'श्रमसेतू सहकार मंच',
-              style: AppTypography.labelSm.copyWith(
-                color: AppColors.secondary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
         ),
       ],
     );
   }
 
-  Widget _buildIllustrationCard() {
+  Widget _buildHeroBanner() {
     return Container(
       width: double.infinity,
-      height: 144, // 36 * 4
+      height: 136,
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainer,
-        borderRadius: AppRadius.radiusXl,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
         image: const DecorationImage(
           image: NetworkImage(
-            'https://lh3.googleusercontent.com/aida-public/AB6AXuDj_q9BXU6qHaTPda1q03V9Tf3_1exNxkPuWc6hnMf22zLFEF7s_kxSJjAtTI8p_lIwHALrj09KNrGAyl4V7p1KZ0QQOFuOElfYfWfvE7QsKi_grlzO2YGPKinOT7hjLb0puxZ5Oed7B6-NtatqH46OqeVl3vpFUMmTVOn13T1ecQh3zRXh0X-jzDHS8h4XT4f2X2gRMHmWp77Lz_RS7XmmF2FBa-IwM6_qJHjrJVzLz5cyfoV-4MW4zQ'
+            'https://lh3.googleusercontent.com/aida-public/AB6AXuDj_q9BXU6qHaTPda1q03V9Tf3_1exNxkPuWc6hnMf22zLFEF7s_kxSJjAtTI8p_lIwHALrj09KNrGAyl4V7p1KZ0QQOFuOElfYfWfvE7QsKi_grlzO2YGPKinOT7hjLb0puxZ5Oed7B6-NtatqH46OqeVl3vpFUMmTVOn13T1ecQh3zRXh0X-jzDHS8h4XT4f2X2gRMHmWp77Lz_RS7XmmF2FBa-IwM6_qJHjrJVzLz5cyfoV-4MW4zQ',
           ),
           fit: BoxFit.cover,
         ),
       ),
       child: Stack(
         children: [
-          Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 64,
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(12),
-                  bottomRight: Radius.circular(12),
-                ),
-                gradient: LinearGradient(
-                  begin: Alignment.bottomCenter,
-                  end: Alignment.topCenter,
-                  colors: [
-                    AppColors.primary.withOpacity(0.7),
-                    Colors.transparent,
-                  ],
-                ),
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.25),
+                  Colors.black.withValues(alpha: 0.8),
+                ],
               ),
             ),
           ),
           Positioned(
-            bottom: AppSpacing.spacingSm,
-            left: AppSpacing.spacingSm,
+            bottom: 10,
+            left: 12,
+            right: 12,
             child: Row(
               children: [
-                const Icon(Icons.verified_outlined, color: AppColors.tertiaryFixed, size: 18),
-                const SizedBox(width: AppSpacing.spacing2xs),
-                Text(
-                  'Fair Wages • Trade Union Backed',
-                  style: AppTypography.labelSm.copyWith(
-                    color: AppColors.onPrimary,
-                    fontWeight: FontWeight.w500,
+                const Icon(Icons.verified, size: 16, color: Color(0xFF4ADE80)),
+                const SizedBox(width: 6),
+                const Text(
+                  '100% Union Backed • Direct Karigar Payouts',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
                   ),
                 ),
               ],
@@ -189,95 +201,154 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildRoleSelector() {
+  Widget _buildTitle() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Choose Your Language',
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: Color(0xFF111111),
+            letterSpacing: -0.4,
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          'आपली भाषा निवडा • अपनी भाषा चुनें. Select your preferred language to customize your booking experience.',
+          style: TextStyle(fontSize: 12, color: Color(0xFF71717A), height: 1.35),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleSegmentedControl() {
+    final isCustomer = _selectedRole == 'customer';
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.spacing3xs),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerHigh,
-        borderRadius: AppRadius.radiusXl,
+        color: const Color(0xFFECECEE),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
         children: [
           Expanded(
-            child: _buildRoleTab('customer', Icons.home_repair_service_outlined, 'Customer', AppColors.secondary),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedRole = 'customer'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: 42,
+                decoration: BoxDecoration(
+                  color: isCustomer ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: isCustomer
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          )
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.home_repair_service,
+                      size: 16,
+                      color: isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'I need services',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: isCustomer ? FontWeight.w800 : FontWeight.w600,
+                        color: isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           Expanded(
-            child: _buildRoleTab('worker', Icons.engineering_outlined, 'Worker', AppColors.primary),
-          ),
-          Expanded(
-            child: _buildRoleTab('admin', Icons.corporate_fare, 'Admin', AppColors.tertiaryFixed),
+            child: GestureDetector(
+              onTap: () => setState(() => _selectedRole = 'worker'),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                height: 42,
+                decoration: BoxDecoration(
+                  color: !isCustomer ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: !isCustomer
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.05),
+                            blurRadius: 4,
+                            offset: const Offset(0, 1),
+                          )
+                        ]
+                      : null,
+                ),
+                alignment: Alignment.center,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.engineering,
+                      size: 16,
+                      color: !isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'I am a Karigar',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: !isCustomer ? FontWeight.w800 : FontWeight.w600,
+                        color: !isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildRoleTab(String roleId, IconData icon, String label, Color iconColor) {
-    final isSelected = _selectedRole == roleId;
-    return GestureDetector(
-      onTap: () => setState(() => _selectedRole = roleId),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.spacingSm,
-          horizontal: 4,
-        ),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.surfaceContainerLowest : Colors.transparent,
-          borderRadius: AppRadius.radiusLg,
-          boxShadow: isSelected ? [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4)] : [],
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              icon,
-              size: 18,
-              color: isSelected ? iconColor : AppColors.onSurfaceVariant,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: AppTypography.labelLg.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOptions() {
+  Widget _buildLanguageCards() {
     return Column(
       children: [
         _buildLanguageCard(
           code: 'en',
-          iconText: 'En',
+          prefix: 'En',
           title: 'English',
-          subtitle: 'Standard platform interface & live updates',
-          badgeText: 'Default',
-          badgeBg: AppColors.primaryContainer.withOpacity(0.1),
-          badgeColor: AppColors.primary,
+          badge: 'Recommended',
+          subtitle: 'Standard interface & verified billings',
         ),
-        const SizedBox(height: AppSpacing.spacingSm),
-        _buildLanguageCard(
-          code: 'mr',
-          iconText: 'म',
-          title: 'मराठी',
-          subtitle: 'पुणे व महाराष्ट्र कामगार सहकारी मंच',
-          badgeText: 'स्थानिक',
-          badgeBg: AppColors.secondaryFixed,
-          badgeColor: AppColors.onSecondaryFixedVariant,
-        ),
-        const SizedBox(height: AppSpacing.spacingSm),
+        const SizedBox(height: 8),
         _buildLanguageCard(
           code: 'hi',
-          iconText: 'हिं',
-          title: 'हिन्दी',
-          subtitle: 'कुशल कामगार और पारदर्शी सेवा गारंटी',
+          prefix: 'हिं',
+          title: 'हिंदी',
+          badge: 'राष्ट्रभाषा',
+          subtitle: 'कुशल कारीगर और पारदर्शी सेवा गारंटी',
+        ),
+        const SizedBox(height: 8),
+        _buildLanguageCard(
+          code: 'mr',
+          prefix: 'म',
+          title: 'मराठी',
+          badge: 'स्थानिक भाषा • पुणे',
+          subtitle: 'पुणे व महाराष्ट्र कामगार सहकारी मंच',
+          badgeColor: const Color(0xFF92400E),
+          badgeBg: const Color(0xFFFEF3C7),
         ),
       ],
     );
@@ -285,112 +356,121 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildLanguageCard({
     required String code,
-    required String iconText,
+    required String prefix,
     required String title,
+    required String badge,
     required String subtitle,
-    String? badgeText,
-    Color? badgeBg,
     Color? badgeColor,
+    Color? badgeBg,
   }) {
-    final bool isSelected = _selectedLanguage == code;
-    
+    final isSelected = _selectedLanguage == code;
     return GestureDetector(
       onTap: () => setState(() => _selectedLanguage = code),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        constraints: const BoxConstraints(minHeight: 64),
-        padding: const EdgeInsets.all(AppSpacing.spacingMd),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: AppRadius.radiusXl,
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            width: 2,
+            color: isSelected ? const Color(0xFF111111) : const Color(0xFFEAEAEA),
+            width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 4,
-              offset: const Offset(0, 2),
+              offset: const Offset(0, 1),
             ),
           ],
         ),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primaryFixed : AppColors.surfaceContainerHigh,
-                borderRadius: AppRadius.radiusXl,
-              ),
-              child: Center(
-                child: Text(
-                  iconText,
-                  style: AppTypography.titleLg.copyWith(
-                    color: isSelected ? AppColors.primary : AppColors.onSurface,
-                    fontWeight: FontWeight.bold,
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF4F4F5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFEAEAEA)),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    prefix,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                    ),
                   ),
                 ),
-              ),
-            ),
-            const SizedBox(width: AppSpacing.spacingMd),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: AppTypography.titleLg.copyWith(
-                          color: AppColors.onSurface,
-                        ),
-                      ),
-                      if (badgeText != null) ...[
-                        const SizedBox(width: AppSpacing.spacingXs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: AppSpacing.spacing2xs,
-                            vertical: AppSpacing.spacing4xs,
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF111111),
                           ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: badgeBg,
-                            borderRadius: BorderRadius.circular(4),
+                            color: badgeBg ?? const Color(0xFFF4F4F5),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: const Color(0xFFE5E5EA)),
                           ),
                           child: Text(
-                            badgeText,
-                            style: AppTypography.labelSm.copyWith(
-                              color: badgeColor,
+                            badge,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: badgeColor ?? const Color(0xFF111111),
                             ),
                           ),
                         ),
                       ],
-                    ],
-                  ),
-                  Text(
-                    subtitle,
-                    style: AppTypography.bodySm.copyWith(
-                      color: AppColors.onSurfaceVariant,
                     ),
-                  ),
-                ],
-              ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF71717A)),
+                    ),
+                  ],
+                ),
+              ],
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 32,
-              height: 32,
+            Container(
+              width: 20,
+              height: 20,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : AppColors.surfaceContainerHigh,
                 shape: BoxShape.circle,
+                color: isSelected ? const Color(0xFF111111) : Colors.white,
+                border: Border.all(
+                  color: isSelected ? const Color(0xFF111111) : const Color(0xFFD4D4D8),
+                  width: 2,
+                ),
               ),
-              child: Icon(
-                Icons.check,
-                size: 20,
-                color: isSelected ? AppColors.onPrimary : AppColors.outline.withOpacity(0.5),
-              ),
+              alignment: Alignment.center,
+              child: isSelected
+                  ? Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                    )
+                  : null,
             ),
           ],
         ),
@@ -398,138 +478,128 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     );
   }
 
-  Widget _buildTrustBanner() {
+  Widget _buildFeaturesStrip() {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: AppRadius.radiusXl,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 4,
-            offset: const Offset(0, 2),
-          ),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEAEAEA)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: const Row(
+        mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          Container(
-            padding: const EdgeInsets.all(AppSpacing.spacing2xs),
-            margin: const EdgeInsets.only(top: AppSpacing.spacing4xs),
-            decoration: BoxDecoration(
-              color: AppColors.tertiaryFixedDim.withOpacity(0.4),
-              borderRadius: AppRadius.radiusLg,
-            ),
-            child: const Icon(
-              Icons.shield_outlined,
-              color: AppColors.tertiaryContainer,
-              size: 22,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.spacingSm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Cooperative Guarantee',
-                  style: AppTypography.titleMd.copyWith(
-                    color: AppColors.onSurface,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.spacing4xs),
-                Text(
-                  '100% Verified Tradespeople • Zero Middlemen Cuts • Fair Hourly Wages Guaranteed by Pune District Trade Union.',
-                  style: AppTypography.bodySm.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _FeatureItem(icon: Icons.payments, title: 'Direct Bank Pay', sub: '0% Middleman Cut', color: Color(0xFF00875A)),
+          _FeatureItem(icon: Icons.verified_user, title: 'Govt ITI & KYC', sub: '100% Background Check', color: Color(0xFF2563EB)),
+          _FeatureItem(icon: Icons.shield, title: 'Co-op Escrow', sub: 'Guaranteed Quality', color: Color(0xFFD97706)),
         ],
       ),
     );
   }
 
   Widget _buildAudioPill() {
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        vertical: AppSpacing.spacingXs,
-        horizontal: AppSpacing.spacingMd,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLow,
-        borderRadius: AppRadius.radiusFull,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(Icons.volume_up_outlined, size: 18, color: AppColors.primary),
-          const SizedBox(width: AppSpacing.spacingXs),
-          Text(
-            'Tap to listen in audio (ऐका / सुनें)',
-            style: AppTypography.labelMd.copyWith(
-              color: AppColors.primary,
+    return Center(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFEAEAEA)),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.volume_up, size: 15, color: Color(0xFF5A38E4)),
+            SizedBox(width: 6),
+            Text(
+              'Listen in audio (ऐका / आवाज में सुनें)',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF111111)),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildBottomCta() {
-    String btnText = 'Continue / Next';
-    if (_selectedLanguage == 'mr') {
-      btnText = 'पुढे चला (Continue)';
-    } else if (_selectedLanguage == 'hi') {
-      btnText = 'आगे बढ़ें (Continue)';
-    }
-
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.marginMobile),
-      color: AppColors.surface,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ElevatedButton(
-            onPressed: _handleContinue,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.onPrimary,
-              minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(
-                borderRadius: AppRadius.radiusXl,
-              ),
-              elevation: 2,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  btnText,
-                  style: AppTypography.headlineSm.copyWith(
-                    color: AppColors.onPrimary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.spacingSm),
-                const Icon(Icons.arrow_forward, size: 22),
-              ],
-            ),
-          ),
-          const SizedBox(height: AppSpacing.spacing2xs),
-          Text(
-            'By proceeding, you support authentic worker-owned cooperatives.',
-            style: AppTypography.labelSm.copyWith(
-              color: AppColors.onSurfaceVariant,
-            ),
-            textAlign: TextAlign.center,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: Color(0xFFEAEAEA))),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
+      child: Column(
+        children: [
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: _handleContinue,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF111111),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _buttonText,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward, size: 18),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'By continuing, you agree to ShramSetu\'s Fair Work Terms & Privacy Policy.',
+            style: TextStyle(fontSize: 10, color: Color(0xFF71717A)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FeatureItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String sub;
+  final Color color;
+
+  const _FeatureItem({
+    required this.icon,
+    required this.title,
+    required this.sub,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(height: 3),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+        ),
+        Text(
+          sub,
+          style: const TextStyle(fontSize: 9, color: Color(0xFF71717A)),
+        ),
+      ],
     );
   }
 }

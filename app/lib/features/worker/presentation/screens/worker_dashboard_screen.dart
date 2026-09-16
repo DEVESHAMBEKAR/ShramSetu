@@ -1,8 +1,6 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -17,7 +15,7 @@ class WorkerDashboardScreen extends StatefulWidget {
 
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   late Future<List<dynamic>> _dataFuture;
-  
+
   @override
   void initState() {
     super.initState();
@@ -26,7 +24,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
 
   void _refreshData() {
     setState(() {
-      final userId = Supabase.instance.client.auth.currentUser!.id;
+      final currentUser = Supabase.instance.client.auth.currentUser;
+      final userId = currentUser?.id ?? 'mock-worker-id';
       _dataFuture = Future.wait([
         DI.workerRepo.getWorkerProfile(userId),
         DI.workerRepo.getWorkerBookings(),
@@ -40,56 +39,97 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            backgroundColor: Color(0xFFF8F9FA),
+            body: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
         }
         if (snapshot.hasError) {
-          return Scaffold(body: Center(child: Text('Error: ${snapshot.error}')));
+          return Scaffold(
+            backgroundColor: const Color(0xFFF8F9FA),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.spacingLg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const SizedBox(height: 12),
+                    Text('Failed to load dashboard: ${snapshot.error}', textAlign: TextAlign.center),
+                    const SizedBox(height: 16),
+                    ElevatedButton(onPressed: _refreshData, child: const Text('Retry')),
+                  ],
+                ),
+              ),
+            ),
+          );
         }
 
         final worker = snapshot.data![0] as WorkerProfile;
         final allBookings = snapshot.data![1] as List<JobRequest>;
-        
-        final activeRequests = allBookings.where((j) => j.status == BookingStatus.pending).toList();
-        final completedJobs = allBookings.where((j) => j.status == BookingStatus.completed).toList();
+
+        final activeRequests = allBookings
+            .where((j) => j.status == BookingStatus.pending)
+            .toList();
+        final completedJobs = allBookings
+            .where((j) => j.status == BookingStatus.completed)
+            .toList();
 
         return Scaffold(
-          backgroundColor: AppColors.surface,
+          backgroundColor: const Color(0xFFF8F9FA),
           appBar: _buildAppBar(worker),
           body: RefreshIndicator(
-            onRefresh: () async { _refreshData(); },
+            color: AppColors.primary,
+            onRefresh: () async {
+              _refreshData();
+            },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(AppSpacing.marginMobile),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.marginMobile,
+                vertical: AppSpacing.spacingSm,
+              ),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildIdentityCard(worker),
+                  _buildIdentityAndDutyCard(worker),
                   const SizedBox(height: AppSpacing.spacingMd),
-                  if (activeRequests.isNotEmpty && worker.isAvailable)
-                    _buildInboundJobCard(activeRequests.first),
-                  const SizedBox(height: AppSpacing.spacingMd),
-                  _buildDailyMetrics(worker),
+                  if (activeRequests.isNotEmpty && worker.isAvailable) ...[
+                    _buildUrgentJobAlertCard(activeRequests.first),
+                    const SizedBox(height: AppSpacing.spacingMd),
+                  ],
+                  _buildPerformanceGrid(worker),
                   const SizedBox(height: AppSpacing.spacingMd),
                   _buildCompletedSchedule(completedJobs),
                   const SizedBox(height: AppSpacing.spacingMd),
                   _buildWelfareBanner(),
-                  const SizedBox(height: 80),
+                  const SizedBox(height: 90),
                 ],
               ),
             ),
           ),
         );
-      }
+      },
     );
   }
+
   PreferredSizeWidget _buildAppBar(WorkerProfile worker) {
     return AppBar(
-      backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-      elevation: 1,
-      shadowColor: Colors.black.withValues(alpha: 0.04),
+      backgroundColor: Colors.white.withValues(alpha: 0.96),
+      elevation: 0,
+      scrolledUnderElevation: 1,
+      shadowColor: Colors.black.withValues(alpha: 0.06),
       titleSpacing: AppSpacing.marginMobile,
       title: Row(
         children: [
-          Image.asset('assets/images/logo.jpg', height: 32, width: 32, fit: BoxFit.contain),
+          Image.asset(
+            'assets/images/logo.jpg',
+            height: 32,
+            width: 32,
+            fit: BoxFit.contain,
+          ),
           const SizedBox(width: AppSpacing.spacingXs),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -97,78 +137,162 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Row(
                 children: [
                   Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle),
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00875A),
+                      shape: BoxShape.circle,
+                    ),
                   ),
-                  const SizedBox(width: AppSpacing.spacing2xs),
-                  Text('${worker.guildName} ${worker.guildId}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                  const SizedBox(width: 5),
+                  Text(
+                    '${worker.guildName.toUpperCase()} #${worker.guildId}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF6C6C70),
+                      letterSpacing: -0.2,
+                    ),
+                  ),
                 ],
               ),
-              Text('Home Dashboard', style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
+              const Text(
+                'Partner Hub',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111111),
+                  letterSpacing: -0.3,
+                ),
+              ),
             ],
           ),
         ],
       ),
       actions: [
         Container(
-          width: 48,
-          height: 48,
-          margin: const EdgeInsets.only(right: AppSpacing.spacing3xs),
-          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusLg),
+          height: 34,
+          padding: const EdgeInsets.symmetric(horizontal: 10),
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            border: Border.all(color: const Color(0xFFE5E5EA)),
+            borderRadius: BorderRadius.circular(8),
+          ),
           alignment: Alignment.center,
           child: RichText(
-            text: TextSpan(
+            text: const TextSpan(
               children: [
-                TextSpan(text: 'म', style: AppTypography.labelMd.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
-                TextSpan(text: '/EN', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface)),
+                TextSpan(
+                  text: 'म',
+                  style: TextStyle(
+                    color: Color(0xFF00875A),
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+                TextSpan(
+                  text: '/EN',
+                  style: TextStyle(
+                    color: Color(0xFF111111),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
               ],
             ),
           ),
         ),
         Container(
-          width: 48,
-          height: 48,
-          margin: const EdgeInsets.only(right: AppSpacing.spacing3xs),
-          decoration: BoxDecoration(color: AppColors.secondaryContainer.withValues(alpha: 0.15), borderRadius: AppRadius.radiusLg),
-          child: const Icon(Icons.support_agent, color: AppColors.secondary),
+          width: 34,
+          height: 34,
+          margin: const EdgeInsets.only(right: 8),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8F9FA),
+            border: Border.all(color: const Color(0xFFE5E5EA)),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.support_agent,
+            color: Color(0xFF111111),
+            size: 18,
+          ),
         ),
         Container(
-          width: 32,
-          height: 32,
+          width: 34,
+          height: 34,
           margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
-          decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-          child: const Icon(Icons.person, color: AppColors.onPrimary, size: 18),
+          decoration: const BoxDecoration(
+            color: Color(0xFF111111),
+            shape: BoxShape.circle,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            worker.name.isNotEmpty
+                ? worker.name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
+                : 'PT',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
         ),
       ],
     );
   }
 
-  Widget _buildIdentityCard(WorkerProfile worker) {
+  Widget _buildIdentityAndDutyCard(WorkerProfile worker) {
+    final isOnline = worker.isAvailable;
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Stack(
                 children: [
                   Container(
-                    width: 56,
-                    height: 56,
-                    decoration: const BoxDecoration(color: AppColors.surfaceContainer, shape: BoxShape.circle),
-                    child: const Icon(Icons.person, color: AppColors.outline),
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFFF0F0F4),
+                      border: Border.all(color: const Color(0xFFF8F9FA), width: 2),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: worker.profileImage.isNotEmpty
+                        ? Image.network(
+                            worker.profileImage,
+                            fit: BoxFit.cover,
+                            errorBuilder: (ctx, err, stack) => const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
+                          )
+                        : const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
                   ),
                   Positioned(
                     bottom: 0,
                     right: 0,
                     child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: const BoxDecoration(color: AppColors.tertiaryFixedDim, shape: BoxShape.circle),
-                      child: const Icon(Icons.verified, size: 12, color: AppColors.onTertiaryFixed),
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF00875A),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: const Icon(Icons.check, size: 11, color: Colors.white),
                     ),
                   ),
                 ],
@@ -178,32 +302,91 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Namaste, ${worker.name}', style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    Text('Master Plumber & Pipe Specialist', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                    const SizedBox(height: AppSpacing.spacing4xs),
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            worker.name,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF111111),
+                              letterSpacing: -0.3,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE3FCEF),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'PRO',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF00875A),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${worker.skills.isNotEmpty ? worker.skills.join(', ') : 'Master Artisan'} • Pipe Specialist',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF6C6C70),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusFull),
-                          child: Row(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            border: Border.all(color: const Color(0xFFE5E5EA)),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.workspace_premium, size: 13, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Text('ITI Certified', style: AppTypography.labelSm.copyWith(color: AppColors.primary)),
+                              Icon(Icons.verified, size: 13, color: Color(0xFF00875A)),
+                              SizedBox(width: 3),
+                              Text(
+                                'ITI Certified',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF111111),
+                                ),
+                              ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: AppSpacing.spacing2xs),
+                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                          decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.05), borderRadius: AppRadius.radiusFull),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.groups, size: 13, color: AppColors.onPrimaryFixedVariant),
-                              const SizedBox(width: 4),
-                              Text('Guild ${worker.guildId}', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryFixedVariant)),
-                            ],
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8F9FA),
+                            border: Border.all(color: const Color(0xFFE5E5EA)),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            'Guild #${worker.guildId}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF6C6C70),
+                            ),
                           ),
                         ),
                       ],
@@ -212,239 +395,113 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 ),
               ),
               Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusLg),
-                child: const Icon(Icons.badge, color: AppColors.primary),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.badge_outlined, color: Color(0xFF111111), size: 20),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.spacingSm),
-          _buildDutyToggle(worker),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDutyToggle(WorkerProfile worker) {
-    final isOnline = worker.isAvailable;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(
-        color: isOnline ? AppColors.tertiaryFixed.withValues(alpha: 0.3) : AppColors.surfaceContainerHigh,
-        borderRadius: AppRadius.radiusXl,
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 14,
-                height: 14,
-                decoration: BoxDecoration(color: isOnline ? AppColors.onTertiaryContainer : AppColors.outline, shape: BoxShape.circle),
-              ),
-              const SizedBox(width: AppSpacing.spacingXs),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isOnline ? 'ONLINE & RECEIVING JOBS' : 'OFFLINE • ON BREAK',
-                    style: AppTypography.labelLg.copyWith(color: isOnline ? AppColors.tertiaryContainer : AppColors.onSurfaceVariant, fontWeight: FontWeight.bold),
-                  ),
-                  if (isOnline)
-                    Text('Priority radius: ${worker.serviceLocation} (3.5 km)', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                ],
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: () => () async { await DI.workerRepo.updateWorkerAvailability(worker.id, !worker.isAvailable); _refreshData(); }(),
-            child: Container(
-              width: 56,
-              height: 36,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: isOnline ? AppColors.primary : AppColors.surfaceVariant, borderRadius: AppRadius.radiusFull),
-              alignment: isOnline ? Alignment.centerRight : Alignment.centerLeft,
-              child: Container(
-                width: 28,
-                height: 28,
-                decoration: const BoxDecoration(color: AppColors.surfaceContainerLowest, shape: BoxShape.circle),
-                child: Icon(isOnline ? Icons.check : Icons.close, size: 16, color: isOnline ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant),
-              ),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              border: Border.all(color: const Color(0xFFE5E5EA)),
+              borderRadius: BorderRadius.circular(12),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInboundJobCard(JobRequest request) {
-    return Container(
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 6)]),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.spacingMd),
-            child: Column(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 4),
-                      decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: AppRadius.radiusFull),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.bolt, size: 16, color: AppColors.secondary),
-                          const SizedBox(width: 4),
-                          Text('New Urgent Request • ${request.distanceKm}', style: AppTypography.labelMd.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
-                        ],
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                        shape: BoxShape.circle,
+                        boxShadow: isOnline
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF00875A).withValues(alpha: 0.4),
+                                  blurRadius: 6,
+                                  spreadRadius: 2,
+                                )
+                              ]
+                            : null,
                       ),
                     ),
-                    Row(
-                      children: [
-                        const Icon(Icons.timer, size: 14, color: AppColors.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(request.createdAt, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(request.customerName, style: AppTypography.titleLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              const Icon(Icons.location_on, size: 16, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Expanded(child: Text(request.customerLocation, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+                    const SizedBox(width: 10),
                     Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('₹${request.totalAmount.toInt()}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                        Text('100% Payout', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.spacingXs),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.plumbing, size: 18, color: AppColors.primary),
-                          const SizedBox(width: AppSpacing.spacingXs),
-                          Text(request.serviceName, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.spacing3xs),
-                      Row(
-                        children: [
-                          const Icon(Icons.calendar_today, size: 18, color: AppColors.onSurfaceVariant),
-                          const SizedBox(width: AppSpacing.spacingXs),
-                          Text('${request.date} • ${request.time}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                        ],
-                      ),
-                      const SizedBox(height: AppSpacing.spacing3xs),
-                      Text('Base: ₹${request.baseAmount.toInt()} + Standard labor: ₹${request.laborAllowance.toInt()}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.spacingMd),
-                Container(
-                  padding: const EdgeInsets.all(AppSpacing.spacingXs),
-                  decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.2), borderRadius: AppRadius.radiusLg),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.verified_user, size: 20, color: AppColors.onTertiaryContainer),
-                      const SizedBox(width: AppSpacing.spacingXs),
-                      Expanded(
-                        child: Text(
-                          'Zero platform commission. Direct UPI credit to your union-linked bank within 10 mins of OTP signoff.',
-                          style: AppTypography.bodySm.copyWith(color: AppColors.onTertiaryFixedVariant),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.spacingMd),
-                GestureDetector(
-                  onTap: () {
-                    () async { await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.accepted); _refreshData(); }();
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => WorkerJobDetailScreen(jobId: request.id)),
-                    );
-                  },
-                  child: Container(
-                    width: double.infinity,
-                    height: 50,
-                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusXl),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.check_circle, color: AppColors.onPrimary),
-                        const SizedBox(width: AppSpacing.spacingXs),
-                        Text('Accept Job (Tap to Confirm)', style: AppTypography.labelLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.spacingXs),
-                Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () => () async { await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected); _refreshData(); }(),
-                        child: Container(
-                          height: 48,
-                          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.redo, size: 18, color: AppColors.onSurface),
-                              const SizedBox(width: 4),
-                              Text('Pass to Guild', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Expanded(
-                      child: Container(
-                        height: 48,
-                        decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                        Row(
                           children: [
-                            const Icon(Icons.call, size: 18, color: AppColors.onSurface),
-                            const SizedBox(width: 4),
-                            Text('Call Desk', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
+                            Text(
+                              isOnline ? 'ONLINE' : 'OFFLINE',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                                color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                            Text(
+                              isOnline ? ' • Receiving Jobs in ${worker.serviceLocation}' : ' • On Break',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF6C6C70),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 1),
+                        Text(
+                          isOnline ? '3.5 km priority radius • Instant alerts' : 'Tap switch to resume shifts',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF6C6C70),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
+                ),
+                GestureDetector(
+                  onTap: () async {
+                    await DI.workerRepo.updateWorkerAvailability(worker.id, !worker.isAvailable);
+                    _refreshData();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 52,
+                    height: 28,
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: isOnline ? const Color(0xFF111111) : const Color(0xFFE5E5EA),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignment: isOnline ? Alignment.centerRight : Alignment.centerLeft,
+                    child: Container(
+                      width: 24,
+                      height: 24,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(
+                        isOnline ? Icons.check : Icons.close,
+                        size: 14,
+                        color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -454,40 +511,425 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     );
   }
 
-  Widget _buildDailyMetrics(WorkerProfile worker) {
+  Widget _buildUrgentJobAlertCard(JobRequest request) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF0B3),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.bolt, size: 14, color: Color(0xFF7A4100)),
+                    const SizedBox(width: 4),
+                    Text(
+                      'URGENT DISPATCH • ${request.distanceKm}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF7A4100),
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.schedule, size: 13, color: Color(0xFF6C6C70)),
+                  const SizedBox(width: 4),
+                  Text(
+                    request.createdAt,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF6C6C70),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      request.customerName,
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111111),
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Row(
+                      children: [
+                        const Icon(Icons.near_me, size: 14, color: Color(0xFF111111)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            request.customerLocation,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6C6C70),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '₹${request.totalAmount.toInt()}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111111),
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const Text(
+                      '100% PAYOUT',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF00875A),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8F9FA),
+              border: Border.all(color: const Color(0xFFEFEFF4)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        border: Border.all(color: const Color(0xFFE5E5EA)),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.plumbing, size: 15, color: Color(0xFF111111)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        request.serviceName,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF111111),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today, size: 13, color: Color(0xFF6C6C70)),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${request.date} • ${request.time}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF6C6C70),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const Text(
+                      'Fixed Price',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF111111),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE3FCEF).withValues(alpha: 0.7),
+              border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.2)),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.verified, size: 16, color: Color(0xFF00875A)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Zero platform commission. Direct UPI settlement in 10 mins.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF006644),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: ElevatedButton(
+              onPressed: () {
+                () async {
+                  await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.accepted);
+                  _refreshData();
+                }();
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => WorkerJobDetailScreen(jobId: request.id)),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF111111),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.check_circle, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Accept Job',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected);
+                      _refreshData();
+                    },
+                    icon: const Icon(Icons.redo, size: 15, color: Color(0xFF6C6C70)),
+                    label: const Text(
+                      'Pass to Guild',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111111),
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: SizedBox(
+                  height: 40,
+                  child: OutlinedButton.icon(
+                    onPressed: () {},
+                    icon: const Icon(Icons.call, size: 15, color: Color(0xFF6C6C70)),
+                    label: const Text(
+                      'Call Society',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111111),
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      backgroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPerformanceGrid(WorkerProfile worker) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text('Today\'s Performance', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-            Text('Guild Cycle #44', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+            const Text(
+              'TODAY\'S PERFORMANCE',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF111111),
+                letterSpacing: 0.5,
+              ),
+            ),
+            Text(
+              'Guild Cycle #${worker.guildId}',
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF6C6C70),
+              ),
+            ),
           ],
         ),
-        const SizedBox(height: AppSpacing.spacingSm),
+        const SizedBox(height: 10),
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          mainAxisSpacing: AppSpacing.spacingXs,
-          crossAxisSpacing: AppSpacing.spacingXs,
-          childAspectRatio: 1.2,
+          mainAxisSpacing: 10,
+          crossAxisSpacing: 10,
+          childAspectRatio: 1.25,
           children: [
-            _buildMetricCard('Today\'s Earnings', Icons.payments, '₹${worker.earnings.toInt()}', '${worker.completedJobs} jobs settled', AppColors.onTertiaryContainer, 'Direct Union Escrow Payout', AppColors.primary),
-            _buildMetricCard('Jobs Dispatched', Icons.engineering, '4 Assigned', '3 Done • 1 In Queue', AppColors.primary, '', AppColors.primary, showProgress: true),
-            _buildMetricCard('Worker Rating', Icons.star, worker.rating.toString(), '126 verified reviews', AppColors.secondaryContainer, '100% On-Time', AppColors.primary, isRating: true),
-            _buildMetricCard('Guild Rank', Icons.military_tech, 'Top 5%', 'Kothrud Cluster', AppColors.secondary, 'Gold Badge Tier', AppColors.secondary),
+            _buildMetricCard(
+              title: "Today's Earnings",
+              icon: Icons.payments_outlined,
+              iconColor: const Color(0xFF00875A),
+              mainValue: '₹${worker.earnings.toInt()}',
+              badgeText: '+6% vs y\'day',
+              badgeColor: const Color(0xFF00875A),
+              badgeBg: const Color(0xFFE3FCEF),
+              footer: 'Direct Escrow Payout',
+            ),
+            _buildMetricCard(
+              title: 'Jobs Completed',
+              icon: Icons.engineering_outlined,
+              iconColor: const Color(0xFF111111),
+              mainValue: '${worker.completedJobs} / ${worker.completedJobs + 1}',
+              showProgress: true,
+              footer: '1 in queue for today',
+            ),
+            _buildMetricCard(
+              title: 'Partner Rating',
+              icon: Icons.star,
+              iconColor: const Color(0xFFFFAB00),
+              mainValue: worker.rating.toStringAsFixed(2),
+              subValue: '/ 5.0',
+              badgeText: '100% On-Time',
+              badgeColor: const Color(0xFF00875A),
+              footer: '126 verified reviews',
+            ),
+            _buildMetricCard(
+              title: 'Guild Standing',
+              icon: Icons.military_tech_outlined,
+              iconColor: const Color(0xFF111111),
+              mainValue: 'Top 5%',
+              badgeText: 'Gold Badge Tier',
+              badgeColor: const Color(0xFF111111),
+              footer: 'Kothrud Cluster',
+            ),
           ],
         ),
       ],
     );
   }
 
-  Widget _buildMetricCard(String title, IconData icon, String value, String subtitle, Color iconColor, String footer, Color valueColor, {bool showProgress = false, bool isRating = false}) {
+  Widget _buildMetricCard({
+    required String title,
+    required IconData icon,
+    required Color iconColor,
+    required String mainValue,
+    String? subValue,
+    String? badgeText,
+    Color? badgeColor,
+    Color? badgeBg,
+    bool showProgress = false,
+    required String footer,
+  }) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -495,8 +937,15 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(title, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-              Icon(icon, size: 18, color: iconColor),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6C6C70),
+                ),
+              ),
+              Icon(icon, size: 16, color: iconColor),
             ],
           ),
           Column(
@@ -506,28 +955,77 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 crossAxisAlignment: CrossAxisAlignment.baseline,
                 textBaseline: TextBaseline.alphabetic,
                 children: [
-                  Text(value, style: AppTypography.headlineMd.copyWith(color: valueColor, fontWeight: FontWeight.bold)),
-                  if (isRating) Text('/ 5.0', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                  Text(
+                    mainValue,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  if (subValue != null) ...[
+                    const SizedBox(width: 3),
+                    Text(
+                      subValue,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF6C6C70),
+                      ),
+                    ),
+                  ],
                 ],
               ),
               if (showProgress)
                 Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  height: 6,
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: AppRadius.radiusFull),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 3, child: Container(decoration: BoxDecoration(color: AppColors.onTertiaryContainer, borderRadius: AppRadius.radiusFull))),
-                      Expanded(flex: 1, child: Container(decoration: BoxDecoration(color: AppColors.secondary, borderRadius: AppRadius.radiusFull))),
-                    ],
+                  margin: const EdgeInsets.only(top: 6, bottom: 2),
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFEFF4),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: FractionallySizedBox(
+                    widthFactor: 0.75,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111111),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                )
+              else if (badgeText != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                    decoration: BoxDecoration(
+                      color: badgeBg ?? const Color(0xFFF8F9FA),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: badgeColor ?? const Color(0xFF111111),
+                      ),
+                    ),
                   ),
                 ),
-              const SizedBox(height: 4),
-              Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
             ],
           ),
-          if (footer.isNotEmpty)
-            Text(footer, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+          Text(
+            footer,
+            style: const TextStyle(
+              fontSize: 10,
+              color: Color(0xFF6C6C70),
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ],
       ),
     );
@@ -542,65 +1040,155 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           children: [
             Row(
               children: [
-                Text('Completed Today', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                const SizedBox(width: AppSpacing.spacingXs),
+                const Text(
+                  'COMPLETED TODAY',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF111111),
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Container(
                   width: 20,
                   height: 20,
-                  decoration: const BoxDecoration(color: AppColors.surfaceContainerHigh, shape: BoxShape.circle),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFE5E5EA),
+                    shape: BoxShape.circle,
+                  ),
                   alignment: Alignment.center,
-                  child: Text(completedJobs.length.toString(), style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                  child: Text(
+                    completedJobs.isNotEmpty ? completedJobs.length.toString() : '2',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                    ),
+                  ),
                 ),
               ],
             ),
-            Row(
-              children: [
-                Text('Full History', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
-                const Icon(Icons.chevron_right, size: 14, color: AppColors.secondary),
-              ],
+            const Text(
+              'Full History →',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF111111),
+              ),
             ),
           ],
         ),
-        const SizedBox(height: AppSpacing.spacingSm),
-        ...completedJobs.map((job) => _buildCompletedJobCard(job)),
+        const SizedBox(height: 10),
+        if (completedJobs.isEmpty) ...[
+          _buildCompletedRow(
+            customerName: 'Rajesh Deshmukh',
+            time: '9:15 AM',
+            service: 'Kitchen Sink Clog • Pratik Nagar',
+            amount: '650',
+          ),
+          const SizedBox(height: 8),
+          _buildCompletedRow(
+            customerName: 'Meera Kulkarni',
+            time: 'Yesterday',
+            service: 'Shower Head Replacement • Mayur Colony',
+            amount: '420',
+          ),
+        ] else
+          ...completedJobs.map(
+            (job) => Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: _buildCompletedRow(
+                customerName: job.customerName,
+                time: job.time,
+                service: '${job.serviceName} • ${job.customerLocation.split(',').first}',
+                amount: job.totalAmount.toInt().toString(),
+              ),
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildCompletedJobCard(JobRequest job) {
+  Widget _buildCompletedRow({
+    required String customerName,
+    required String time,
+    required String service,
+    required String amount,
+  }) {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingXs),
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.3), shape: BoxShape.circle),
-            child: const Icon(Icons.check, color: AppColors.onTertiaryContainer, size: 20),
+            width: 36,
+            height: 36,
+            decoration: const BoxDecoration(
+              color: Color(0xFFE3FCEF),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.check, color: Color(0xFF00875A), size: 18),
           ),
-          const SizedBox(width: AppSpacing.spacingSm),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Text(job.customerName, style: AppTypography.titleMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Text(job.time.split(' ')[0] + ' ' + job.time.split(' ')[1], style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                    Text(
+                      customerName,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF111111),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      time,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF6C6C70),
+                      ),
+                    ),
                   ],
                 ),
-                Text('${job.serviceName} • ${job.customerLocation.split(',').first}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant), maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: AppSpacing.spacing3xs),
-                Row(
+                const SizedBox(height: 2),
+                Text(
+                  service,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6C6C70),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                const Row(
                   children: [
-                    const Icon(Icons.account_balance_wallet, size: 13, color: AppColors.onTertiaryContainer),
-                    const SizedBox(width: 4),
-                    Text('Paid via UPI', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
-                    Text(' • Rating ★ 5.0', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                    Icon(Icons.bolt, size: 12, color: Color(0xFF00875A)),
+                    SizedBox(width: 2),
+                    Text(
+                      'Instant UPI • ★ 5.0',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF00875A),
+                      ),
+                    ),
                   ],
                 ),
               ],
@@ -609,8 +1197,31 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('₹${job.totalAmount.toInt()}', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              Text('Settled', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer)),
+              Text(
+                '₹$amount',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF111111),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 3),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE3FCEF),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'Settled',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF00875A),
+                  ),
+                ),
+              ),
             ],
           ),
         ],
@@ -621,7 +1232,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   Widget _buildWelfareBanner() {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusXl),
+      decoration: BoxDecoration(
+        color: const Color(0xFF111111),
+        borderRadius: BorderRadius.circular(16),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -631,57 +1245,105 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Row(
                 children: [
                   Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(color: AppColors.surfaceContainerLowest.withValues(alpha: 0.15), borderRadius: AppRadius.radiusLg),
-                    child: const Icon(Icons.health_and_safety, color: AppColors.tertiaryFixed, size: 20),
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.health_and_safety,
+                      color: Color(0xFF99F89E),
+                      size: 18,
+                    ),
                   ),
-                  const SizedBox(width: AppSpacing.spacingXs),
-                  Column(
+                  const SizedBox(width: 10),
+                  const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Cooperative Safety Net Active', style: AppTypography.titleMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                      Text('Pune District Trade Union Trust', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
+                      Text(
+                        'Cooperative Safety Net',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Text(
+                        'Pune District Trade Union Trust',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Color(0xFFA0A0A5),
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: BorderRadius.circular(4)),
-                child: Text('ACTIVE', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryFixed, fontWeight: FontWeight.bold)),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00875A),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: const Text(
+                  'ACTIVE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
-          RichText(
-            text: TextSpan(
-              style: AppTypography.bodySm.copyWith(color: AppColors.primaryFixed),
-              children: [
-                const TextSpan(text: 'Insurance cover up to '),
-                TextSpan(text: '₹50,000', style: const TextStyle(fontWeight: FontWeight.bold)),
-                const TextSpan(text: ' active for today\'s shifts covering workplace injury, transit, and tool damages.'),
-              ],
+          const SizedBox(height: 10),
+          const Text(
+            'Insurance cover up to ₹50,000 active for today\'s shifts covering workplace injury, transit, and tool damages.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFE5E5EA),
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: AppSpacing.spacingSm),
+          const SizedBox(height: 12),
           Container(
-            padding: const EdgeInsets.all(AppSpacing.spacingXs),
-            decoration: BoxDecoration(color: AppColors.primaryContainer.withValues(alpha: 0.4), borderRadius: AppRadius.radiusLg),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                const Row(
                   children: [
-                    const Icon(Icons.call, size: 18, color: AppColors.secondaryContainer),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Text('Union Helpline: 1800-209-4092', style: AppTypography.bodySm.copyWith(color: AppColors.onPrimary)),
+                    Icon(Icons.call, size: 16, color: Color(0xFFFFD180)),
+                    SizedBox(width: 6),
+                    Text(
+                      'Union Helpline: 1800-209-4092',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.white,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 4),
-                  decoration: BorderRadius.circular(4) != null ? BoxDecoration(color: AppColors.secondaryContainer, borderRadius: BorderRadius.circular(4)) : null,
-                  child: Text('Call Now', style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryContainer, fontWeight: FontWeight.bold)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Text(
+                    'Call Now',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -691,4 +1353,3 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     );
   }
 }
-

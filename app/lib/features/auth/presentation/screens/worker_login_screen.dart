@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
-import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../core/theme/app_radius.dart';
-import 'package:app/core/config/dependency_injection.dart';
+import '../../../../core/config/dependency_injection.dart';
 
 class WorkerLoginScreen extends StatefulWidget {
   const WorkerLoginScreen({super.key});
@@ -23,7 +20,6 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
-  // Countdown timer state
   Timer? _countdownTimer;
   int _secondsRemaining = 30;
 
@@ -56,10 +52,9 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
     try {
       if (!_isOtpSent) {
-        // Step 1: Send OTP
         final phone = _phoneController.text.trim();
         if (phone.length < 10) {
-          throw Exception('Please enter a valid phone number.');
+          throw Exception('Please enter a valid 10-digit mobile number.');
         }
         await DI.authRepo.sendOtp(phone);
         setState(() {
@@ -67,21 +62,19 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           _isLoading = false;
         });
         _startCountdown();
-        // Request focus on OTP field after a short delay to allow UI to build
         Future.delayed(const Duration(milliseconds: 100), () {
           _otpFocusNode.requestFocus();
         });
       } else {
-        // Step 2: Verify OTP
         final otp = _otpController.text.trim();
         if (otp.length != 6) {
-          throw Exception('Please enter the 6-digit OTP.');
+          throw Exception('Please enter the 6-digit OTP code.');
         }
         final isValid = await DI.authRepo.verifyOtp(_phoneController.text.trim(), otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
           final userId = user?.id ?? 'mock_user_id';
-          
+
           await DI.userRepo.upsertUserProfile(
             userId: userId,
             role: 'WORKER',
@@ -92,7 +85,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             Navigator.of(context).pushReplacementNamed('/worker/dashboard');
           }
         } else {
-          throw Exception('Invalid OTP. Please try again. (Hint: use 123456 in mock mode)');
+          throw Exception('Invalid OTP. Please try again. (Hint: use 123456 in test mode)');
         }
       }
     } catch (e) {
@@ -115,14 +108,17 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.surface,
+      backgroundColor: const Color(0xFFF8F9FC),
       body: SafeArea(
         child: Column(
           children: [
             _buildTopNav(),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.marginMobile,
+                  vertical: AppSpacing.spacingSm,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -131,11 +127,13 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     if (_errorMessage != null) _buildErrorBanner(),
                     _buildMobileInputCard(),
                     if (_isOtpSent) _buildOtpVerificationCard(),
-                    if (!_isOtpSent) const SizedBox(height: AppSpacing.spacingLg),
-                    _buildTrustBadge(),
+                    const SizedBox(height: 12),
+                    _buildUnionProtectionCallout(),
+                    const SizedBox(height: 20),
                     _buildActionCta(),
+                    const SizedBox(height: 14),
                     _buildAlternativeModeSwitch(),
-                    const SizedBox(height: AppSpacing.spacing3xl),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -150,7 +148,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpacing.marginMobile,
-        vertical: AppSpacing.spacingSm,
+        vertical: 8,
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -159,34 +157,36 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             onPressed: () {
               if (_isOtpSent) {
                 _handleEditPhone();
-              } else {
+              } else if (Navigator.of(context).canPop()) {
                 Navigator.of(context).pop();
+              } else {
+                Navigator.of(context).pushReplacementNamed('/');
               }
             },
-            icon: const Icon(Icons.arrow_back, color: AppColors.primary),
+            icon: const Icon(Icons.arrow_back, color: Color(0xFF111111)),
             style: IconButton.styleFrom(
-              backgroundColor: Colors.transparent,
-              hoverColor: AppColors.surfaceContainer,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              side: const BorderSide(color: Color(0xFFE5E5EA)),
             ),
           ),
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.spacingSm,
-              vertical: AppSpacing.spacing3xs,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: AppColors.surfaceContainerHigh,
-              borderRadius: AppRadius.radiusFull,
+              color: const Color(0xFFECEEF0),
+              borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.shield_outlined, size: 14, color: AppColors.secondary),
-                const SizedBox(width: AppSpacing.spacing2xs),
+                const Icon(Icons.engineering, size: 14, color: Color(0xFF111111)),
+                const SizedBox(width: 4),
                 Text(
-                  _isOtpSent ? 'Step 2 of 2: OTP Verification' : 'Step 1 of 2: Mobile Verification',
-                  style: AppTypography.labelSm.copyWith(
-                    color: AppColors.onSurfaceVariant,
+                  _isOtpSent ? 'Partner Auth: Step 2/2' : 'Partner Portal: Step 1/2',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6C6C70),
                   ),
                 ),
               ],
@@ -199,44 +199,66 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
   Widget _buildBrandingHeader() {
     return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.spacingXs, bottom: AppSpacing.spacingMd),
+      padding: const EdgeInsets.only(top: 6, bottom: 16),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: AppRadius.radiusLg,
+              color: const Color(0xFF111111),
+              borderRadius: BorderRadius.circular(12),
               boxShadow: [
-                BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4),
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
               ],
             ),
             alignment: Alignment.center,
-            child: Text(
-              'श',
-              style: AppTypography.headlineSm.copyWith(
-                color: AppColors.secondaryFixedDim,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: const Icon(Icons.handyman, color: Colors.white, size: 22),
           ),
-          const SizedBox(width: AppSpacing.spacingXs),
+          const SizedBox(width: 10),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'ShramSetu',
-                style: AppTypography.headlineMd.copyWith(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
+              Row(
+                children: [
+                  const Text(
+                    'ShramSetu Partner',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111111),
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3FCEF),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Text(
+                      'GUILD',
+                      style: TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF00875A),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-              Text(
-                'National Workers & Trade Cooperative',
-                style: AppTypography.labelSm.copyWith(
-                  color: AppColors.onSurfaceVariant,
+              const Text(
+                'Karigar Login & Trade Union Escrow Hub',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF6C6C70),
                 ),
               ),
             ],
@@ -248,23 +270,26 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
   Widget _buildHeadingSection() {
     return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.spacingLg),
+      padding: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            _isOtpSent ? 'Verify your number' : 'Enter your mobile number',
-            style: AppTypography.headlineLgMobile.copyWith(
-              color: AppColors.primary,
-              fontWeight: FontWeight.bold,
+            _isOtpSent ? 'Verify registered mobile' : 'Partner Sign-in',
+            style: const TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF111111),
+              letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: AppSpacing.spacing3xs),
-          Text(
-            'We will send a 6-digit one-time password (OTP) to securely authenticate your account and connect to verified cooperatives.',
-            style: AppTypography.bodySm.copyWith(
-              color: AppColors.onSurfaceVariant,
-              height: 1.5,
+          const SizedBox(height: 4),
+          const Text(
+            'Enter your union-registered phone number. Direct OTP dispatch to connect to your active guild bookings.',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6C6C70),
+              height: 1.4,
             ),
           ),
         ],
@@ -275,20 +300,21 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   Widget _buildErrorBanner() {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingMd),
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.errorContainer,
-        borderRadius: AppRadius.radiusLg,
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFFCDD2)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: AppColors.onErrorContainer, size: 20),
-          const SizedBox(width: AppSpacing.spacingXs),
+          const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 18),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: AppTypography.bodySm.copyWith(color: AppColors.onErrorContainer),
+              style: const TextStyle(fontSize: 12, color: Color(0xFFD32F2F), fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -298,39 +324,50 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
   Widget _buildMobileInputCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingMd),
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: AppRadius.radiusXl,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Mobile Number',
-            style: AppTypography.labelMd.copyWith(color: AppColors.onSurface),
-          ),
-          const SizedBox(height: AppSpacing.spacing2xs),
-          Container(
-            height: 52,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: AppRadius.radiusLg,
+          const Text(
+            'PARTNER PHONE NUMBER',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF6C6C70),
+              letterSpacing: 0.5,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingMd),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            height: 50,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: const Color(0xFFE5E5EA)),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
               children: [
-                // Mock Indian Flag
+                // Indian Tricolor indicator
                 Container(
                   width: 20,
                   height: 14,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 2)],
+                    border: Border.all(color: const Color(0xFFE5E5EA)),
                   ),
                   child: Column(
                     children: [
@@ -339,48 +376,61 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                         child: Container(
                           color: Colors.white,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.circle_outlined, size: 4, color: Color(0xFF000080)),
+                          child: const Icon(Icons.circle, size: 3, color: Color(0xFF000080)),
                         ),
                       ),
                       Expanded(child: Container(color: const Color(0xFF138808))),
                     ],
                   ),
                 ),
-                const SizedBox(width: AppSpacing.spacingXs),
-                Text(
+                const SizedBox(width: 8),
+                const Text(
                   '+91',
-                  style: AppTypography.titleMd.copyWith(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111111),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.spacingXs),
+                const SizedBox(width: 10),
+                const VerticalDivider(width: 1, indent: 12, endIndent: 12, color: Color(0xFFE5E5EA)),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _phoneController,
                     readOnly: _isOtpSent,
                     keyboardType: TextInputType.phone,
-                    inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')), LengthLimitingTextInputFormatter(15)],
-                    style: AppTypography.titleMd.copyWith(
-                      color: AppColors.onSurface,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF111111),
+                      letterSpacing: 1.5,
                     ),
                     decoration: const InputDecoration(
                       border: InputBorder.none,
-                      hintText: '90000 00000',
+                      hintText: '98231 45890',
+                      hintStyle: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFFA0A0A5),
+                        letterSpacing: 0,
+                      ),
                     ),
                   ),
                 ),
-                if (_isOtpSent)
+                if (_phoneController.text.length >= 10)
                   Container(
-                    width: 24,
-                    height: 24,
+                    width: 22,
+                    height: 22,
                     decoration: const BoxDecoration(
-                      color: AppColors.tertiaryFixed,
+                      color: Color(0xFFE3FCEF),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check, size: 16, color: AppColors.onTertiaryFixed),
+                    child: const Icon(Icons.check, size: 14, color: Color(0xFF00875A)),
                   ),
               ],
             ),
@@ -392,13 +442,18 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
   Widget _buildOtpVerificationCard() {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingLg),
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainerLowest,
-        borderRadius: AppRadius.radiusXl,
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 4, offset: const Offset(0, 2)),
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 4,
+            offset: const Offset(0, 1),
+          ),
         ],
       ),
       child: Column(
@@ -408,31 +463,67 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             children: [
               Row(
                 children: [
-                  Text('OTP sent to ', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface)),
+                  const Text('OTP sent to ', style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70))),
                   Text(
                     '+91 ${_phoneController.text}',
-                    style: AppTypography.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF111111),
+                    ),
                   ),
                 ],
               ),
-              TextButton(
-                onPressed: _handleEditPhone,
-                style: TextButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: AppSpacing.spacing3xs),
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: Text(
+              GestureDetector(
+                onTap: _handleEditPhone,
+                child: const Text(
                   'Edit',
-                  style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111111),
+                    decoration: TextDecoration.underline,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingMd),
+          const SizedBox(height: 14),
           _buildOtpInputBoxes(),
-          const SizedBox(height: AppSpacing.spacingSm),
-          _buildResendSection(),
+          const SizedBox(height: 12),
+          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.schedule, size: 14, color: Color(0xFF6C6C70)),
+                  const SizedBox(width: 4),
+                  Text(
+                    _secondsRemaining > 0 ? 'Resend OTP in 00:${_secondsRemaining.toString().padLeft(2, '0')}s' : 'Code expired',
+                    style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                  ),
+                ],
+              ),
+              GestureDetector(
+                onTap: _secondsRemaining == 0
+                    ? () {
+                        DI.authRepo.sendOtp(_phoneController.text.trim());
+                        _startCountdown();
+                      }
+                    : null,
+                child: Text(
+                  'Resend via SMS',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _secondsRemaining == 0 ? const Color(0xFF111111) : const Color(0xFFA0A0A5),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -441,58 +532,72 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   Widget _buildOtpInputBoxes() {
     return Stack(
       children: [
-        // The hidden text field that captures input
         Opacity(
           opacity: 0.0,
           child: TextField(
             controller: _otpController,
             focusNode: _otpFocusNode,
             keyboardType: TextInputType.number,
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(6),
+            ],
             onChanged: (val) {
               setState(() {});
               if (val.length == 6) {
-                // Auto-submit when 6 digits are entered
                 _handlePrimaryAction();
               }
             },
           ),
         ),
-        // The visual boxes
         GestureDetector(
           onTap: () => _otpFocusNode.requestFocus(),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: List.generate(6, (index) {
-              final String text = _otpController.text;
-              final bool isFocused = _otpFocusNode.hasFocus && text.length == index;
-              final bool hasValue = text.length > index;
-              final String char = hasValue ? text[index] : '';
+              final text = _otpController.text;
+              final isFocused = _otpFocusNode.hasFocus && text.length == index;
+              final hasValue = text.length > index;
+              final char = hasValue ? text[index] : '';
 
-              return Expanded(
-                child: AspectRatio(
-                  aspectRatio: 1,
-                  child: Container(
-                    margin: EdgeInsets.only(right: index < 5 ? AppSpacing.spacing2xs : 0),
-                    decoration: BoxDecoration(
-                      color: isFocused ? AppColors.surfaceContainerLowest : AppColors.surfaceContainerLow,
-                      borderRadius: AppRadius.radiusLg,
-                      boxShadow: isFocused ? [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 4)] : [],
+              return Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isFocused ? const Color(0xFF111111) : const Color(0xFFE5E5EA),
+                    width: isFocused ? 2 : 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 4,
+                      offset: const Offset(0, 1),
                     ),
-                    alignment: Alignment.center,
-                    child: hasValue
-                        ? Text(
-                            char,
-                            style: AppTypography.currencyDisplay.copyWith(
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.bold,
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: hasValue
+                    ? Text(
+                        char,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF111111),
+                        ),
+                      )
+                    : (isFocused
+                        ? Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF111111),
+                              shape: BoxShape.circle,
                             ),
                           )
-                        : isFocused
-                            ? _BlinkingCursor()
-                            : const SizedBox.shrink(),
-                  ),
-                ),
+                        : null),
               );
             }),
           ),
@@ -501,97 +606,39 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
     );
   }
 
-  Widget _buildResendSection() {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.schedule, size: 16, color: AppColors.outline),
-                const SizedBox(width: AppSpacing.spacing3xs),
-                Text(
-                  _secondsRemaining > 0 ? 'Resend OTP in 00:${_secondsRemaining.toString().padLeft(2, '0')}s' : 'OTP expired. Please resend.',
-                  style: AppTypography.labelSm.copyWith(
-                    color: _secondsRemaining > 0 ? AppColors.outline : AppColors.secondary,
-                  ),
-                ),
-              ],
-            ),
-            if (_secondsRemaining == 0)
-              TextButton.icon(
-                onPressed: () {
-                  _startCountdown();
-                  // In real app, call resend API
-                },
-                icon: const Icon(Icons.sms_outlined, size: 16),
-                label: const Text('Resend via SMS'),
-                style: TextButton.styleFrom(
-                  foregroundColor: AppColors.secondary,
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  textStyle: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold),
-                ),
-              ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.spacing3xs),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text('Didn\'t receive SMS?', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingSm, vertical: AppSpacing.spacing3xs),
-              decoration: BoxDecoration(
-                color: AppColors.tertiaryFixed.withOpacity(0.3),
-                borderRadius: AppRadius.radiusFull,
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.chat_outlined, size: 16, color: AppColors.onTertiaryFixedVariant),
-                  const SizedBox(width: AppSpacing.spacing3xs),
-                  Text(
-                    'Get on WhatsApp',
-                    style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryFixedVariant, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTrustBadge() {
+  Widget _buildUnionProtectionCallout() {
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.spacingMd),
-      padding: const EdgeInsets.all(AppSpacing.spacingSm),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceContainer,
-        borderRadius: AppRadius.radiusLg,
+        color: const Color(0xFFE3FCEF).withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.2)),
       ),
-      child: Row(
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.only(top: AppSpacing.spacing4xs),
-            child: Icon(Icons.lock_outline, size: 20, color: AppColors.onSurfaceVariant),
-          ),
-          const SizedBox(width: AppSpacing.spacingXs),
+          Icon(Icons.shield, size: 16, color: Color(0xFF00875A)),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Cooperative Escrow Protected',
-                  style: AppTypography.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  '100% Direct Karigar Payout Guarantee',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF006644),
+                  ),
                 ),
+                SizedBox(height: 2),
                 Text(
-                  'Protected under National Cooperative Data Charter. Your phone number is strictly encrypted and never shared with third-party telemarketers.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                  'Zero middleman deduction. Union escrow directly settles earnings to your linked bank account upon job completion OTP signoff.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF006644),
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -602,129 +649,76 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   }
 
   Widget _buildActionCta() {
-    return Column(
-      children: [
-        ElevatedButton(
-          onPressed: _isLoading ? null : _handlePrimaryAction,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.primary,
-            foregroundColor: AppColors.onPrimary,
-            minimumSize: const Size(double.infinity, 52),
-            shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl),
-            elevation: 2,
-          ),
-          child: _isLoading 
-            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
+    return SizedBox(
+      width: double.infinity,
+      height: 50,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : _handlePrimaryAction,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF111111),
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          elevation: 0,
+        ),
+        child: _isLoading
+            ? const SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+              )
             : Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _isOtpSent ? 'Verify & Continue' : 'Get OTP',
-                  style: AppTypography.labelLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: AppSpacing.spacingXs),
-                const Icon(Icons.arrow_forward, size: 20),
-              ],
-            ),
-        ),
-        const SizedBox(height: AppSpacing.spacingSm),
-        RichText(
-          textAlign: TextAlign.center,
-          text: TextSpan(
-            style: AppTypography.bodySm.copyWith(color: AppColors.outline),
-            children: [
-              const TextSpan(text: 'By proceeding, you agree to the\n'),
-              TextSpan(
-                text: 'ShramSetu Cooperative Terms',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                  decoration: TextDecoration.underline,
-                ),
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _isOtpSent ? 'Verify & Open Partner Hub' : 'Send Partner OTP',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(Icons.arrow_forward, size: 18),
+                ],
               ),
-              const TextSpan(text: ' & '),
-              TextSpan(
-                text: 'Worker Charter Privacy Policy',
-                style: AppTypography.bodySm.copyWith(
-                  color: AppColors.onSurfaceVariant,
-                  decoration: TextDecoration.underline,
-                ),
-              ),
-              const TextSpan(text: '.'),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _buildAlternativeModeSwitch() {
-    return Padding(
-      padding: const EdgeInsets.only(top: AppSpacing.spacingXl),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingMd, vertical: AppSpacing.spacingXs),
-          decoration: BoxDecoration(
-            color: AppColors.secondaryFixed.withOpacity(0.3),
-            borderRadius: AppRadius.radiusFull,
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.construction, size: 16, color: AppColors.onSecondaryFixedVariant),
-              const SizedBox(width: AppSpacing.spacing2xs),
-              Text(
-                'Are you looking for a worker?',
-                style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixedVariant),
-              ),
-              const SizedBox(width: AppSpacing.spacing4xs),
-              GestureDetector(
-                onTap: () => Navigator.of(context).pushReplacementNamed('/login/customer'),
-                child: Text(
+    return Column(
+      children: [
+        const Text(
+          'Looking to book home services?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+        ),
+        const SizedBox(height: 8),
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).pushReplacementNamed('/login/customer');
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFECEEF0),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE5E5EA)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.home_repair_service, size: 14, color: Color(0xFF111111)),
+                SizedBox(width: 6),
+                Text(
                   'Switch to Customer Sign-in →',
-                  style: AppTypography.labelSm.copyWith(
-                    color: AppColors.secondary,
-                    fontWeight: FontWeight.bold,
-                    decoration: TextDecoration.underline,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF111111),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _BlinkingCursor extends StatefulWidget {
-  @override
-  State<_BlinkingCursor> createState() => _BlinkingCursorState();
-}
-
-class _BlinkingCursorState extends State<_BlinkingCursor> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller,
-      child: Container(
-        width: 2,
-        height: 24,
-        color: AppColors.secondary,
-      ),
+      ],
     );
   }
 }

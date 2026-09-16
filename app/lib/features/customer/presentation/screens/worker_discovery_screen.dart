@@ -8,163 +8,240 @@ import '../../../../core/config/dependency_injection.dart';
 import 'worker_profile_screen.dart';
 
 class WorkerDiscoveryScreen extends StatefulWidget {
-  final ServiceCategory category;
+  final ServiceCategory? initialCategory;
 
-  const WorkerDiscoveryScreen({super.key, required this.category});
+  const WorkerDiscoveryScreen({super.key, this.initialCategory});
 
   @override
   State<WorkerDiscoveryScreen> createState() => _WorkerDiscoveryScreenState();
 }
 
 class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
-  String _activeFilter = 'All';
+  String _activeCategoryFilter = 'all';
+  String _searchQuery = '';
   late Future<List<Worker>> _workersFuture;
+  late ServiceCategory _currentCategory;
 
   @override
   void initState() {
     super.initState();
-    _workersFuture = DI.customerRepo.getEligibleWorkers(widget.category.id);
+    _currentCategory = widget.initialCategory ??
+        const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
+    _loadWorkers();
+  }
+
+  void _loadWorkers() {
+    setState(() {
+      _workersFuture = DI.customerRepo.getEligibleWorkers(_currentCategory.id);
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        titleSpacing: 0,
-        title: Row(
+      body: SafeArea(
+        child: Column(
           children: [
-            Image.asset('assets/images/logo.jpg', height: 28, width: 28, fit: BoxFit.contain),
-            const SizedBox(width: AppSpacing.spacingXs),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text('ShramSetu', style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: AppSpacing.spacing4xs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: AppRadius.radiusFull),
-                      child: Text('UNION', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
-                ),
-                Row(
-                  children: [
-                    const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
-                    const SizedBox(width: 4),
-                    Text('Pune, Maharashtra', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant)),
-                  ],
-                ),
-              ],
+            // 1. Urban Company Header Strip
+            _buildHeader(),
+
+            // 2. Search & Trade Chips Section
+            _buildSearchAndFilters(),
+
+            // 3. Certified Union Guild Banner
+            _buildGuildBanner(),
+
+            // 4. Specialist List Header
+            _buildListHeader(),
+
+            // 5. Workers List View
+            Expanded(
+              child: FutureBuilder<List<Worker>>(
+                future: _workersFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
+                  }
+                  if (snapshot.hasError) {
+                    return Center(child: Text('Error: ${snapshot.error}', style: AppTypography.bodyMd));
+                  }
+
+                  final allWorkers = snapshot.data ?? [];
+                  final filtered = allWorkers.where((w) {
+                    if (_searchQuery.isNotEmpty && !w.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+                      return false;
+                    }
+                    if (_activeCategoryFilter == 'top_rated' && w.rating < 4.8) {
+                      return false;
+                    }
+                    return true;
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.search_off, size: 48, color: AppColors.outline),
+                          const SizedBox(height: 8),
+                          Text('No union artisans found matching criteria', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return ListView.separated(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 24),
+                    itemCount: filtered.length,
+                    separatorBuilder: (context, index) => const SizedBox(height: 12),
+                    itemBuilder: (context, index) {
+                      final worker = filtered[index];
+                      return _buildWorkerCard(worker);
+                    },
+                  );
+                },
+              ),
             ),
           ],
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.translate, color: AppColors.onSurfaceVariant), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.notifications_none, color: AppColors.onSurfaceVariant), onPressed: () {}),
-        ],
       ),
-      body: FutureBuilder<List<Worker>>(
-        future: _workersFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Failed to load workers', style: AppTypography.bodyMd));
-          }
+    );
+  }
 
-          List<Worker> workers = snapshot.data ?? [];
-
-          // Apply local visual filtering
-          if (_activeFilter == 'Available Today') {
-            workers = workers.where((w) => w.availability.toLowerCase().contains('today')).toList();
-          } else if (_activeFilter == 'Within 3 km') {
-            workers = workers.where((w) => w.distanceKm <= 3.0).toList();
-          } else if (_activeFilter == '4.5+ Rating') {
-            workers = workers.where((w) => w.rating >= 4.5).toList();
-          } else if (_activeFilter == 'Under ₹500') {
-            workers = workers.where((w) => w.rate < 500).toList();
-          } else if (_activeFilter == '5+ Yrs Experience') {
-            workers = workers.where((w) => w.experience.toLowerCase().contains('yrs') || w.experience.toLowerCase().contains('exp')).toList();
-          }
-
-          return Column(
+  Widget _buildHeader() {
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
             children: [
-              _buildStickyHeader(),
-              Expanded(
-                child: ListView(
+              if (Navigator.canPop(context))
+                IconButton(
+                  icon: const Icon(Icons.arrow_back, size: 20, color: AppColors.primary),
+                  onPressed: () => Navigator.pop(context),
                   padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              if (Navigator.canPop(context)) const SizedBox(width: 10),
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: AppRadius.radiusLg,
+                ),
+                child: const Icon(Icons.handyman, size: 18, color: Colors.white),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    children: [
+                      Text('ShramSetu', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
+                        child: Text('UNION', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
+                      const SizedBox(width: 2),
+                      Text('Kothrud, Pune', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10)),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              Container(
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryFixed,
+                  borderRadius: AppRadius.radiusFull,
+                ),
+                child: Row(
                   children: [
-                    _buildAssuranceStrip(),
-                    _buildMatchingHeader(workers.length),
-                    if (workers.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.all(AppSpacing.spacingXl),
-                        child: Center(child: Text('No workers found for this filter.', style: AppTypography.bodyMd.copyWith(color: AppColors.outline))),
-                      )
-                    else
-                      ...workers.map((worker) => _buildWorkerCard(context, worker)),
-                    const SizedBox(height: AppSpacing.spacing3xl),
+                    const Icon(Icons.translate, size: 13, color: AppColors.secondary),
+                    const SizedBox(width: 4),
+                    Text('मराठी / EN', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.bold)),
                   ],
                 ),
               ),
             ],
-          );
-        }
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildStickyHeader() {
+  Widget _buildSearchAndFilters() {
     return Container(
-      color: AppColors.surfaceBright,
-      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingSm, 0, AppSpacing.spacingXs),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 10, AppSpacing.marginMobile, 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
+      ),
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.only(right: AppSpacing.marginMobile),
-            child: Container(
-              height: 52,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppRadius.radiusXl,
-                boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2, offset: Offset(0, 1))],
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: AppSpacing.spacingMd),
-                  const Icon(Icons.search, size: 22, color: AppColors.onSurfaceVariant),
-                  const SizedBox(width: AppSpacing.spacingXs),
-                  Expanded(
-                    child: Text(
-                      'Search plumbers, leak repair...',
-                      style: AppTypography.bodyMd.copyWith(color: AppColors.outline),
+          // Search Input
+          Container(
+            height: 42,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: AppRadius.radiusLg,
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 10),
+                const Icon(Icons.search, size: 18, color: AppColors.outline),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextField(
+                    onChanged: (val) => setState(() => _searchQuery = val),
+                    decoration: InputDecoration(
+                      hintText: 'Search verified union artisans...',
+                      hintStyle: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 12),
+                      border: InputBorder.none,
+                      isDense: true,
                     ),
                   ),
-                  const Icon(Icons.mic_none, size: 20, color: AppColors.onSurfaceVariant),
-                  const SizedBox(width: AppSpacing.spacingXs),
-                ],
-              ),
+                ),
+                const Icon(Icons.mic_none, size: 18, color: AppColors.outline),
+                const SizedBox(width: 10),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.spacingXs),
+          const SizedBox(height: 8),
+
+          // Trade Category Chips
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildFilterChip('All', Icons.filter_list, _activeFilter == 'All'),
-                _buildFilterChip('Available Today', Icons.bolt, _activeFilter == 'Available Today'),
-                _buildFilterChip('Within 3 km', Icons.near_me, _activeFilter == 'Within 3 km'),
-                _buildFilterChip('4.5+ Rating', Icons.star, _activeFilter == '4.5+ Rating'),
-                _buildFilterChip('Under ₹500', Icons.currency_rupee, _activeFilter == 'Under ₹500'),
-                _buildFilterChip('5+ Yrs Experience', Icons.verified_user, _activeFilter == '5+ Yrs Experience'),
-                const SizedBox(width: AppSpacing.marginMobile),
+                _buildTradeChip('all', 'All Trades', Icons.handyman),
+                const SizedBox(width: 6),
+                _buildTradeChip('plumbers', 'Plumbers', Icons.plumbing),
+                const SizedBox(width: 6),
+                _buildTradeChip('electricians', 'Electricians', Icons.bolt),
+                const SizedBox(width: 6),
+                _buildTradeChip('top_rated', 'Top Rated (4.8+)', Icons.star),
               ],
             ),
           ),
@@ -173,28 +250,39 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, IconData icon, bool isActive) {
+  Widget _buildTradeChip(String key, String label, IconData icon) {
+    final isSelected = _activeCategoryFilter == key;
     return GestureDetector(
       onTap: () {
-        setState(() {
-          _activeFilter = label;
-        });
+        setState(() => _activeCategoryFilter = key);
+        if (key == 'electricians') {
+          _currentCategory = const ServiceCategory(id: 'c1', name: 'Electrical', iconData: 'bolt');
+          _loadWorkers();
+        } else if (key == 'plumbers' || key == 'all') {
+          _currentCategory = const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
+          _loadWorkers();
+        }
       },
       child: Container(
-        margin: const EdgeInsets.only(right: AppSpacing.spacingXs),
-        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingMd, vertical: AppSpacing.spacing2xs),
+        height: 32,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primary : AppColors.surfaceContainerLowest,
+          color: isSelected ? AppColors.primary : Colors.white,
           borderRadius: AppRadius.radiusFull,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+          border: Border.all(color: isSelected ? AppColors.primary : AppColors.outlineVariant),
+          boxShadow: isSelected ? [const BoxShadow(color: Colors.black12, blurRadius: 2)] : null,
         ),
         child: Row(
           children: [
-            Icon(icon, size: 16, color: isActive ? AppColors.secondaryFixed : AppColors.secondary),
-            const SizedBox(width: AppSpacing.spacing3xs),
+            Icon(icon, size: 13, color: isSelected ? Colors.white : AppColors.onSurfaceVariant),
+            const SizedBox(width: 5),
             Text(
               label,
-              style: AppTypography.labelMd.copyWith(color: isActive ? AppColors.onPrimary : AppColors.onSurface),
+              style: AppTypography.labelSm.copyWith(
+                color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 11,
+              ),
             ),
           ],
         ),
@@ -202,254 +290,232 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     );
   }
 
-  Widget _buildAssuranceStrip() {
+  Widget _buildGuildBanner() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingSm, AppSpacing.marginMobile, 0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 10, AppSpacing.marginMobile, 4),
       child: Container(
-        padding: const EdgeInsets.all(AppSpacing.spacingSm),
+        padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLow,
-          borderRadius: AppRadius.radiusXl,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 2)],
+          color: Colors.white,
+          borderRadius: AppRadius.radiusLg,
+          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: Row(
           children: [
             Container(
               width: 32,
               height: 32,
-              decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle),
-              child: const Icon(Icons.verified, size: 18, color: AppColors.tertiaryFixed),
+              decoration: BoxDecoration(
+                color: AppColors.tertiaryContainer,
+                borderRadius: AppRadius.radiusSm,
+              ),
+              child: const Icon(Icons.verified_user, size: 18, color: AppColors.onTertiaryContainer),
             ),
-            const SizedBox(width: AppSpacing.spacingXs),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Pune District ${widget.category.name} Union', style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                  Text('Fair daily wages guaranteed • 0% commission cut', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                  Row(
+                    children: [
+                      Text('Pune Certified Union Guild', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                        decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusSm),
+                        child: Text('100% DIRECT', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 8, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                  Text('Fixed union diagnostic rates • 0% platform deductions', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
                 ],
               ),
             ),
-            const Icon(Icons.info_outline, size: 20, color: AppColors.outline),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMatchingHeader(int count) {
+  Widget _buildListHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingMd, AppSpacing.marginMobile, AppSpacing.spacingXs),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 10, AppSpacing.marginMobile, 6),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${widget.category.name} Services in Pune', style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    Text('Showing active union technicians in Kothrud • $count available', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 4),
-                decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusFull),
-                child: Text('Auto-Matched', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              ),
+              Text('${_currentCategory.name} Specialists in Pune', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+              Text('Govt-verified Union professionals near Kothrud', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
             ],
           ),
-          const SizedBox(height: AppSpacing.spacingXs),
-          Row(
-            children: [
-              const Icon(Icons.handshake, size: 16, color: AppColors.onTertiaryContainer),
-              const SizedBox(width: AppSpacing.spacing2xs),
-              Text('Recommended by Pune Central Cooperative', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
-            ],
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
+            child: Row(
+              children: [
+                const Icon(Icons.bolt, size: 12, color: AppColors.secondary),
+                const SizedBox(width: 2),
+                Text('INSTANT', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold)),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildWorkerCard(BuildContext context, Worker worker) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => WorkerProfileScreen(worker: worker, category: widget.category),
+  Widget _buildWorkerCard(Worker worker) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.radiusXl,
+        border: Border.all(color: AppColors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
-        );
-      },
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingXs, AppSpacing.marginMobile, AppSpacing.spacingMd),
-        padding: const EdgeInsets.all(AppSpacing.spacingMd),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceContainerLowest,
-          borderRadius: AppRadius.radiusXl,
-          boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2))],
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: Stack(
-          children: [
-            if (worker.customTag != null || worker.isUnionGold || worker.isCoopMaster)
-              Positioned(
-                top: -AppSpacing.spacingMd,
-                right: -AppSpacing.spacingMd,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingSm, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: worker.customTag != null ? AppColors.primary : worker.isUnionGold ? AppColors.secondaryFixed : AppColors.surfaceContainerHigh,
-                    borderRadius: const BorderRadius.only(bottomLeft: Radius.circular(12)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Stack(
+                children: [
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: AppColors.surfaceContainerLow,
+                    backgroundImage: worker.imageUrl.isNotEmpty ? NetworkImage(worker.imageUrl) : null,
+                    child: worker.imageUrl.isEmpty ? const Icon(Icons.person, size: 28, color: AppColors.primary) : null,
                   ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        worker.customTag != null ? Icons.thumb_up : worker.isUnionGold ? Icons.workspace_premium : Icons.shield,
-                        size: 14,
-                        color: worker.customTag != null ? AppColors.tertiaryFixed : worker.isUnionGold ? AppColors.secondary : AppColors.onSurfaceVariant,
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      width: 18,
+                      height: 18,
+                      decoration: BoxDecoration(
+                        color: AppColors.onTertiaryContainer,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        worker.customTag ?? (worker.isUnionGold ? 'Union Gold' : 'Cooperative Master'),
-                        style: AppTypography.labelSm.copyWith(
-                          color: worker.customTag != null ? AppColors.onPrimary : worker.isUnionGold ? AppColors.onSecondaryFixed : AppColors.onSurfaceVariant,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
+                      child: const Icon(Icons.check, size: 10, color: Colors.white),
+                    ),
                   ),
-                ),
+                ],
               ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Stack(
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                         Container(
-                          width: 64,
-                          height: 64,
-                          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
-                          child: const Icon(Icons.person, color: AppColors.outline),
-                        ),
-                        Positioned(
-                          bottom: -4,
-                          right: -4,
-                          child: Container(
-                            decoration: const BoxDecoration(color: AppColors.surfaceContainerLowest, shape: BoxShape.circle),
-                            child: const Icon(Icons.check_circle, size: 20, color: AppColors.tertiaryFixedDim),
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.tertiaryContainer,
+                            borderRadius: AppRadius.radiusFull,
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(width: AppSpacing.spacingSm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(worker.name, style: AppTypography.titleLg.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                          Text('${worker.locationTag} • ${worker.distanceKm} km away', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                          const SizedBox(height: 4),
-                          Row(
+                          child: Row(
                             children: [
-                              const Icon(Icons.star, size: 15, color: AppColors.secondary),
-                              const SizedBox(width: 4),
-                              Text(worker.rating.toString(), style: AppTypography.labelMd.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                              Text(' (${worker.reviewCount} reviews) • ', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                              Text('${worker.jobsCompleted} jobs', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.star, size: 11, color: AppColors.onTertiaryContainer),
+                              const SizedBox(width: 2),
+                              Text('${worker.rating.toStringAsFixed(1)} (${worker.reviewCount})', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold, fontSize: 10)),
                             ],
                           ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusFull),
-                      child: Row(
-                        children: [
-                          Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle)),
-                          const SizedBox(width: 4),
-                          Text(worker.availability, style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: AppSpacing.spacingXs),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingXs, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusFull),
-                      child: Text(worker.experience, style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.spacingXs),
-                  decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Specializations:', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                      Text(worker.specializations.join(', '), style: AppTypography.bodySm.copyWith(color: AppColors.onSurface)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.spacingMd),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Union Fixed Rate', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text('₹${worker.rate}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                            Text('/ visit', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                          ],
                         ),
                       ],
                     ),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingSm, vertical: AppSpacing.spacingXs),
-                          decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
-                          child: Text('Profile', style: AppTypography.labelMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
+                          child: Text('Union Master', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold)),
                         ),
-                        const SizedBox(width: AppSpacing.spacingXs),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacingMd, vertical: AppSpacing.spacingXs),
-                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusXl),
-                          child: Row(
-                            children: [
-                              Text('Book Now', style: AppTypography.labelMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.arrow_forward, size: 18, color: AppColors.onPrimary),
-                            ],
-                          ),
-                        ),
+                        const SizedBox(width: 6),
+                        Text('${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Container(width: 5, height: 5, decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle)),
+                        const SizedBox(width: 4),
+                        Text('Available in 20 mins', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 4),
+                        Text('• ITI Certified', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
                       ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+          const Divider(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Fixed Standard Diag.', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                  Text('₹${worker.rate.toStringAsFixed(0)}', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              Row(
+                children: [
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.outlineVariant),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
+                        ),
+                      );
+                    },
+                    child: Text('Profile', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.arrow_forward, size: 14),
+                    label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
