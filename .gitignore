@@ -1,0 +1,37 @@
+﻿# Root .gitignore for ShramSetu
+
+# Build & compiled outputs
+**/build/
+build/
+app/build/
+app/android/build/
+app/android/app/build/
+app/android/.gradle/
+.gradle/
+
+# Dart / Flutter
+**/.dart_tool/
+.dart_tool/
+app/.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub/
+.pub-cache/
+
+# Android Studio / IntelliJ / VS Code
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# Operating system files
+.DS_Store
+Thumbs.db
+*.swp
+*~

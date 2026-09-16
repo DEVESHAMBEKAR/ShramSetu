@@ -1,15 +1,14 @@
-import 'package:app/core/config/dependency_injection.dart';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../../../../core/config/dependency_injection.dart';
 import 'admin_workers_screen.dart';
 import 'admin_customers_screen.dart';
 import 'admin_complaints_screen.dart';
 import 'admin_analytics_screen.dart';
 import 'admin_welfare_screen.dart';
-import '../../data/repositories/mock_admin_repository.dart';
 
 class AdminProfileScreen extends StatelessWidget {
   const AdminProfileScreen({super.key});

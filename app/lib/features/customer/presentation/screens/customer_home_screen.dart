@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -6,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../../../../shared/widgets/map_location_picker_screen.dart';
 import '../../data/models/customer_models.dart';
 import '../../data/models/customer_profile.dart';
 import 'worker_discovery_screen.dart';
@@ -26,6 +28,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  StreamSubscription<List<Map<String, dynamic>>>? _bookingsSub;
 
   @override
   void initState() {
@@ -35,6 +38,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   @override
   void dispose() {
+    _bookingsSub?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -53,19 +57,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     try {
       final cats = await DI.customerRepo.getActiveServices();
       if (mounted) _categories = cats;
-    } catch (_) {}
-
-    try {
-      final workers = await DI.customerRepo.getEligibleWorkers('c2');
-      if (mounted) _featuredWorkers = workers;
-    } catch (_) {}
-
-    try {
-      final bookings = await DI.customerRepo.getCustomerBookings();
-      if (mounted && bookings.isNotEmpty) {
-        _activeBooking = bookings.first;
+      if (cats.isNotEmpty) {
+        final workers = await DI.customerRepo.getEligibleWorkers(cats.first.id);
+        if (mounted) _featuredWorkers = workers;
       }
     } catch (_) {}
+
+    _bookingsSub?.cancel();
+    _bookingsSub = DI.customerRepo.watchCustomerBookings().listen(
+      (bookings) {
+        if (mounted) {
+          final activeList = bookings.where((b) {
+            final s = (b['status']?.toString() ?? '').toLowerCase();
+            return s != 'completed' && s != 'cancelled' && s != 'rejected';
+          }).toList();
+          setState(() {
+            _activeBooking = activeList.isNotEmpty ? activeList.first : null;
+          });
+        }
+      },
+      onError: (_) {},
+    );
 
     if (mounted) {
       setState(() => _isLoading = false);
@@ -86,8 +98,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   String get _locationDisplay {
     final addr = _profile?.defaultAddress;
-    if (addr == null) return 'Kothrud, Pune • 411038';
-    return '${addr.area.isNotEmpty ? addr.area : addr.city}, ${addr.city} • ${addr.postalCode}';
+    if (addr == null) return 'Pune • Tap to set address';
+    final areaPart = addr.area.isNotEmpty ? addr.area : addr.city;
+    if (addr.postalCode.isNotEmpty) {
+      return '$areaPart, ${addr.city} • ${addr.postalCode}';
+    }
+    return '$areaPart, ${addr.city}';
   }
 
   IconData _mapCategoryIcon(String? iconName) {
@@ -161,6 +177,153 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showLocationPickerSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        final currentAddr = _profile?.defaultAddress;
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.marginMobile),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Service Location', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusLg,
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: AppColors.primary, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            currentAddr?.displayString.isNotEmpty == true
+                                ? currentAddr!.displayString
+                                : 'Pune, Maharashtra',
+                            style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                          if (currentAddr?.hasCoordinates == true)
+                            Text(
+                              'GPS Coordinates: ${currentAddr!.latitude!.toStringAsFixed(4)}, ${currentAddr.longitude!.toStringAsFixed(4)}',
+                              style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.my_location, color: AppColors.secondary),
+                title: const Text('Use Current GPS Location', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Detect coordinates and reverse geocode address'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final userId = Supabase.instance.client.auth.currentUser?.id;
+                  if (userId == null) return;
+                  
+                  final result = await DI.locationService.getCurrentPosition();
+                  if (result.isSuccess && result.coordinates != null) {
+                    final coords = result.coordinates!;
+                    final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude);
+                    if (geo != null) {
+                      await DI.userRepo.createAddress(
+                        userId: userId,
+                        addressLine: geo.addressLine.isNotEmpty ? geo.addressLine : 'Current Location',
+                        area: geo.area,
+                        city: geo.city,
+                        state: geo.state,
+                        postalCode: geo.postalCode,
+                        latitude: coords.latitude,
+                        longitude: coords.longitude,
+                      );
+                      await _loadAllData();
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Service location updated successfully.')),
+                        );
+                      }
+                    }
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(result.errorMessage ?? 'Unable to detect GPS location.')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.map_outlined, color: AppColors.primary),
+                title: const Text('Pick on Google Map', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Pinpoint your exact location visually'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final userId = Supabase.instance.client.auth.currentUser?.id;
+                  if (userId == null) return;
+
+                  final currentAddr = _profile?.defaultAddress;
+                  final mapRes = await Navigator.push<LocationPickerResult>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapLocationPickerScreen(
+                        initialLatitude: currentAddr?.latitude,
+                        initialLongitude: currentAddr?.longitude,
+                        title: 'Select Delivery Location',
+                      ),
+                    ),
+                  );
+
+                  if (mapRes != null) {
+                    final geo = mapRes.address;
+                    await DI.userRepo.createAddress(
+                      userId: userId,
+                      addressLine: geo?.addressLine.isNotEmpty == true ? geo!.addressLine : 'Selected Location',
+                      area: geo?.area ?? '',
+                      city: geo?.city.isNotEmpty == true ? geo!.city : 'Pune',
+                      state: geo?.state.isNotEmpty == true ? geo!.state : 'Maharashtra',
+                      postalCode: geo?.postalCode ?? '',
+                      latitude: mapRes.latitude,
+                      longitude: mapRes.longitude,
+                    );
+                    await _loadAllData();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Location updated on map.')),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -249,13 +412,21 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           Row(
             children: [
               Container(
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: Colors.white,
                   borderRadius: AppRadius.radiusLg,
+                  border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
                 ),
-                child: const Icon(Icons.handyman, size: 18, color: Colors.white),
+                padding: const EdgeInsets.all(2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    'assets/images/logo.jpg',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
               RichText(
@@ -363,93 +534,97 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Location Pill Box
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: AppRadius.radiusLg,
-              border: Border.all(color: AppColors.outlineVariant),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.03),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: AppRadius.radiusSm,
+          // Location Pill Box (Interactive)
+          InkWell(
+            onTap: _showLocationPickerSheet,
+            borderRadius: AppRadius.radiusLg,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.radiusLg,
+                border: Border.all(color: AppColors.outlineVariant),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.03),
+                    blurRadius: 4,
+                    offset: const Offset(0, 1),
                   ),
-                  child: const Icon(Icons.location_on, size: 18, color: AppColors.primary),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            'PUNE GUILD HUB',
-                            style: AppTypography.labelSm.copyWith(
-                              fontSize: 9,
-                              color: AppColors.onSurfaceVariant,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: AppColors.tertiaryContainer,
-                              borderRadius: AppRadius.radiusFull,
-                            ),
-                            child: Text(
-                              'VERIFIED AREA',
+                ],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppRadius.radiusSm,
+                    ),
+                    child: const Icon(Icons.location_on, size: 18, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'PUNE GUILD HUB',
                               style: AppTypography.labelSm.copyWith(
-                                fontSize: 8,
-                                color: AppColors.onTertiaryContainer,
+                                fontSize: 9,
+                                color: AppColors.onSurfaceVariant,
                                 fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 1),
-                      Text(
-                        _locationDisplay,
-                        style: AppTypography.labelLg.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.tertiaryContainer,
+                                borderRadius: AppRadius.radiusFull,
+                              ),
+                              child: Text(
+                                'VERIFIED AREA',
+                                style: AppTypography.labelSm.copyWith(
+                                  fontSize: 8,
+                                  color: AppColors.onTertiaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+                        const SizedBox(height: 1),
+                        Text(
+                          _locationDisplay,
+                          style: AppTypography.labelLg.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: AppRadius.radiusSm,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppRadius.radiusSm,
+                    ),
+                    child: Row(
+                      children: [
+                        Text('Change', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                        const Icon(Icons.expand_more, size: 14),
+                      ],
+                    ),
                   ),
-                  child: Row(
-                    children: [
-                      Text('Change', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-                      const Icon(Icons.expand_more, size: 14),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -607,7 +782,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         decoration: BoxDecoration(
           color: AppColors.primary,
           borderRadius: AppRadius.radiusXl,
-          border: Border.all(color: const Color(0xFF262626)),
+          border: Border.all(color: AppColors.onPrimaryFixedVariant.withValues(alpha: 0.3)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.15),
@@ -622,16 +797,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 38,
-                  height: 38,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
+                    color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: AppRadius.radiusLg,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
                   ),
-                  child: const Icon(Icons.verified, color: Colors.white, size: 20),
+                  child: const Icon(Icons.shield_outlined, color: AppColors.secondaryFixed, size: 24),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -639,8 +814,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       Row(
                         children: [
                           Text(
-                            'Pune Trades Guild Co-op',
-                            style: AppTypography.titleMd.copyWith(
+                            'ShramSetu Cooperative Trust',
+                            style: AppTypography.labelLg.copyWith(
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
@@ -649,15 +824,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                             decoration: BoxDecoration(
-                              color: AppColors.secondary,
-                              borderRadius: AppRadius.radiusSm,
+                              color: AppColors.tertiaryContainer,
+                              borderRadius: AppRadius.radiusFull,
                             ),
                             child: Text(
-                              'PLUS UNION',
+                              'GOVT WAGES',
                               style: AppTypography.labelSm.copyWith(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w900,
                                 fontSize: 8,
+                                color: AppColors.onTertiaryContainer,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
                           ),
@@ -667,7 +842,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       Text(
                         '100% Background-checked • Zero middleman commission',
                         style: AppTypography.bodySm.copyWith(
-                          color: const Color(0xFFD1D5DB),
+                          color: AppColors.primaryFixedDim,
                           fontSize: 11,
                         ),
                       ),
@@ -691,14 +866,14 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         width: 6,
                         height: 6,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF34D399),
+                          color: AppColors.tertiaryFixed,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '384 Guild Masters active right now',
-                        style: AppTypography.labelSm.copyWith(color: const Color(0xFFE5E7EB), fontSize: 11),
+                        style: AppTypography.labelSm.copyWith(color: AppColors.primaryFixed, fontSize: 11),
                       ),
                     ],
                   ),
@@ -733,10 +908,10 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     final workerData = booking['workers'] as Map<String, dynamic>?;
     final workerUserData = workerData?['users'] as Map<String, dynamic>?;
 
-    final serviceName = serviceData?['name']?.toString() ?? 'Plumbing & Pipe Repair';
-    final workerName = workerUserData?['full_name']?.toString() ?? 'Rahul Patil';
-    final amount = (booking['base_amount'] as num?)?.toDouble() ?? 399.0;
-    final orderRef = bookingId.length >= 4 ? bookingId.substring(0, 4).toUpperCase() : '9042';
+    final serviceName = serviceData?['name']?.toString() ?? 'Service Request';
+    final workerName = workerUserData?['full_name']?.toString() ?? 'Assigned Artisan';
+    final amount = (booking['base_amount'] as num?)?.toDouble() ?? 0.0;
+    final orderRef = bookingId.length >= 4 ? bookingId.substring(0, 4).toUpperCase() : (bookingId.isNotEmpty ? bookingId.toUpperCase() : 'REQ');
 
     final isLive = status != 'completed' && status != 'cancelled';
 
@@ -774,7 +949,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      isLive ? 'PARTNER ARRIVING' : 'RECENT SERVICE',
+                      isLive ? 'ACTIVE BOOKING' : 'RECENT SERVICE',
                       style: AppTypography.labelSm.copyWith(
                         color: AppColors.secondary,
                         fontWeight: FontWeight.w800,
@@ -782,7 +957,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ),
                     ),
                     const SizedBox(width: 4),
-                    Text('• In 12 mins', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                    Text('• ${status.toUpperCase()}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
                   ],
                 ),
                 Container(
@@ -897,7 +1072,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.navigation, size: 15, color: Color(0xFF34D399)),
+                    icon: const Icon(Icons.navigation, size: 15, color: AppColors.tertiaryFixed),
                     label: Text('Track Partner', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -922,8 +1097,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ServiceCategory(id: 'c7', name: 'Gardening', iconData: 'yard'),
             ServiceCategory(id: 'c8', name: 'Driver', iconData: 'directions_car'),
           ];
-
-    final onlineCounts = [84, 62, 45, 91, 28, 37, 19, 52];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 14, AppSpacing.marginMobile, 6),
@@ -975,7 +1148,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             itemCount: displayCategories.length > 8 ? 8 : displayCategories.length,
             itemBuilder: (context, index) {
               final cat = displayCategories[index];
-              final count = onlineCounts[index % onlineCounts.length];
 
               return GestureDetector(
                 onTap: () => _navigateToCategory(cat),
@@ -1017,7 +1189,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        '$count online',
+                        'Verified',
                         style: AppTypography.bodySm.copyWith(
                           color: AppColors.outline,
                           fontSize: 9,
@@ -1035,41 +1207,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildArtisansNearYou() {
-    final workers = _featuredWorkers.isNotEmpty
-        ? _featuredWorkers
-        : [
-            const Worker(
-              id: 'w1',
-              name: 'Rahul Patil',
-              categoryId: 'c2',
-              rate: 399,
-              rating: 4.8,
-              reviewCount: 126,
-              jobsCompleted: 184,
-              distanceKm: 1.4,
-              experience: '6 yrs exp',
-              availability: 'Available Today',
-              specializations: ['Leak Detection', 'Bath Fittings'],
-              locationTag: 'Kothrud',
-              imageUrl: '',
-            ),
-            const Worker(
-              id: 'w2',
-              name: 'Suresh Gaikwad',
-              categoryId: 'c1',
-              rate: 299,
-              rating: 4.9,
-              reviewCount: 214,
-              jobsCompleted: 350,
-              distanceKm: 2.1,
-              experience: '9 yrs exp',
-              availability: 'Available Today',
-              specializations: ['Master Electrician'],
-              locationTag: 'Kothrud',
-              imageUrl: '',
-            ),
-          ];
-
+    final workers = _featuredWorkers;
     final filteredWorkers = _searchQuery.trim().isEmpty
         ? workers
         : workers.where((w) =>
@@ -1089,37 +1227,74 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text('Services Near You', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                  Text('Govt-verified Union professionals in Kothrud, Pune', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                  Text('Govt-verified Union professionals in $_locationDisplay', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
                 ],
               ),
-              Container(
-                height: 28,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppRadius.radiusSm,
-                  border: Border.all(color: AppColors.outlineVariant),
-                ),
-                child: Row(
-                  children: [
-                    Text('See all (42)', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    const Icon(Icons.chevron_right, size: 14),
-                  ],
+              GestureDetector(
+                onTap: () {
+                  if (_categories.isNotEmpty) {
+                    _navigateToCategory(_categories.first);
+                  }
+                },
+                child: Container(
+                  height: 28,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.radiusSm,
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        workers.isNotEmpty ? 'See all (${workers.length})' : 'See all',
+                        style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                      ),
+                      const Icon(Icons.chevron_right, size: 14),
+                    ],
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: filteredWorkers.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final worker = filteredWorkers[index];
-              return _buildArtisanCard(worker);
-            },
-          ),
+          if (filteredWorkers.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.radiusLg,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.handyman_outlined, size: 36, color: AppColors.outline),
+                  const SizedBox(height: 8),
+                  Text(
+                    'No artisans currently available',
+                    style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Select a category above to find and book available specialists.',
+                    style: AppTypography.bodySm.copyWith(color: AppColors.outline),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredWorkers.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final worker = filteredWorkers[index];
+                return _buildArtisanCard(worker);
+              },
+            ),
         ],
       ),
     );
@@ -1267,7 +1442,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       _navigateToCategory(_categories.first);
                     }
                   },
-                  icon: const Icon(Icons.lock_outline, size: 14, color: Color(0xFF34D399)),
+                  icon: const Icon(Icons.lock_outline, size: 14, color: AppColors.tertiaryFixed),
                   label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                 ),
               ),

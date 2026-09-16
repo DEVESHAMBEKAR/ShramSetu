@@ -1,9 +1,16 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
+import 'admin_demand_forecast_screen.dart';
+import 'admin_workers_screen.dart';
+import 'admin_payments_screen.dart';
+import 'admin_complaints_screen.dart';
+import 'admin_bookings_screen.dart';
+import 'admin_profile_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -14,6 +21,7 @@ class AdminDashboardScreen extends StatefulWidget {
 
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   late Future<List<dynamic>> _dataFuture;
+  StreamSubscription<List<JobRequest>>? _bookingsSub;
   int _currentNavIndex = 0;
   bool _disputeResolved = false;
 
@@ -21,6 +29,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   void initState() {
     super.initState();
     _refreshData();
+    _bookingsSub = DI.adminRepo.watchBookings().listen(
+      (_) {
+        if (mounted) _refreshData();
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _bookingsSub?.cancel();
+    super.dispose();
   }
 
   void _refreshData() {
@@ -28,6 +48,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       _dataFuture = Future.wait([
         DI.adminRepo.getDashboardStats(),
         DI.adminRepo.getWorkers(),
+        DI.adminRepo.getComplaints(),
       ]);
     });
   }
@@ -37,7 +58,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       SnackBar(
         content: Row(
           children: [
-            const Icon(Icons.verified, color: Color(0xFF4ADE80), size: 18),
+            const Icon(Icons.verified, color: AppColors.tertiaryFixed, size: 18),
             const SizedBox(width: 8),
             Expanded(
               child: Text(
@@ -47,11 +68,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ),
             const Text(
               'Coop Node #12',
-              style: TextStyle(fontSize: 10, color: Color(0xFFA0A0A5)),
+              style: TextStyle(fontSize: 10, color: AppColors.outline),
             ),
           ],
         ),
-        backgroundColor: const Color(0xFF111111),
+        backgroundColor: AppColors.primary,
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -65,18 +86,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            backgroundColor: Color(0xFFF8F9FC),
+            backgroundColor: AppColors.background,
             body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
         if (snapshot.hasError) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF8F9FC),
+            backgroundColor: AppColors.background,
             body: Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
                   const SizedBox(height: 12),
                   Text('Failed to load admin console: ${snapshot.error}'),
                   const SizedBox(height: 16),
@@ -89,10 +110,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
         final stats = snapshot.data![0] as AdminDashboardStats;
         final workers = snapshot.data![1] as List<WorkerProfile>;
+        final complaints = (snapshot.data!.length > 2 ? snapshot.data![2] as List<Complaint>? : null) ?? [];
         final pending = workers.where((w) => w.verificationStatus == VerificationStatus.pending).toList();
+        final openComplaints = complaints.where((c) => c.status == ComplaintStatus.open).toList();
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FC),
+          backgroundColor: AppColors.background,
           appBar: _buildAppBar(),
           body: SingleChildScrollView(
             child: Column(
@@ -110,7 +133,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const SizedBox(height: 14),
                       _buildFairWorkIndex(),
                       const SizedBox(height: 14),
-                      _buildUrgentActionsSection(pending),
+                      _buildUrgentActionsSection(pending, openComplaints),
                       const SizedBox(height: 80),
                     ],
                   ),
@@ -143,19 +166,19 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -0.3,
                 ),
               ),
               Row(
                 children: [
-                  const Icon(Icons.location_on, size: 12, color: Color(0xFF5A38E4)),
+                  const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
                   const SizedBox(width: 3),
                   const Text(
                     'Kothrud Ward #12 (Pune)',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70), fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w500),
                   ),
-                  const Icon(Icons.expand_more, size: 14, color: Color(0xFF6C6C70)),
+                  const Icon(Icons.expand_more, size: 14, color: AppColors.onSurfaceVariant),
                 ],
               ),
             ],
@@ -166,7 +189,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Stack(
           children: [
             IconButton(
-              icon: const Icon(Icons.notifications_none, color: Color(0xFF111111)),
+              icon: const Icon(Icons.notifications_none, color: AppColors.primary),
               onPressed: () {},
             ),
             Positioned(
@@ -176,7 +199,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 width: 8,
                 height: 8,
                 decoration: const BoxDecoration(
-                  color: Color(0xFF5A38E4),
+                  color: AppColors.secondary,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -188,13 +211,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           height: 32,
           margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
           decoration: const BoxDecoration(
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
           child: const Text(
             'OP',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Colors.white),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.onPrimary),
           ),
         ),
       ],
@@ -220,33 +243,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECEEF0),
+                      color: AppColors.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: const Row(
                       children: [
-                        CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF00875A)),
+                        CircleAvatar(radius: 3.5, backgroundColor: AppColors.onTertiaryContainer),
                         SizedBox(width: 5),
                         Text(
                           'Guild Node Active',
-                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 6),
-                  const Text('• Sync 12s ago', style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70))),
+                  const Text('• Sync 12s ago', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF2F4F6),
+                  color: AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
                   'Cluster ID: #PN-12',
-                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w700, color: Color(0xFF6C6C70)),
+                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -257,14 +280,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF111111),
+              color: AppColors.primary,
               letterSpacing: -0.5,
             ),
           ),
           const SizedBox(height: 2),
           const Text(
             'Pune District Trades Federation • Real-time dispatch & governance ledger',
-            style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
           ),
         ],
       ),
@@ -283,35 +306,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         _buildMetricCard(
           title: 'Active Karigars Online',
           icon: Icons.engineering,
-          value: '${stats.totalWorkers > 0 ? stats.totalWorkers : 384}',
-          badgeText: '+12%',
-          badgeSub: 'vs yday',
-          badgeColor: const Color(0xFF00875A),
-          badgeBg: const Color(0xFFE3FCEF),
+          value: '${stats.totalWorkers}',
+          badgeText: 'Verified',
+          badgeColor: AppColors.onTertiaryContainer,
+          badgeBg: AppColors.tertiaryContainer,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen())),
         ),
         _buildMetricCard(
           title: 'Escrow Locked Value',
           icon: Icons.lock,
-          value: '₹${stats.escrowLocked > 0 ? stats.escrowLocked.toInt() : "1,84,500"}',
+          value: '₹${stats.escrowLocked.toStringAsFixed(0)}',
           badgeText: '100% Secured',
-          badgeColor: const Color(0xFF00875A),
-          badgeBg: const Color(0xFFE3FCEF),
+          badgeColor: AppColors.onTertiaryContainer,
+          badgeBg: AppColors.tertiaryContainer,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPaymentsScreen())),
         ),
         _buildMetricCard(
-          title: 'Dispute Rate',
+          title: 'Pending Verifications',
           icon: Icons.gavel,
-          value: '0.2%',
-          badgeText: 'Historic Low',
-          badgeColor: const Color(0xFF00875A),
-          badgeBg: const Color(0xFFE3FCEF),
+          value: '${stats.pendingVerifications}',
+          badgeText: stats.pendingVerifications > 0 ? 'Action Needed' : 'All Clear',
+          badgeColor: stats.pendingVerifications > 0 ? AppColors.onWarningContainer : AppColors.onTertiaryContainer,
+          badgeBg: stats.pendingVerifications > 0 ? AppColors.warningContainer : AppColors.tertiaryContainer,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen())),
         ),
         _buildMetricCard(
-          title: 'Avg Arrival Time',
+          title: 'Active Bookings',
           icon: Icons.bolt,
-          value: '14.2 mins',
-          badgeText: 'SLA Target',
-          badgeColor: const Color(0xFF00875A),
-          badgeBg: const Color(0xFFE3FCEF),
+          value: '${stats.activeBookings}',
+          badgeText: 'Realtime SLA',
+          badgeColor: AppColors.onTertiaryContainer,
+          badgeBg: AppColors.tertiaryContainer,
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminBookingsScreen())),
         ),
       ],
     );
@@ -325,77 +351,85 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     String? badgeSub,
     required Color badgeColor,
     required Color badgeBg,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF6C6C70)),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(icon, size: 16, color: const Color(0xFF111111)),
-            ],
-          ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF111111),
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
-                    decoration: BoxDecoration(
-                      color: badgeBg,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      badgeText,
-                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: badgeColor),
-                    ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.outlineVariant),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onSurfaceVariant),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  if (badgeSub != null) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      badgeSub,
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF6C6C70)),
+                ),
+                Icon(icon, size: 16, color: AppColors.primary),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.primary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: badgeBg,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        badgeText,
+                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: badgeColor),
+                      ),
                     ),
+                    if (badgeSub != null) ...[
+                      const SizedBox(width: 4),
+                      Text(
+                        badgeSub,
+                        style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
+                      ),
+                    ],
+                    if (onTap != null) ...[
+                      const Spacer(),
+                      const Icon(Icons.arrow_forward_ios, size: 10, color: AppColors.outline),
+                    ],
                   ],
-                ],
-              ),
-            ],
-          ),
-        ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -406,7 +440,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -427,10 +461,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFECEEF0),
+                      color: AppColors.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(Icons.balance, size: 18, color: Color(0xFF111111)),
+                    child: const Icon(Icons.balance, size: 18, color: AppColors.primary),
                   ),
                   const SizedBox(width: 10),
                   const Column(
@@ -438,11 +472,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     children: [
                       Text(
                         'Fair Work Distribution & Queue Health',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary),
                       ),
                       Text(
                         'Algorithmic anti-monopoly fair allocation parity',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                        style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -451,12 +485,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECEEF0),
+                  color: AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
                   '94% Parity',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.primary),
                 ),
               ),
             ],
@@ -465,24 +499,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFEFEFF4)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Column(
               children: [
                 const Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Senior / Junior Allocation Balance', style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70))),
-                    Text('361 / 384 Karigars on Quota', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF111111))),
+                    Text('Senior / Junior Allocation Balance', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+                    Text('361 / 384 Karigars on Quota', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Container(
                   height: 8,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE1E2E5),
+                    color: AppColors.outlineVariant,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Row(
@@ -491,7 +525,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         flex: 58,
                         child: Container(
                           decoration: const BoxDecoration(
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                             borderRadius: BorderRadius.horizontal(left: Radius.circular(10)),
                           ),
                         ),
@@ -500,7 +534,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         flex: 36,
                         child: Container(
                           decoration: const BoxDecoration(
-                            color: Color(0xFF5A38E4),
+                            color: AppColors.secondary,
                             borderRadius: BorderRadius.horizontal(right: Radius.circular(10)),
                           ),
                         ),
@@ -514,39 +548,48 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   children: [
                     Row(
                       children: [
-                        CircleAvatar(radius: 3, backgroundColor: Color(0xFF111111)),
+                        CircleAvatar(radius: 3, backgroundColor: AppColors.primary),
                         SizedBox(width: 4),
-                        Text('Senior Guild (58%)', style: TextStyle(fontSize: 10, color: Color(0xFF6C6C70))),
+                        Text('Senior Guild (58%)', style: TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant)),
                         SizedBox(width: 10),
-                        CircleAvatar(radius: 3, backgroundColor: Color(0xFF5A38E4)),
+                        CircleAvatar(radius: 3, backgroundColor: AppColors.secondary),
                         SizedBox(width: 4),
-                        Text('Junior Apprentices (36%)', style: TextStyle(fontSize: 10, color: Color(0xFF6C6C70))),
+                        Text('Junior Apprentices (36%)', style: TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant)),
                       ],
                     ),
-                    Text('Max Cap: 4 jobs/day', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF111111))),
+                    Text('Max Cap: 4 jobs/day', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.primary)),
                   ],
                 ),
               ],
             ),
           ),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF2F4F6),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.verified, size: 15, color: Color(0xFF00875A)),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Dispatch algorithm is balancing surge demand to Junior Karigars with completed safety certifications.',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF333333)),
+          GestureDetector(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AdminDemandForecastScreen()),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.auto_awesome, size: 15, color: AppColors.secondary),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'AI Demand Forecasting is balancing surge demand across guild clusters. Tap to view 7-day forecast.',
+                      style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                    ),
                   ),
-                ),
-              ],
+                  Icon(Icons.arrow_forward_ios, size: 11, color: AppColors.outline),
+                ],
+              ),
             ),
           ),
         ],
@@ -554,7 +597,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildUrgentActionsSection(List<WorkerProfile> pendingWorkers) {
+  Widget _buildUrgentActionsSection(List<WorkerProfile> pendingWorkers, List<Complaint> openComplaints) {
+    final totalPending = pendingWorkers.length + openComplaints.length;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -566,48 +610,92 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               children: [
                 Text(
                   'Urgent Union Actions & Approvals',
-                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
                 ),
                 Text(
                   'Requires cluster administrator validation',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                  style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                 ),
               ],
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF0B3),
+                color: totalPending > 0 ? AppColors.warningContainer : AppColors.tertiaryContainer,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Text(
-                '2 Pending',
-                style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: Color(0xFF7A4100)),
+              child: Text(
+                '$totalPending Pending',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  color: totalPending > 0 ? AppColors.onWarningContainer : AppColors.onTertiaryContainer,
+                ),
               ),
             ),
           ],
         ),
         const SizedBox(height: 12),
         // Action Card 1: KYC Clearance
-        _buildKycActionCard(pendingWorkers),
+        if (pendingWorkers.isNotEmpty)
+          _buildKycActionCard(pendingWorkers.first)
+        else
+          _buildAllKycApprovedCard(),
         const SizedBox(height: 10),
         // Action Card 2: Escrow Dispute
-        _buildDisputeActionCard(),
+        if (openComplaints.isNotEmpty)
+          _buildDisputeActionCard(openComplaints.first)
+        else
+          _buildAllDisputesResolvedCard(),
       ],
     );
   }
 
-  Widget _buildKycActionCard(List<WorkerProfile> pendingWorkers) {
-    final worker = pendingWorkers.isNotEmpty ? pendingWorkers.first : null;
-    final workerName = worker?.name ?? 'Suresh Gaikwad';
-    final trade = worker?.skills.isNotEmpty == true ? worker!.skills.first : 'Electrician';
+  Widget _buildAllKycApprovedCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.tertiaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.verified, size: 20, color: AppColors.onTertiaryContainer),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('All Karigars Verified', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                Text('No pending KYC document approvals in this cluster.', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildKycActionCard(WorkerProfile worker) {
+    final workerName = worker.name.isNotEmpty ? worker.name : 'Karigar';
+    final trade = worker.skills.isNotEmpty ? worker.skills.first : 'Artisan';
+    final experience = worker.experience.isNotEmpty ? worker.experience : 'Experienced Artisan';
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -626,10 +714,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECEEF0),
+                  color: AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.badge_outlined, size: 22, color: Color(0xFF111111)),
+                child: const Icon(Icons.badge_outlined, size: 22, color: AppColors.primary),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -642,7 +730,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Flexible(
                           child: Text(
                             'KYC Clearance - $workerName',
-                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -650,29 +738,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFECEEF0),
+                            color: AppColors.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
                             'Review Required',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Color(0xFF6C6C70)),
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$trade • 9 yrs experience • Ward #12',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                      '$trade • $experience • Pune Guild',
+                      style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 4),
                     const Row(
                       children: [
-                        Icon(Icons.check_circle, size: 13, color: Color(0xFF00875A)),
+                        Icon(Icons.check_circle, size: 13, color: AppColors.onTertiaryContainer),
                         SizedBox(width: 4),
                         Text(
-                          'Aadhaar + Police NOC Verified',
-                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF00875A)),
+                          'Documents Submitted • Awaiting Approval',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.onTertiaryContainer),
                         ),
                       ],
                     ),
@@ -682,7 +770,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 10),
           Row(
             children: [
@@ -691,17 +779,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   height: 40,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      _showToast('Opening credential dossier for $workerName');
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen()));
                     },
-                    icon: const Icon(Icons.visibility_outlined, size: 15, color: Color(0xFF111111)),
+                    icon: const Icon(Icons.visibility_outlined, size: 15, color: AppColors.primary),
                     label: const Text(
                       'Review',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF111111)),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      side: const BorderSide(color: AppColors.outlineVariant),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      backgroundColor: const Color(0xFFF8F9FA),
+                      backgroundColor: AppColors.background,
                     ),
                   ),
                 ),
@@ -712,10 +800,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   height: 40,
                   child: ElevatedButton.icon(
                     onPressed: () async {
-                      if (worker != null) {
-                        await DI.adminRepo.approveWorker(worker.id);
-                      }
-                      _showToast('$workerName credential approved and active.');
+                      await DI.adminRepo.approveWorker(worker.id);
+                      _showToast('$workerName approved and verified.');
                       _refreshData();
                     },
                     icon: const Icon(Icons.check, size: 15),
@@ -724,7 +810,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF111111),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                       elevation: 0,
@@ -739,13 +825,47 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
-  Widget _buildDisputeActionCard() {
+  Widget _buildAllDisputesResolvedCard() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.tertiaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.shield_outlined, size: 20, color: AppColors.onTertiaryContainer),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('No Open Disputes', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                Text('All customer and artisan escrow mediations are settled.', style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDisputeActionCard(Complaint complaint) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -764,10 +884,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0B3),
+                  color: AppColors.warningContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.balance, size: 22, color: Color(0xFF7A4100)),
+                child: const Icon(Icons.balance, size: 22, color: AppColors.onWarningContainer),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -777,32 +897,38 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
-                          'Escrow Mediation Dispute #491',
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+                        Flexible(
+                          child: Text(
+                            'Dispute: ${complaint.subject}',
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFFEBEE),
+                            color: AppColors.errorContainer,
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: const Text(
-                            'Urgent',
-                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFD32F2F)),
+                          child: Text(
+                            complaint.priority,
+                            style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: AppColors.error),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 2),
-                    const Text(
-                      'Tap repair scope discrepancy • ₹180 disputed delta',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    Text(
+                      'Customer: ${complaint.customerName} • Worker: ${complaint.workerName}',
+                      style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                     ),
                     const SizedBox(height: 4),
-                    const Text(
-                      'Liaison recommendation: Tariff item #PL-04 approved brass replacement.',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF111111), fontWeight: FontWeight.w600),
+                    Text(
+                      complaint.description,
+                      style: const TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.w600),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -810,50 +936,67 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 10),
           if (_disputeResolved)
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFFE3FCEF),
+                color: AppColors.tertiaryContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.check_circle, size: 16, color: Color(0xFF00875A)),
-                  SizedBox(width: 6),
+                  const Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
+                  const SizedBox(width: 6),
                   Text(
-                    'Dispute #491 settled via Guild Rate Card. Escrow released.',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF006644)),
+                    'Dispute #${complaint.id} resolved via Guild mediation.',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.onTertiaryContainer),
                   ),
                 ],
               ),
             )
           else
-            SizedBox(
-              width: double.infinity,
-              height: 40,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  await DI.adminRepo.updateComplaintStatus('491', ComplaintStatus.resolved);
-                  setState(() {
-                    _disputeResolved = true;
-                  });
-                  _showToast('Dispute #491 settled via Guild Rate Card. Escrow released.');
-                },
-                icon: const Icon(Icons.price_check, size: 16),
-                label: const Text(
-                  'Resolve via Guild Rate Card',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminComplaintsScreen()));
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.outlineVariant),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                    ),
+                    child: const Text('View All', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                  ),
                 ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF111111),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      await DI.adminRepo.updateComplaintStatus(complaint.id, ComplaintStatus.resolved);
+                      setState(() {
+                        _disputeResolved = true;
+                      });
+                      _showToast('Dispute #${complaint.id} resolved via Guild mediation.');
+                      _refreshData();
+                    },
+                    icon: const Icon(Icons.price_check, size: 16),
+                    label: const Text(
+                      'Resolve Dispute',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
         ],
       ),
@@ -864,7 +1007,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFE5E5EA))),
+        border: const Border(top: BorderSide(color: AppColors.outlineVariant)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -895,7 +1038,18 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     final isSelected = _currentNavIndex == index;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap: () => setState(() => _currentNavIndex = index),
+      onTap: () {
+        setState(() => _currentNavIndex = index);
+        if (index == 1) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen()));
+        } else if (index == 2) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPaymentsScreen()));
+        } else if (index == 3) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminComplaintsScreen()));
+        } else if (index == 4) {
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminProfileScreen()));
+        }
+      },
       child: Container(
         width: 60,
         alignment: Alignment.center,
@@ -904,7 +1058,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           children: [
             Icon(
               isSelected ? activeIcon : inactiveIcon,
-              color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+              color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
               size: 20,
             ),
             const SizedBox(height: 2),
@@ -912,7 +1066,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+                color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
               ),
             ),

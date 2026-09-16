@@ -56,6 +56,8 @@ class CustomerAddress {
   final String state;
   final String postalCode;
   final bool isDefault;
+  final double? latitude;
+  final double? longitude;
 
   const CustomerAddress({
     required this.id,
@@ -65,7 +67,11 @@ class CustomerAddress {
     required this.state,
     required this.postalCode,
     required this.isDefault,
+    this.latitude,
+    this.longitude,
   });
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 
   String get displayString {
     final parts = [
@@ -76,15 +82,54 @@ class CustomerAddress {
     return parts.join(', ');
   }
 
+  CustomerAddress copyWith({
+    String? id,
+    String? addressLine,
+    String? area,
+    String? city,
+    String? state,
+    String? postalCode,
+    bool? isDefault,
+    double? latitude,
+    double? longitude,
+  }) {
+    return CustomerAddress(
+      id: id ?? this.id,
+      addressLine: addressLine ?? this.addressLine,
+      area: area ?? this.area,
+      city: city ?? this.city,
+      state: state ?? this.state,
+      postalCode: postalCode ?? this.postalCode,
+      isDefault: isDefault ?? this.isDefault,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'address_line': addressLine,
+    'area': area,
+    'city': city,
+    'state': state,
+    'postal_code': postalCode,
+    'is_default': isDefault,
+    if (latitude != null) 'latitude': latitude,
+    if (longitude != null) 'longitude': longitude,
+  };
+
   factory CustomerAddress.fromMap(Map<String, dynamic> map) {
     return CustomerAddress(
-      id: map['id'] as String,
+      id: map['id'] as String? ?? '',
       addressLine: map['address_line'] as String? ?? '',
       area: map['area'] as String? ?? '',
       city: map['city'] as String? ?? '',
       state: map['state'] as String? ?? '',
       postalCode: map['postal_code'] as String? ?? '',
       isDefault: map['is_default'] as bool? ?? false,
+      latitude: (map['latitude'] as num?)?.toDouble(),
+      longitude: (map['longitude'] as num?)?.toDouble(),
     );
   }
 }
+

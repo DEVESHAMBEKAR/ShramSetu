@@ -1,4 +1,5 @@
 import '../../../../core/repositories/i_worker_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../models/worker_models.dart';
 
 class MockWorkerRepository implements IWorkerRepository {
@@ -21,6 +22,7 @@ class MockWorkerRepository implements IWorkerRepository {
       skills: ['Plumbing', 'Pipe Fitting'],
       experience: '5 Years',
       rating: 4.88,
+      reviewCount: 42,
       completedJobs: 126,
       earnings: 1850.0,
       isVerified: true,
@@ -61,6 +63,21 @@ class MockWorkerRepository implements IWorkerRepository {
   }
 
   @override
+  Future<void> updateWorkerLocation(
+    String workerId, {
+    required double latitude,
+    required double longitude,
+    String? locationTag,
+  }) async {
+    currentWorker = currentWorker.copyWith(
+      latitude: latitude,
+      longitude: longitude,
+      locationUpdatedAt: DateTime.now(),
+      serviceLocation: locationTag ?? currentWorker.serviceLocation,
+    );
+  }
+
+  @override
   Future<void> updateProfileImage(String workerId, String imageUrl) async {
     currentWorker = currentWorker.copyWith(profileImage: imageUrl);
   }
@@ -68,6 +85,11 @@ class MockWorkerRepository implements IWorkerRepository {
   @override
   Future<List<JobRequest>> getWorkerBookings() async {
     return _jobRequests;
+  }
+
+  @override
+  Stream<List<JobRequest>> watchWorkerBookings() {
+    return Stream.value(List<JobRequest>.from(_jobRequests));
   }
 
   @override
@@ -79,7 +101,17 @@ class MockWorkerRepository implements IWorkerRepository {
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
     final index = _jobRequests.indexWhere((j) => j.id == bookingId);
     if (index != -1) {
-      _jobRequests[index] = _jobRequests[index].copyWith(status: newStatus);
+      final job = _jobRequests[index];
+      _jobRequests[index] = job.copyWith(status: newStatus);
+      try {
+        await DI.notificationRepo.sendPushNotification(
+          recipientUserId: job.customerId,
+          type: 'booking_status',
+          title: 'Booking Update',
+          body: 'Booking status updated to ${newStatus.label}',
+          data: {'bookingId': bookingId, 'status': newStatus.toDbString()},
+        );
+      } catch (_) {}
     }
   }
 

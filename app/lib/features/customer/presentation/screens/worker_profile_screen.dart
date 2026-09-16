@@ -3,6 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../../../../core/models/review_models.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/customer_models.dart';
 import '../../../booking/data/models/booking_models.dart';
 import '../../../booking/presentation/screens/booking_date_time_screen.dart';
@@ -19,6 +21,13 @@ class WorkerProfileScreen extends StatefulWidget {
 
 class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   int _activeTabIndex = 0;
+  late Future<List<ReviewModel>> _reviewsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _reviewsFuture = DI.reviewRepo.getWorkerReviews(widget.worker.id);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -134,7 +143,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(2),
                         decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle),
-                        child: const Icon(Icons.check_circle, size: 16, color: AppColors.tertiaryFixed),
+                        child: const Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
                       ),
                     ),
                   ],
@@ -170,10 +179,16 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                             decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusSm),
                             child: Row(
                               children: [
-                                const Icon(Icons.star, size: 14, color: AppColors.secondary),
+                                const Icon(Icons.star, size: 14, color: AppColors.starRating),
                                 const SizedBox(width: 2),
-                                Text(widget.worker.rating.toString(), style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                                Text(' (${widget.worker.reviewCount})', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                                Text(
+                                  widget.worker.rating > 0 ? widget.worker.rating.toStringAsFixed(1) : 'New',
+                                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold),
+                                ),
+                                Text(
+                                  widget.worker.reviewCount > 0 ? ' (${widget.worker.reviewCount})' : '',
+                                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                                ),
                               ],
                             ),
                           ),
@@ -196,7 +211,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.security, size: 16, color: AppColors.tertiaryContainer),
+                      const Icon(Icons.security, size: 16, color: AppColors.onTertiaryContainer),
                       const SizedBox(width: AppSpacing.spacing2xs),
                       Text('Police Verified Background & Identity Cleared', style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
                     ],
@@ -217,9 +232,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.3), borderRadius: AppRadius.radiusSm),
                         child: Row(
                           children: [
-                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle)),
+                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle)),
                             const SizedBox(width: 4),
-                            Text('Today from 10:30 AM', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryContainer, fontWeight: FontWeight.bold)),
+                            Text('Today from 10:30 AM', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -348,7 +363,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Insurance Bonded', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                          Text(widget.worker.insuranceAmount ?? 'N/A', style: AppTypography.labelMd.copyWith(color: AppColors.tertiaryContainer, fontWeight: FontWeight.bold)),
+                          Text(widget.worker.insuranceAmount ?? 'N/A', style: AppTypography.labelMd.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     ),
@@ -451,7 +466,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text('₹$price', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
-              Text('Fixed Rate', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryContainer, fontWeight: FontWeight.bold)),
+              Text('Fixed Rate', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
             ],
           ),
         ],
@@ -460,11 +475,52 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   }
 
   Widget _buildReviewsTab() {
-    return Column(
-      children: [
-        _buildReviewItem('Priya D.', 'Kothrud, Pune', 5, 'Rahul arrived exactly at 11 AM, fixed the sink leakage neatly and charged standard cooperative rate without any surprise demands. Highly recommended!', '3 days ago'),
-        _buildReviewItem('Sunil Kulkarni', 'Bavdhan, Pune', 4.5, 'Clean work installing geyser in our master toilet. Verified credentials upfront, wore clean shoe covers. True trade professional.', '1 week ago'),
-      ],
+    return FutureBuilder<List<ReviewModel>>(
+      future: _reviewsFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        final reviews = snapshot.data ?? [];
+        if (reviews.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(AppSpacing.spacingLg),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: AppRadius.radiusXl,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.rate_review_outlined, size: 40, color: AppColors.outline),
+                const SizedBox(height: 8),
+                Text('No reviews yet', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 4),
+                Text(
+                  'Verified customer reviews will appear here after completed bookings.',
+                  textAlign: TextAlign.center,
+                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Column(
+          children: reviews.map((r) => _buildReviewItem(
+            r.customerName,
+            widget.worker.locationTag,
+            r.rating.toDouble(),
+            r.comment ?? 'Great professional service.',
+            r.relativeDateString,
+          )).toList(),
+        );
+      },
     );
   }
 
@@ -501,7 +557,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
               Row(
                 children: List.generate(5, (index) => Icon(
                   index < rating ? Icons.star : Icons.star_border,
-                  size: 16, color: AppColors.secondary,
+                  size: 16, color: AppColors.starRating,
                 )),
               ),
             ],
@@ -534,14 +590,14 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
           decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusLg),
           child: Row(
             children: [
-              const Icon(Icons.workspace_premium, color: AppColors.tertiaryFixed, size: 24),
+              const Icon(Icons.workspace_premium, color: AppColors.onTertiaryContainer, size: 24),
               const SizedBox(width: AppSpacing.spacingXs),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Govt ITI Plumbing Trade (2018)', style: AppTypography.labelMd.copyWith(color: AppColors.surfaceBright, fontWeight: FontWeight.bold)),
-                    Text('Maharashtra State Board of Vocational Education', style: AppTypography.labelSm.copyWith(color: AppColors.surfaceContainerHighest)),
+                    Text('Govt ITI Plumbing Trade (2018)', style: AppTypography.labelMd.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
+                    Text('Maharashtra State Board of Vocational Education', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer.withValues(alpha: 0.8))),
                   ],
                 ),
               ),

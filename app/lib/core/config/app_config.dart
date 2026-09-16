@@ -20,6 +20,7 @@ class AppConfig {
   static bool get useMockData {
     // If true, the app will use local Mock repositories instead of Supabase.
     // If false, it uses Supabase repositories (which will throw errors if not initialized).
+    if (!dotenv.isInitialized) return true;
     return dotenv.env['USE_MOCK_DATA'] == 'true';
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../models/booking_status.dart';
 
 /// Modern Urban Company / Elite Service Standard Color Palette for ShramSetu.
 /// Features Obsidian Black, Urban Company Royal Purple/Violet, and Emerald Trust Green.
@@ -60,4 +61,187 @@ class AppColors {
   // Outline - Subtle Modern Borders
   static const Color outline = Color(0xFF747878);
   static const Color outlineVariant = Color(0xFFEAEAEA);
+
+  // Warning - Warm Amber / Gold
+  static const Color warning = Color(0xFFB54708);
+  static const Color onWarning = Color(0xFFFFFFFF);
+  static const Color warningContainer = Color(0xFFFEF0C7);
+  static const Color onWarningContainer = Color(0xFF7A4100);
+
+  // Success - Emerald Cooperative
+  static const Color success = Color(0xFF027A48);
+  static const Color onSuccess = Color(0xFFFFFFFF);
+  static const Color successContainer = Color(0xFFECFDF3);
+  static const Color onSuccessContainer = Color(0xFF027A48);
+
+  // Info - Royal Violet
+  static const Color info = Color(0xFF5A38E4);
+  static const Color onInfo = Color(0xFFFFFFFF);
+  static const Color infoContainer = Color(0xFFE5DEFF);
+  static const Color onInfoContainer = Color(0xFF1A0063);
+
+  // Semantic UI Aliases
+  static const Color textPrimary = primary;
+  static const Color textSecondary = onSurfaceVariant;
+  static const Color textTertiary = outline;
+  static const Color border = outlineVariant;
+  static const Color divider = outlineVariant;
+  static const Color cardBackground = surfaceContainerLowest;
+  static const Color starRating = Color(0xFFF59E0B);
+  static const Color disabled = Color(0xFF9E9E9E);
+  static const Color disabledContainer = surfaceContainerLow;
+
+  // National Identity & Civic Indicators
+  static const Color flagSaffron = Color(0xFFFF9933);
+  static const Color flagNavy = Color(0xFF000080);
+  static const Color flagGreen = Color(0xFF138808);
+
+  // ──────────────── Status Visual Helpers ────────────────
+
+  static Color bookingStatusColor(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return warning;
+      case BookingStatus.accepted:
+      case BookingStatus.onTheWay:
+      case BookingStatus.arrived:
+      case BookingStatus.inProgress:
+        return secondary;
+      case BookingStatus.completed:
+        return success;
+      case BookingStatus.rejected:
+      case BookingStatus.cancelled:
+        return error;
+    }
+  }
+
+  static Color bookingStatusContainer(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return warningContainer;
+      case BookingStatus.accepted:
+      case BookingStatus.onTheWay:
+      case BookingStatus.arrived:
+      case BookingStatus.inProgress:
+        return secondaryFixed;
+      case BookingStatus.completed:
+        return successContainer;
+      case BookingStatus.rejected:
+      case BookingStatus.cancelled:
+        return errorContainer;
+    }
+  }
+
+  static Color bookingStatusTextColor(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return onWarningContainer;
+      case BookingStatus.accepted:
+      case BookingStatus.onTheWay:
+      case BookingStatus.arrived:
+      case BookingStatus.inProgress:
+        return onSecondaryFixed;
+      case BookingStatus.completed:
+        return onSuccessContainer;
+      case BookingStatus.rejected:
+      case BookingStatus.cancelled:
+        return onErrorContainer;
+    }
+  }
+
+  static Color statusColorFromString(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+      case 'open':
+      case 'in_review':
+      case 'inreview':
+        return warning;
+      case 'accepted':
+      case 'ontheway':
+      case 'arrived':
+      case 'inprogress':
+      case 'in_progress':
+        return secondary;
+      case 'completed':
+      case 'paid':
+      case 'resolved':
+      case 'active':
+      case 'approved':
+      case 'verified':
+        return success;
+      case 'rejected':
+      case 'cancelled':
+      case 'canceled':
+      case 'failed':
+      case 'inactive':
+      case 'closed':
+        return error;
+      default:
+        return primary;
+    }
+  }
+
+  static Color statusContainerFromString(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+      case 'open':
+      case 'in_review':
+      case 'inreview':
+        return warningContainer;
+      case 'accepted':
+      case 'ontheway':
+      case 'arrived':
+      case 'inprogress':
+      case 'in_progress':
+        return secondaryFixed;
+      case 'completed':
+      case 'paid':
+      case 'resolved':
+      case 'active':
+      case 'approved':
+      case 'verified':
+        return successContainer;
+      case 'rejected':
+      case 'cancelled':
+      case 'canceled':
+      case 'failed':
+      case 'inactive':
+      case 'closed':
+        return errorContainer;
+      default:
+        return surfaceContainerLow;
+    }
+  }
+
+  static Color statusTextColorFromString(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+      case 'open':
+      case 'in_review':
+      case 'inreview':
+        return onWarningContainer;
+      case 'accepted':
+      case 'ontheway':
+      case 'arrived':
+      case 'inprogress':
+      case 'in_progress':
+        return onSecondaryFixed;
+      case 'completed':
+      case 'paid':
+      case 'resolved':
+      case 'active':
+      case 'approved':
+      case 'verified':
+        return onSuccessContainer;
+      case 'rejected':
+      case 'cancelled':
+      case 'canceled':
+      case 'failed':
+      case 'inactive':
+      case 'closed':
+        return onErrorContainer;
+      default:
+        return onSurface;
+    }
+  }
 }

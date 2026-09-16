@@ -14,11 +14,44 @@ class BookingDateTimeScreen extends StatefulWidget {
 }
 
 class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
-  String? _selectedDate = 'Today, 18 Oct';
+  String? _selectedDate;
   String? _selectedTime;
 
-  final List<String> _dates = ['Today, 18 Oct', 'Tomorrow, 19 Oct', 'Mon, 20 Oct'];
+  late final List<String> _dates;
   final List<String> _times = ['09:00 AM', '10:00 AM', '11:00 AM', '01:00 PM', '02:00 PM', '04:00 PM'];
+
+  static const List<String> _monthNames = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+  ];
+  static const List<String> _weekdayNames = [
+    'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _dates = _generateDates();
+    _selectedDate = _dates.isNotEmpty ? _dates.first : null;
+  }
+
+  static List<String> _generateDates() {
+    final now = DateTime.now();
+    final dates = <String>[];
+    for (int i = 0; i < 5; i++) {
+      final date = now.add(Duration(days: i));
+      final month = _monthNames[date.month - 1];
+      if (i == 0) {
+        dates.add('Today, ${date.day} $month');
+      } else if (i == 1) {
+        dates.add('Tomorrow, ${date.day} $month');
+      } else {
+        final weekday = _weekdayNames[date.weekday - 1];
+        dates.add('$weekday, ${date.day} $month');
+      }
+    }
+    return dates;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +136,7 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
           ),
           alignment: Alignment.center,
           child: completed
-              ? const Icon(Icons.check, size: 14, color: AppColors.tertiaryFixed)
+              ? const Icon(Icons.check, size: 14, color: AppColors.onTertiaryContainer)
               : Text(
                   label == 'Pay' ? '4' : '3', // Hacky simple step count
                   style: AppTypography.labelSm.copyWith(color: current ? AppColors.onPrimary : AppColors.onSurfaceVariant),

@@ -41,6 +41,8 @@ abstract class IUserRepository {
     required String state,
     required String postalCode,
     String? label,
+    double? latitude,
+    double? longitude,
   });
 
   /// Get the customer's default address (returns null if none).

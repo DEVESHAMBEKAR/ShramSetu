@@ -1,13 +1,16 @@
-﻿import 'package:supabase_flutter/supabase_flutter.dart';
+import 'dart:async';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_admin_repository.dart';
+import '../../../../core/services/booking_realtime_service.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
-import '../../../../core/models/booking_status.dart';
 
 class SupabaseAdminRepository implements IAdminRepository {
   final SupabaseClient _client;
+  final BookingRealtimeService _realtimeService;
 
-  SupabaseAdminRepository(this._client);
+  SupabaseAdminRepository(this._client)
+      : _realtimeService = BookingRealtimeService(_client);
 
   @override
   Future<AdminDashboardStats> getDashboardStats() async {
@@ -91,7 +94,7 @@ class SupabaseAdminRepository implements IAdminRepository {
         time: b['scheduled_time'] ?? '',
         baseAmount: (b['amount'] ?? 0).toDouble(),
         laborAllowance: 0.0,
-        status: _mapBookingStatus(b['status']),
+        status: BookingStatus.fromDbString(b['status']),
         distanceKm: '0.0 km',
         createdAt: b['created_at'] ?? '',
       );
@@ -99,42 +102,54 @@ class SupabaseAdminRepository implements IAdminRepository {
   }
 
   @override
-  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
-    String strStatus = 'pending';
-    switch (newStatus) {
-      case BookingStatus.pending: strStatus = 'pending'; break;
-      case BookingStatus.accepted: strStatus = 'accepted'; break;
-      case BookingStatus.onTheWay: strStatus = 'onTheWay'; break;
-      case BookingStatus.inProgress: strStatus = 'inProgress'; break;
-      case BookingStatus.completed: strStatus = 'completed'; break;
-      case BookingStatus.cancelled: strStatus = 'cancelled'; break;
-      default: strStatus = 'pending'; break;
-    }
-    await _client.from('bookings').update({'status': strStatus}).eq('id', bookingId);
+  Stream<List<JobRequest>> watchBookings() {
+    late StreamController<List<JobRequest>> controller;
+    StreamSubscription? sub;
+
+    controller = StreamController<List<JobRequest>>.broadcast(
+      onListen: () async {
+        // Emit initial data
+        try {
+          final initial = await getBookings();
+          if (!controller.isClosed) controller.add(initial);
+        } catch (e) {
+          if (!controller.isClosed) controller.addError(e);
+        }
+
+        // Listen for all booking changes (Admin RLS permits reading all)
+        sub = _realtimeService.streamBookingChanges().listen(
+          (event) async {
+            try {
+              final updated = await getBookings();
+              if (!controller.isClosed) controller.add(updated);
+            } catch (e) {
+              if (!controller.isClosed) controller.addError(e);
+            }
+          },
+          onError: (err) {
+            if (!controller.isClosed) controller.addError(err);
+          },
+        );
+      },
+      onCancel: () async {
+        await sub?.cancel();
+        if (!controller.isClosed) {
+          await controller.close();
+        }
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
-  Future<List<PaymentRecord>> getPayments() async {
-    final response = await _client.from('payments').select('''
-      id, booking_id, amount, status, payment_method, created_at,
-      bookings(id),
-      users!customer_id(full_name)
-    ''').order('created_at', ascending: false).limit(100);
-    
-    return (response as List).map((p) {
-      final cData = p['users'] ?? {};
-      return PaymentRecord(
-        id: p['id'].toString(),
-        bookingId: p['booking_id'] ?? '',
-        customerName: cData['full_name'] ?? 'Unknown',
-        workerName: 'Worker', 
-        amount: (p['amount'] ?? 0).toDouble(),
-        date: p['created_at'] != null ? DateTime.parse(p['created_at']) : DateTime.now(),
-        status: p['status'] == 'PAID' ? PaymentStatus.paid : PaymentStatus.pending,
-        method: p['payment_method'] ?? 'Transfer',
-      );
-    }).toList();
+  Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
+    await _client.from('bookings').update({
+      'status': newStatus.toDbString(),
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', bookingId);
   }
+
 
   @override
   Future<List<Complaint>> getComplaints() async {
@@ -227,17 +242,6 @@ class SupabaseAdminRepository implements IAdminRepository {
     }
   }
 
-  BookingStatus _mapBookingStatus(String? status) {
-    switch (status) {
-      case 'accepted': return BookingStatus.accepted;
-      case 'onTheWay': return BookingStatus.onTheWay;
-      case 'inProgress': return BookingStatus.inProgress;
-      case 'completed': return BookingStatus.completed;
-      case 'cancelled': return BookingStatus.cancelled;
-      default: return BookingStatus.pending;
-    }
-  }
-
   @override
   Future<void> suspendWorker(String workerId) async {
     await _client
@@ -253,5 +257,57 @@ class SupabaseAdminRepository implements IAdminRepository {
         .select()
         .eq('worker_id', workerId)
         .order('created_at');
+  }
+
+  @override
+  Future<List<PaymentRecord>> getPayments() async {
+    final response = await _client.from('payments').select('''
+      id, booking_id, amount, status, escrow_status,
+      payment_method, razorpay_order_id, razorpay_payment_id,
+      created_at,
+      customer:users!payments_customer_id_fkey(full_name),
+      worker:workers!payments_worker_id_fkey(users(full_name))
+    ''').order('created_at', ascending: false).limit(100);
+
+    return (response as List).map((p) {
+      final customerName =
+          (p['customer'] as Map<String, dynamic>?)?['full_name'] as String? ?? 'Unknown';
+      final workerData = p['worker'] as Map<String, dynamic>?;
+      final workerName =
+          (workerData?['users'] as Map<String, dynamic>?)?['full_name'] as String? ?? 'Unknown';
+
+      final statusStr = (p['status'] as String?)?.toUpperCase() ?? 'PENDING';
+      final status = switch (statusStr) {
+        'PAID' => PaymentStatus.paid,
+        'FAILED' => PaymentStatus.failed,
+        'REFUNDED' => PaymentStatus.refunded,
+        'CANCELLED' => PaymentStatus.cancelled,
+        _ => PaymentStatus.pending,
+      };
+
+      final escrowStr = (p['escrow_status'] as String?) ?? 'not_funded';
+      final escrow = switch (escrowStr) {
+        'held' => EscrowStatus.held,
+        'release_pending' => EscrowStatus.releasePending,
+        'released' => EscrowStatus.released,
+        'refund_pending' => EscrowStatus.refundPending,
+        'refunded' => EscrowStatus.refunded,
+        _ => EscrowStatus.notFunded,
+      };
+
+      return PaymentRecord(
+        id: p['id'] as String,
+        bookingId: p['booking_id'] as String,
+        customerName: customerName,
+        workerName: workerName,
+        amount: (p['amount'] as num).toDouble(),
+        status: status,
+        escrowStatus: escrow,
+        date: DateTime.parse(p['created_at'] as String),
+        method: (p['payment_method'] as String?) ?? 'razorpay',
+        razorpayOrderId: p['razorpay_order_id'] as String?,
+        razorpayPaymentId: p['razorpay_payment_id'] as String?,
+      );
+    }).toList();
   }
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -5,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import 'customer_live_tracking_screen.dart';
+import '../widgets/review_rating_modal.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
   const CustomerBookingsScreen({super.key});
@@ -15,18 +17,64 @@ class CustomerBookingsScreen extends StatefulWidget {
 
 class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
   int _selectedTab = 0; // 0: Active, 1: Past
-  late Future<List<Map<String, dynamic>>> _bookingsFuture;
+  List<Map<String, dynamic>>? _bookings;
+  bool _isLoading = true;
+  String? _errorMessage;
+  StreamSubscription<List<Map<String, dynamic>>>? _bookingsSub;
 
   @override
   void initState() {
     super.initState();
-    _refreshBookings();
+    _subscribeBookings();
   }
 
-  void _refreshBookings() {
+  @override
+  void dispose() {
+    _bookingsSub?.cancel();
+    super.dispose();
+  }
+
+  void _subscribeBookings() {
+    _bookingsSub?.cancel();
     setState(() {
-      _bookingsFuture = DI.customerRepo.getCustomerBookings();
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    _bookingsSub = DI.customerRepo.watchCustomerBookings().listen(
+      (data) {
+        if (mounted) {
+          setState(() {
+            _bookings = data;
+            _isLoading = false;
+          });
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = e.toString();
+            _isLoading = false;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _refreshBookings() async {
+    try {
+      final data = await DI.customerRepo.getCustomerBookings();
+      if (mounted) {
+        setState(() {
+          _bookings = data;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.toString());
+      }
+    }
   }
 
   @override
@@ -101,24 +149,23 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
               ),
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFEAEAEA)),
+          const Divider(height: 1, color: AppColors.outlineVariant),
 
           // Bookings Content
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async => _refreshBookings(),
               color: AppColors.secondary,
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: _bookingsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+              child: Builder(
+                builder: (context) {
+                  if (_isLoading && (_bookings == null || _bookings!.isEmpty)) {
                     return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
                   }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}', style: AppTypography.bodyMd));
+                  if (_errorMessage != null && (_bookings == null || _bookings!.isEmpty)) {
+                    return Center(child: Text('Error: $_errorMessage', style: AppTypography.bodyMd));
                   }
 
-                  final allBookings = snapshot.data ?? [];
+                  final allBookings = _bookings ?? [];
                   final activeBookings = allBookings.where((b) {
                     final s = (b['status']?.toString() ?? '').toLowerCase();
                     return s != 'completed' && s != 'cancelled' && s != 'rejected';
@@ -178,6 +225,10 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
 
     final serviceName = serviceData?['name']?.toString() ?? 'Home Maintenance Service';
     final workerName = workerUserData?['full_name']?.toString() ?? 'Rahul Patil';
+    final workerRating = (workerData?['rating'] as num?)?.toDouble();
+    final ratingDisplay = (workerRating != null && workerRating > 0)
+        ? '${workerRating.toStringAsFixed(1)} ★'
+        : 'Cooperative Member';
     final amount = (booking['base_amount'] as num?)?.toDouble() ?? 399.0;
     final otp = booking['otp']?.toString() ?? '8492';
     final orderRef = bookingId.length >= 4 ? bookingId.substring(0, 4).toUpperCase() : '8942';
@@ -213,7 +264,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                         width: 7,
                         height: 7,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF34D399),
+                          color: AppColors.tertiaryFixed,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -294,7 +345,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(workerName, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold)),
-                              Text('Certified Artisan • 4.9 ★', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                              Text('Certified Artisan • $ratingDisplay', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
                             ],
                           ),
                         ],
@@ -375,25 +426,51 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                             ),
                           );
                         },
-                        icon: const Icon(Icons.navigation, size: 14, color: Color(0xFF34D399)),
+                        icon: const Icon(Icons.navigation, size: 14, color: AppColors.tertiaryFixed),
                         label: Text('Track Live', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                       )
                     else
-                      OutlinedButton(
-                        style: OutlinedButton.styleFrom(
-                          side: BorderSide(color: AppColors.outlineVariant),
-                          shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CustomerLiveTrackingScreen(bookingId: bookingId),
+                      Row(
+                        children: [
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: AppColors.outlineVariant),
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             ),
-                          );
-                        },
-                        child: Text('View Details', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => CustomerLiveTrackingScreen(bookingId: bookingId),
+                                ),
+                              );
+                            },
+                            child: Text('Details', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          ),
+                          if (status == 'completed') ...[
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.surfaceContainerHigh,
+                                foregroundColor: AppColors.primary,
+                                elevation: 0,
+                                shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              ),
+                              onPressed: () {
+                                ReviewRatingModal.show(
+                                  context,
+                                  bookingId: bookingId,
+                                  workerName: workerName,
+                                  serviceName: serviceName,
+                                );
+                              },
+                              icon: const Icon(Icons.star_rounded, size: 16, color: AppColors.starRating),
+                              label: Text('Rate', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                            ),
+                          ],
+                        ],
                       ),
                   ],
                 ),

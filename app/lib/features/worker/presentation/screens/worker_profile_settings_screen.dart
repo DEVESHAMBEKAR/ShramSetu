@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../../../../core/repositories/i_storage_repository.dart';
+import '../../../../shared/widgets/map_location_picker_screen.dart';
 import 'worker_kyc_screen.dart';
 
 class WorkerProfileSettingsScreen extends StatefulWidget {
@@ -196,7 +197,7 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
           _buildAvailabilityToggle(worker),
           const Divider(height: 1, indent: 56),
           ListTile(
-            leading: const Icon(Icons.verified, color: AppColors.tertiaryFixed),
+            leading: const Icon(Icons.verified, color: AppColors.onTertiaryContainer),
             title: Text('KYC Verification', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
             subtitle: Text('Identity & Documents Verified', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
             trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
@@ -215,11 +216,158 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
           ListTile(
             leading: const Icon(Icons.location_on, color: AppColors.primary),
             title: Text('Service Area', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
-            subtitle: Text(worker.serviceLocation, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+            subtitle: Text(
+              worker.hasLocation 
+                  ? '${worker.serviceLocation} • GPS Locked'
+                  : worker.serviceLocation, 
+              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+            ),
             trailing: const Icon(Icons.chevron_right, color: AppColors.outline),
+            onTap: () => _showUpdateLocationSheet(worker),
           ),
         ],
       ),
+    );
+  }
+
+  void _showUpdateLocationSheet(WorkerProfile worker) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.marginMobile),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Worker Service Area', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusLg,
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, color: AppColors.primary, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(worker.serviceLocation, style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
+                          if (worker.hasLocation)
+                            Text(
+                              'GPS: ${worker.latitude!.toStringAsFixed(4)}, ${worker.longitude!.toStringAsFixed(4)}',
+                              style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10),
+                            ),
+                          if (worker.locationUpdatedAt != null)
+                            Text(
+                              'Last updated: ${worker.locationUpdatedAt!.toLocal().toString().split('.')[0]}',
+                              style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.my_location, color: AppColors.secondary),
+                title: const Text('Update with Current GPS Location', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Detect coordinates and set current duty post'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final result = await DI.locationService.getCurrentPosition();
+                  if (result.isSuccess && result.coordinates != null) {
+                    final coords = result.coordinates!;
+                    final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude);
+                    final tagParts = [
+                      if (geo?.area.isNotEmpty == true) geo!.area,
+                      if (geo?.city.isNotEmpty == true) geo!.city,
+                    ];
+                    final locationTag = tagParts.isNotEmpty ? tagParts.join(', ') : worker.serviceLocation;
+
+                    await DI.workerRepo.updateWorkerLocation(
+                      worker.id,
+                      latitude: coords.latitude,
+                      longitude: coords.longitude,
+                      locationTag: locationTag,
+                    );
+                    _refreshData();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Service area updated to $locationTag')),
+                      );
+                    }
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(result.errorMessage ?? 'Unable to detect GPS.')),
+                    );
+                  }
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.map_outlined, color: AppColors.primary),
+                title: const Text('Pick Area on Map', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Pinpoint duty location on Google Map'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final mapRes = await Navigator.push<LocationPickerResult>(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => MapLocationPickerScreen(
+                        initialLatitude: worker.latitude,
+                        initialLongitude: worker.longitude,
+                        title: 'Select Worker Service Base',
+                      ),
+                    ),
+                  );
+
+                  if (mapRes != null) {
+                    final geo = mapRes.address;
+                    final tagParts = [
+                      if (geo?.area.isNotEmpty == true) geo!.area,
+                      if (geo?.city.isNotEmpty == true) geo!.city,
+                    ];
+                    final locationTag = tagParts.isNotEmpty ? tagParts.join(', ') : worker.serviceLocation;
+
+                    await DI.workerRepo.updateWorkerLocation(
+                      worker.id,
+                      latitude: mapRes.latitude,
+                      longitude: mapRes.longitude,
+                      locationTag: locationTag,
+                    );
+                    _refreshData();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Service area updated to $locationTag')),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -228,7 +376,7 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
     return SwitchListTile(
       value: isAvailable,
       onChanged: (val) async { await DI.workerRepo.updateWorkerAvailability(worker.id, val); _refreshData(); },
-      activeColor: AppColors.onTertiaryContainer,
+      activeThumbColor: AppColors.onTertiaryContainer,
       secondary: Icon(isAvailable ? Icons.notifications_active : Icons.notifications_off, color: isAvailable ? AppColors.onTertiaryContainer : AppColors.outline),
       title: Text('Active Duty Status', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
       subtitle: Text(isAvailable ? 'Receiving local job requests' : 'Currently offline', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),

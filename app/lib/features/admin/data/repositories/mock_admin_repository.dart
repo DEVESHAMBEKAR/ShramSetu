@@ -1,4 +1,3 @@
-﻿import 'package:flutter/foundation.dart';
 import '../../../../core/repositories/i_admin_repository.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
@@ -27,6 +26,8 @@ class MockAdminRepository implements IAdminRepository {
   Future<List<WorkerProfile>> getWorkers() async => _workers;
   @override
   Future<List<JobRequest>> getBookings() async => _bookings;
+  @override
+  Stream<List<JobRequest>> watchBookings() => Stream.value(List<JobRequest>.from(_bookings));
   @override
   Future<List<PaymentRecord>> getPayments() async => _payments;
   @override

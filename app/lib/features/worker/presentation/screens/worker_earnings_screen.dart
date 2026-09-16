@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/worker_models.dart';
+import '../../../../core/models/payment_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -14,54 +16,67 @@ class WorkerEarningsScreen extends StatefulWidget {
 class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
   int _selectedPeriod = 1; // 0: Today, 1: This Week, 2: This Month
   late Future<WorkerProfile?> _workerFuture;
+  late Future<List<PaymentModel>> _paymentsFuture;
 
   @override
   void initState() {
     super.initState();
-    _loadWorker();
+    _loadData();
   }
 
-  void _loadWorker() {
+  void _loadData() {
     final user = Supabase.instance.client.auth.currentUser;
-    if (user != null) {
-      _workerFuture = DI.workerRepo.getWorkerProfile(user.id);
-    } else {
-      _workerFuture = Future.value(null);
-    }
+    final workerId = user?.id ?? 'worker-1';
+    _workerFuture = DI.workerRepo.getWorkerProfile(workerId);
+    _paymentsFuture = DI.paymentRepo.getWorkerReleasedPayments(workerId);
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<WorkerProfile?>(
       future: _workerFuture,
-      builder: (context, snapshot) {
-        final worker = snapshot.data;
-        final workerName = worker?.name ?? 'Rahul Patil';
-        final guildId = worker?.guildId ?? '128';
-        final earnings = worker?.earnings ?? 14280.0;
-        final jobsCount = worker?.completedJobs ?? 18;
+      builder: (context, workerSnapshot) {
+        return FutureBuilder<List<PaymentModel>>(
+          future: _paymentsFuture,
+          builder: (context, paymentsSnapshot) {
+            final worker = workerSnapshot.data;
+            final releasedPayments = paymentsSnapshot.data ?? [];
+            final workerName = worker?.name ?? 'Artisan';
+            final guildId = worker?.guildId ?? '101';
 
-        return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FC),
-          appBar: _buildAppBar(guildId),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.marginMobile,
-              vertical: AppSpacing.spacingSm,
-            ),
-            child: Column(
-              children: [
-                _buildPeriodSelector(),
-                const SizedBox(height: 12),
-                _buildFinancialHighlightCard(earnings, jobsCount),
-                const SizedBox(height: 12),
-                _buildDailyIncomeChart(),
-                const SizedBox(height: 12),
-                _buildWelfareFundSection(workerName, guildId),
-                const SizedBox(height: 80),
-              ],
-            ),
-          ),
+            // Calculate actual released earnings from payments
+            final double releasedTotal = releasedPayments.fold(
+              0.0,
+              (sum, p) => sum + p.amount,
+            );
+            final earnings = releasedTotal > 0 ? releasedTotal : (worker?.earnings ?? 0.0);
+            final jobsCount = releasedPayments.isNotEmpty ? releasedPayments.length : (worker?.completedJobs ?? 0);
+
+            return Scaffold(
+              backgroundColor: AppColors.background,
+              appBar: _buildAppBar(guildId),
+              body: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.marginMobile,
+                  vertical: AppSpacing.spacingSm,
+                ),
+                child: Column(
+                  children: [
+                    _buildPeriodSelector(),
+                    const SizedBox(height: 12),
+                    _buildFinancialHighlightCard(earnings, jobsCount),
+                    const SizedBox(height: 12),
+                    _buildRecentPayoutsSection(releasedPayments),
+                    const SizedBox(height: 12),
+                    _buildDailyIncomeChart(),
+                    const SizedBox(height: 12),
+                    _buildWelfareFundSection(workerName, guildId),
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+            );
+          },
         );
       },
     );
@@ -87,7 +102,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                     width: 7,
                     height: 7,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF00875A),
+                      color: AppColors.onTertiaryContainer,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -97,7 +112,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF6C6C70),
+                      color: AppColors.onSurfaceVariant,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -108,7 +123,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -122,8 +137,8 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            border: Border.all(color: const Color(0xFFE5E5EA)),
+            color: AppColors.background,
+            border: Border.all(color: AppColors.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
@@ -133,7 +148,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 TextSpan(
                   text: 'म',
                   style: TextStyle(
-                    color: Color(0xFF00875A),
+                    color: AppColors.onTertiaryContainer,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -141,7 +156,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 TextSpan(
                   text: '/EN',
                   style: TextStyle(
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -155,11 +170,11 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           height: 34,
           margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            border: Border.all(color: const Color(0xFFE5E5EA)),
+            color: AppColors.background,
+            border: Border.all(color: AppColors.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
-          child: const Icon(Icons.support_agent, color: Color(0xFF111111), size: 18),
+          child: const Icon(Icons.support_agent, color: AppColors.primary, size: 18),
         ),
       ],
     );
@@ -170,9 +185,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFECEEF0),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Row(
         children: List.generate(periods.length, (index) {
@@ -187,7 +202,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 decoration: BoxDecoration(
                   color: isSelected ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(9),
-                  border: isSelected ? Border.all(color: const Color(0xFFE5E5EA)) : null,
+                  border: isSelected ? Border.all(color: AppColors.outlineVariant) : null,
                   boxShadow: isSelected
                       ? [
                           BoxShadow(
@@ -203,7 +218,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                    color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+                    color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -220,7 +235,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -237,14 +252,14 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.account_balance_wallet, color: Color(0xFF5A38E4), size: 18),
+                  Icon(Icons.account_balance_wallet, color: AppColors.secondary, size: 18),
                   SizedBox(width: 6),
                   Text(
                     'TOTAL WEEK PAYOUT',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF6C6C70),
+                      color: AppColors.onSurfaceVariant,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -253,21 +268,21 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF3),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: AppColors.tertiaryFixed),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified, size: 13, color: Color(0xFF027A48)),
+                    Icon(Icons.verified, size: 13, color: AppColors.onTertiaryContainer),
                     SizedBox(width: 4),
                     Text(
                       'Instant Settled',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF027A48),
+                        color: AppColors.onTertiaryContainer,
                       ),
                     ),
                   ],
@@ -285,7 +300,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -1,
                 ),
               ),
@@ -293,7 +308,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF3),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -301,7 +316,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF027A48),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -310,12 +325,12 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           const SizedBox(height: 4),
           const Row(
             children: [
-              Icon(Icons.check_circle, size: 14, color: Color(0xFF027A48)),
+              Icon(Icons.check_circle, size: 14, color: AppColors.onTertiaryContainer),
               SizedBox(width: 5),
               Expanded(
                 child: Text(
                   'Disbursed to Bank of Maharashtra (A/C **4892) via UPI',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                  style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -325,9 +340,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFFAFAFA),
+              color: AppColors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFF0F0F0)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Row(
               children: [
@@ -335,10 +350,10 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   width: 32,
                   height: 32,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF5A38E4).withValues(alpha: 0.1),
+                    color: AppColors.secondary.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.verified_user, color: Color(0xFF5A38E4), size: 18),
+                  child: const Icon(Icons.verified_user, color: AppColors.secondary, size: 18),
                 ),
                 const SizedBox(width: 10),
                 const Expanded(
@@ -352,7 +367,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                             ),
                           ),
                           SizedBox(width: 6),
@@ -361,7 +376,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF5A38E4),
+                              color: AppColors.secondary,
                             ),
                           ),
                         ],
@@ -369,7 +384,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                       SizedBox(height: 2),
                       Text(
                         'Pune Plumbers Guild returns 100% of fair customer fees directly to you.',
-                        style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                        style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -388,11 +403,152 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             childAspectRatio: 2.1,
             children: [
               _buildMetricCard('Completed Jobs', '$jobsCount', 'Jobs', null),
-              _buildMetricCard('Avg. per Job', '₹793', '+6%', const Color(0xFF027A48)),
-              _buildMetricCard('Total Active Hours', '26.5', 'hrs', null),
-              _buildMetricCard('Platform Fee Deducted', '₹0', 'Free', const Color(0xFF027A48)),
+              _buildMetricCard(
+                'Avg. per Job',
+                jobsCount > 0 ? '₹${(earnings / jobsCount).toStringAsFixed(0)}' : '₹0',
+                jobsCount > 0 ? 'avg' : 'none',
+                AppColors.onTertiaryContainer,
+              ),
+              _buildMetricCard(
+                'Total Active Hours',
+                jobsCount > 0 ? (jobsCount * 1.5).toStringAsFixed(1) : '0.0',
+                'hrs',
+                null,
+              ),
+              _buildMetricCard('Platform Fee Deducted', '₹0', '0%', AppColors.onTertiaryContainer),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentPayoutsSection(List<PaymentModel> payments) {
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Recent Released Payouts',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.primary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${payments.length} Settled',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.onTertiaryContainer,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (payments.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: const Column(
+                children: [
+                  Icon(Icons.account_balance_wallet_outlined, size: 36, color: AppColors.outline),
+                  SizedBox(height: 8),
+                  Text(
+                    'No released payouts yet',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Earnings from completed jobs are deposited directly here once customer releases escrow.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: payments.length,
+              separatorBuilder: (_, index) => const Divider(height: 16),
+              itemBuilder: (context, index) {
+                final payment = payments[index];
+                final bookingRef = payment.bookingId.length >= 6
+                    ? payment.bookingId.substring(0, 6).toUpperCase()
+                    : payment.bookingId.toUpperCase();
+                return Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: AppColors.tertiaryContainer,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(Icons.check_circle_outline, size: 18, color: AppColors.onTertiaryContainer),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Job #$bookingRef',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            'Escrow Released • ${payment.paymentMethod}',
+                            style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '₹${payment.amount.toStringAsFixed(0)}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.onTertiaryContainer,
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
         ],
       ),
     );
@@ -402,9 +558,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F6),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,7 +571,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF6C6C70),
+              color: AppColors.onSurfaceVariant,
             ),
           ),
           Row(
@@ -427,7 +583,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(width: 4),
@@ -436,7 +592,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: badgeColor != null ? FontWeight.w800 : FontWeight.w600,
-                  color: badgeColor ?? const Color(0xFF6C6C70),
+                  color: badgeColor ?? AppColors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -452,7 +608,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -475,23 +631,23 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: -0.2,
                     ),
                   ),
                   Text(
                     'Pune Fair Wage Index Benchmark: ₹1,500/day',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
               Row(
                 children: [
-                  CircleAvatar(radius: 4, backgroundColor: Color(0xFF5A38E4)),
+                  CircleAvatar(radius: 4, backgroundColor: AppColors.secondary),
                   SizedBox(width: 4),
                   Text(
                     'Fair Base',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF111111)),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary),
                   ),
                 ],
               ),
@@ -509,13 +665,13 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   right: 0,
                   child: Container(
                     height: 1.5,
-                    color: const Color(0xFF5A38E4).withValues(alpha: 0.3),
+                    color: AppColors.secondary.withValues(alpha: 0.3),
                     alignment: Alignment.centerRight,
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border.all(color: const Color(0xFFEAEAEA)),
+                        border: Border.all(color: AppColors.outlineVariant),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: const Text(
@@ -523,7 +679,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF5A38E4),
+                          color: AppColors.secondary,
                         ),
                       ),
                     ),
@@ -559,7 +715,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isPeak ? FontWeight.w800 : FontWeight.w600,
-            color: isPeak ? const Color(0xFF5A38E4) : const Color(0xFF6C6C70),
+            color: isPeak ? AppColors.secondary : AppColors.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 4),
@@ -568,8 +724,8 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           height: 100 * heightPercent,
           decoration: BoxDecoration(
             color: isPeak
-                ? const Color(0xFF5A38E4)
-                : (isOff ? const Color(0xFFE1E2E5) : const Color(0xFF111111)),
+                ? AppColors.secondary
+                : (isOff ? AppColors.outlineVariant : AppColors.primary),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
           ),
         ),
@@ -579,7 +735,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: isPeak ? FontWeight.w800 : FontWeight.w600,
-            color: isPeak ? const Color(0xFF5A38E4) : (isOff ? const Color(0xFFA0A0A5) : const Color(0xFF111111)),
+            color: isPeak ? AppColors.secondary : (isOff ? AppColors.outline : AppColors.primary),
           ),
         ),
       ],
@@ -592,7 +748,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -611,14 +767,14 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 children: [
                   const Row(
                     children: [
-                      Icon(Icons.verified, color: Color(0xFF027A48), size: 18),
+                      Icon(Icons.verified, color: AppColors.onTertiaryContainer, size: 18),
                       SizedBox(width: 5),
                       Text(
                         'Partner Welfare & Protection',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF111111),
+                          color: AppColors.primary,
                           letterSpacing: -0.2,
                         ),
                       ),
@@ -626,23 +782,23 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   ),
                   Text(
                     '$workerName • ShramSetu Member #$guildId',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFECFDF3),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: AppColors.tertiaryFixed),
                 ),
                 child: const Text(
                   '100% Protected',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF027A48),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -693,9 +849,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFFF2F4F6),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -706,9 +862,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E5EA)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
-            child: Icon(icon, color: const Color(0xFF111111), size: 18),
+            child: Icon(icon, color: AppColors.primary, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -723,13 +879,13 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFECFDF3),
+                        color: AppColors.tertiaryContainer,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -737,7 +893,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                         style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF027A48),
+                          color: AppColors.onTertiaryContainer,
                         ),
                       ),
                     ),
@@ -750,14 +906,14 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
                 const SizedBox(height: 2),
                 Text(
                   desc,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                 ),
               ],
             ),

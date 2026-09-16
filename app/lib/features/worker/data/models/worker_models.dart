@@ -16,6 +16,7 @@ class WorkerProfile {
   final List<String> skills;
   final String experience;
   final double rating;
+  final int reviewCount;
   final int completedJobs;
   final double earnings;
   final bool isVerified;
@@ -24,6 +25,9 @@ class WorkerProfile {
   final String serviceLocation;
   final String guildName;
   final String guildId;
+  final double? latitude;
+  final double? longitude;
+  final DateTime? locationUpdatedAt;
 
   WorkerProfile({
     required this.id,
@@ -33,6 +37,7 @@ class WorkerProfile {
     required this.skills,
     required this.experience,
     required this.rating,
+    this.reviewCount = 0,
     required this.completedJobs,
     required this.earnings,
     required this.isVerified,
@@ -41,7 +46,12 @@ class WorkerProfile {
     required this.serviceLocation,
     required this.guildName,
     required this.guildId,
+    this.latitude,
+    this.longitude,
+    this.locationUpdatedAt,
   });
+
+  bool get hasLocation => latitude != null && longitude != null;
 
   WorkerProfile copyWith({
     String? id,
@@ -51,6 +61,7 @@ class WorkerProfile {
     List<String>? skills,
     String? experience,
     double? rating,
+    int? reviewCount,
     int? completedJobs,
     double? earnings,
     bool? isVerified,
@@ -59,6 +70,9 @@ class WorkerProfile {
     String? serviceLocation,
     String? guildName,
     String? guildId,
+    double? latitude,
+    double? longitude,
+    DateTime? locationUpdatedAt,
   }) {
     return WorkerProfile(
       id: id ?? this.id,
@@ -68,6 +82,7 @@ class WorkerProfile {
       skills: skills ?? this.skills,
       experience: experience ?? this.experience,
       rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
       completedJobs: completedJobs ?? this.completedJobs,
       earnings: earnings ?? this.earnings,
       isVerified: isVerified ?? this.isVerified,
@@ -76,6 +91,9 @@ class WorkerProfile {
       serviceLocation: serviceLocation ?? this.serviceLocation,
       guildName: guildName ?? this.guildName,
       guildId: guildId ?? this.guildId,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      locationUpdatedAt: locationUpdatedAt ?? this.locationUpdatedAt,
     );
   }
 }

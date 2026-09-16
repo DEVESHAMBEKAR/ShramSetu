@@ -14,6 +14,17 @@ abstract class IWorkerRepository {
   /// Fetch all active, pending, or completed jobs for the worker
   Future<List<JobRequest>> getWorkerBookings();
 
+  /// Realtime stream watching all assigned jobs for the authenticated worker
+  Stream<List<JobRequest>> watchWorkerBookings();
+
+  /// Update the worker's current service location coordinates and timestamp
+  Future<void> updateWorkerLocation(
+    String workerId, {
+    required double latitude,
+    required double longitude,
+    String? locationTag,
+  });
+
   /// Update the status of a specific booking (e.g. pending -> confirmed -> completed)
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);
 }

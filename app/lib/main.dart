@@ -1,4 +1,5 @@
 import 'package:app/core/config/dependency_injection.dart';
+import 'package:app/core/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:app/core/config/app_config.dart';
 import 'core/theme/app_theme.dart';
@@ -16,6 +17,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.initialize();
   DI.setup();
+  await NotificationService.instance.initialize();
   runApp(const ShramSetuApp());
 }
 
@@ -25,6 +27,7 @@ class ShramSetuApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: NotificationService.navigatorKey,
       title: 'ShramSetu',
       theme: AppTheme.lightTheme,
       debugShowCheckedModeBanner: false,

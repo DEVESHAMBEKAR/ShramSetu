@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 
 class SupabaseAuthRepository implements IAuthRepository {
   final SupabaseClient _client;
@@ -39,34 +40,39 @@ class SupabaseAuthRepository implements IAuthRepository {
 
   @override
   Future<bool> verifyOtp(String phone, String otp) async {
-    try {
-      final formattedPhone = '+91$phone';
-      final response = await _client.auth.verifyOTP(
-        phone: formattedPhone,
-        token: otp,
-        type: OtpType.sms,
-      );
-      return response.session != null;
-    } catch (e) {
-      throw e;
+    final formattedPhone = '+91$phone';
+    final response = await _client.auth.verifyOTP(
+      phone: formattedPhone,
+      token: otp,
+      type: OtpType.sms,
+    );
+    if (response.session != null) {
+      try {
+        await DI.notificationService.registerDeviceToken(userId: response.session!.user.id);
+      } catch (_) {}
     }
+    return response.session != null;
   }
 
   @override
   Future<bool> login(String email, String password) async {
-    try {
-      await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
-      return true;
-    } catch (e) {
-      throw e;
+    final res = await _client.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+    if (res.session != null) {
+      try {
+        await DI.notificationService.registerDeviceToken(userId: res.session!.user.id);
+      } catch (_) {}
     }
+    return true;
   }
 
   @override
   Future<void> logout() async {
+    try {
+      await DI.notificationService.deactivateCurrentToken();
+    } catch (_) {}
     await _client.auth.signOut();
   }
 }

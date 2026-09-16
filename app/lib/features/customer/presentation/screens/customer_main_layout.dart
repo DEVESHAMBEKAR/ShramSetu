@@ -17,6 +17,14 @@ class CustomerMainLayout extends StatefulWidget {
 class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DI.notificationService.requestPermissions();
+    });
+  }
+
   late final List<Widget> _screens = [
     const CustomerHomeScreen(),
     const WorkerDiscoveryScreen(),
@@ -129,7 +137,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFEEEEEE), width: 1)),
+          border: Border(top: BorderSide(color: AppColors.outlineVariant, width: 1)),
         ),
         child: SafeArea(
           child: SizedBox(

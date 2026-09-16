@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../core/theme/app_colors.dart';
+
 class AppButton extends StatelessWidget {
   final String text;
   final VoidCallback onPressed;
@@ -25,7 +27,7 @@ class AppButton extends StatelessWidget {
           ? const SizedBox(
               height: 20, 
               width: 20, 
-              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary)
             )
           : Row(
               mainAxisSize: MainAxisSize.min,

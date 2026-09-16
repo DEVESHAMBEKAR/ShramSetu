@@ -26,4 +26,10 @@ abstract class ICustomerRepository {
 
   /// Cancel a booking if permitted by the state machine
   Future<bool> cancelBooking(String bookingId, {String? reason});
+
+  /// Realtime stream watching the authenticated customer's booking list
+  Stream<List<Map<String, dynamic>>> watchCustomerBookings();
+
+  /// Realtime stream watching a specific booking's state changes
+  Stream<Map<String, dynamic>?> watchBookingDetails(String bookingId);
 }

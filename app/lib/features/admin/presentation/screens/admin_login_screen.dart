@@ -72,16 +72,51 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     return Scaffold(
       backgroundColor: AppColors.primary,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.marginMobile),
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const Icon(Icons.corporate_fare, color: AppColors.onPrimary, size: 64),
+              Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white),
+                  onPressed: () {
+                    if (Navigator.of(context).canPop()) {
+                      Navigator.of(context).pop();
+                    } else {
+                      Navigator.of(context).pushReplacementNamed('/onboarding');
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.all(8),
+                child: ClipOval(
+                  child: Image.asset(
+                    'assets/images/logo.jpg',
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
               const SizedBox(height: AppSpacing.spacingMd),
               Text('Cooperative Admin Console', style: AppTypography.headlineSm.copyWith(color: AppColors.onPrimary)),
               Text('ShramSetu Federation', style: AppTypography.bodyMd.copyWith(color: AppColors.onPrimaryContainer)),
-              const SizedBox(height: AppSpacing.spacing3xl),
+              const SizedBox(height: AppSpacing.spacing2xl),
               Container(
                 padding: const EdgeInsets.all(AppSpacing.spacingLg),
                 decoration: BoxDecoration(
@@ -128,6 +163,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             : const Text('Access Console', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
+
                   ],
                 ),
               ),

@@ -1,5 +1,6 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 
 class MockAuthRepository implements IAuthRepository {
   bool _isLoggedIn = false;
@@ -30,6 +31,9 @@ class MockAuthRepository implements IAuthRepository {
     await Future.delayed(const Duration(milliseconds: 500));
     if (otp == '123456') {
       _isLoggedIn = true;
+      try {
+        await DI.notificationService.registerDeviceToken(userId: 'mock_user_123');
+      } catch (_) {}
       return true;
     }
     return false;
@@ -40,6 +44,9 @@ class MockAuthRepository implements IAuthRepository {
     if (email.contains('admin') && password == 'admin123') {
       _isLoggedIn = true;
       _mockRole = 'ADMIN';
+      try {
+        await DI.notificationService.registerDeviceToken(userId: 'mock_admin_123');
+      } catch (_) {}
       return true;
     }
     return false;
@@ -48,6 +55,9 @@ class MockAuthRepository implements IAuthRepository {
   @override
   Future<void> logout() async {
     _isLoggedIn = false;
+    try {
+      await DI.notificationService.deactivateCurrentToken();
+    } catch (_) {}
   }
 
   void setMockRole(String role) {

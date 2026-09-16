@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
+import '../widgets/review_rating_modal.dart';
 
 class CustomerLiveTrackingScreen extends StatefulWidget {
   final String bookingId;
@@ -21,81 +22,78 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
   Map<String, dynamic>? _bookingData;
   bool _isLoading = true;
   String? _errorMessage;
-  Timer? _pollingTimer;
+  StreamSubscription<Map<String, dynamic>?>? _bookingSub;
   bool _copiedOtp = false;
 
   @override
   void initState() {
     super.initState();
-    _loadBookingDetails();
-    // Poll every 5 seconds for live status updates from worker
-    _pollingTimer = Timer.periodic(const Duration(seconds: 5), (_) {
-      if (mounted) _pollBookingDetails();
-    });
+    _subscribeToBookingUpdates();
   }
 
   @override
   void dispose() {
-    _pollingTimer?.cancel();
+    _bookingSub?.cancel();
     super.dispose();
   }
 
-  Future<void> _loadBookingDetails() async {
+  void _subscribeToBookingUpdates() {
+    _bookingSub?.cancel();
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
+
+    _bookingSub = DI.customerRepo.watchBookingDetails(widget.bookingId).listen(
+      (data) {
+        if (mounted) {
+          final prevStatus = _bookingData?['status'] as String?;
+          final newStatus = data?['status'] as String?;
+          setState(() {
+            _bookingData = data;
+            _isLoading = false;
+          });
+          // Trigger escrow release when booking transitions to completed
+          if (prevStatus != 'completed' && newStatus == 'completed') {
+            _triggerEscrowRelease();
+          }
+        }
+      },
+      onError: (e) {
+        if (mounted) {
+          setState(() {
+            _errorMessage = e.toString();
+            _isLoading = false;
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _triggerEscrowRelease() async {
     try {
-      final data = await DI.customerRepo.getBookingDetails(widget.bookingId);
-      if (mounted) {
-        setState(() {
-          _bookingData = data;
-          _isLoading = false;
-        });
+      final released = await DI.paymentRepo.releaseEscrow(widget.bookingId);
+      if (released && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Payment released to Karigar. Service complete!'),
+            backgroundColor: Color(0xFF2E7D32),
+            duration: Duration(seconds: 4),
+          ),
+        );
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _errorMessage = e.toString();
-          _isLoading = false;
-        });
-      }
+      // Silently log — webhook will reconcile if Edge Function call fails
+      debugPrint('[EscrowRelease] Non-critical error: $e');
     }
   }
 
-  Future<void> _pollBookingDetails() async {
-    if (_bookingData == null) return;
-    final statusStr = _bookingData!['status'] as String? ?? '';
-    // Stop polling once terminal state is reached
-    if (statusStr == 'completed' || statusStr == 'cancelled' || statusStr == 'rejected') {
-      _pollingTimer?.cancel();
-      return;
-    }
-
-    try {
-      final data = await DI.customerRepo.getBookingDetails(widget.bookingId);
-      if (mounted && data != null) {
-        setState(() {
-          _bookingData = data;
-        });
-      }
-    } catch (_) {
-      // Ignore background poll errors silently
-    }
+  Future<void> _loadBookingDetails() async {
+    _subscribeToBookingUpdates();
   }
 
   BookingStatus _parseStatus(String? statusStr) {
-    switch (statusStr) {
-      case 'pending': return BookingStatus.pending;
-      case 'accepted': return BookingStatus.accepted;
-      case 'onTheWay': return BookingStatus.onTheWay;
-      case 'arrived': return BookingStatus.arrived;
-      case 'inProgress': return BookingStatus.inProgress;
-      case 'completed': return BookingStatus.completed;
-      case 'rejected': return BookingStatus.rejected;
-      case 'cancelled': return BookingStatus.cancelled;
-      default: return BookingStatus.pending;
-    }
+    return BookingStatus.fromDbString(statusStr);
   }
 
   String get _orderRef {
@@ -382,8 +380,8 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
               // 7. Job & Fare Summary
               _buildFareSummaryCard(serviceName, serviceDesc, baseAmount, laborAllowance, totalEscrow),
 
-              // 8. Action Buttons (Reschedule / Cancel)
-              _buildActionButtons(status),
+              // 8. Action Buttons (Reschedule / Cancel / Rate)
+              _buildActionButtons(status, workerName, serviceName),
 
               // 9. Cooperative Assurance Footer
               _buildAssuranceFooter(workerName),
@@ -544,7 +542,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
         badgeText = 'Job Completed';
         badgeIcon = Icons.verified;
         badgeBg = AppColors.tertiaryContainer;
-        badgeColor = AppColors.onTertiary;
+        badgeColor = AppColors.onTertiaryContainer;
         etaText = 'Settled';
         headline = 'Job completed and verified via Escrow OTP';
         break;
@@ -651,7 +649,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
             // Map stylized canvas grid background
             Positioned.fill(
               child: Container(
-                color: const Color(0xFFE5E9EE),
+                color: AppColors.surfaceVariant,
                 child: CustomPaint(
                   painter: _MapCanvasPainter(),
                 ),
@@ -797,7 +795,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          const Icon(Icons.star, size: 16, color: Colors.amber),
+                          const Icon(Icons.star, size: 16, color: AppColors.starRating),
                           const SizedBox(width: 3),
                           Text(rating.toStringAsFixed(1), style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                           const SizedBox(width: 4),
@@ -1137,13 +1135,39 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     );
   }
 
-  Widget _buildActionButtons(BookingStatus status) {
+  Widget _buildActionButtons(BookingStatus status, String workerName, String serviceName) {
     final canCancel = status == BookingStatus.pending || status == BookingStatus.accepted;
+    final isCompleted = status == BookingStatus.completed;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
       child: Column(
         children: [
+          if (isCompleted) ...[
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                  elevation: 0,
+                ),
+                onPressed: () {
+                  ReviewRatingModal.show(
+                    context,
+                    bookingId: widget.bookingId,
+                    workerName: workerName,
+                    serviceName: serviceName,
+                  );
+                },
+                icon: const Icon(Icons.star_rounded, size: 20, color: AppColors.starRating),
+                label: Text('Rate Service & Artisan', style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold, color: Colors.white)),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.spacingXs),
+          ],
           SizedBox(
             width: double.infinity,
             height: 48,

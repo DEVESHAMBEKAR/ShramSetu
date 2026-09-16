@@ -1,5 +1,6 @@
 
-enum PaymentStatus { pending, paid, refunded, failed }
+enum PaymentStatus { pending, paid, refunded, failed, cancelled }
+enum EscrowStatus { notFunded, held, releasePending, released, refundPending, refunded }
 enum ComplaintStatus { open, inReview, resolved, closed }
 enum ServiceStatus { active, inactive }
 
@@ -10,8 +11,11 @@ class PaymentRecord {
   final String workerName;
   final double amount;
   final PaymentStatus status;
+  final EscrowStatus escrowStatus;
   final DateTime date;
   final String method;
+  final String? razorpayOrderId;
+  final String? razorpayPaymentId;
 
   PaymentRecord({
     required this.id,
@@ -20,8 +24,11 @@ class PaymentRecord {
     required this.workerName,
     required this.amount,
     required this.status,
+    this.escrowStatus = EscrowStatus.notFunded,
     required this.date,
     required this.method,
+    this.razorpayOrderId,
+    this.razorpayPaymentId,
   });
 }
 

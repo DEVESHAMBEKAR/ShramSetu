@@ -5,7 +5,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/admin_models.dart';
-import '../../data/models/admin_models.dart';
 
 class AdminComplaintsScreen extends StatefulWidget {
   const AdminComplaintsScreen({super.key});
@@ -68,8 +67,8 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
                     Text('Case ${complaint.id}', style: AppTypography.labelSm.copyWith(color: AppColors.outline)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: _getStatusColor(complaint.status), borderRadius: AppRadius.radiusSm),
-                      child: Text(complaint.status.name.toUpperCase(), style: AppTypography.labelSm.copyWith(color: AppColors.onPrimary)),
+                      decoration: BoxDecoration(color: AppColors.statusContainerFromString(complaint.status.name), borderRadius: AppRadius.radiusSm),
+                      child: Text(complaint.status.name.toUpperCase(), style: AppTypography.labelSm.copyWith(color: AppColors.statusTextColorFromString(complaint.status.name), fontWeight: FontWeight.w700)),
                     ),
                   ],
                 ),
@@ -112,17 +111,5 @@ class _AdminComplaintsScreenState extends State<AdminComplaintsScreen> {
     );
         }
       );
-  }
-
-  Color _getStatusColor(ComplaintStatus status) {
-    switch (status) {
-      case ComplaintStatus.open:
-        return AppColors.error;
-      case ComplaintStatus.inReview:
-        return AppColors.secondary;
-      case ComplaintStatus.resolved:
-      case ComplaintStatus.closed:
-        return AppColors.tertiaryFixed;
-    }
   }
 }

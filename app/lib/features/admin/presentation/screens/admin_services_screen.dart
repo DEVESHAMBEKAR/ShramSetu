@@ -82,7 +82,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(service.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
-                      Text(isActive ? 'Active' : 'Inactive', style: AppTypography.labelSm.copyWith(color: isActive ? AppColors.tertiaryFixed : AppColors.outline)),
+                      Text(isActive ? 'Active' : 'Inactive', style: AppTypography.labelSm.copyWith(color: isActive ? AppColors.onTertiaryContainer : AppColors.outline, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),

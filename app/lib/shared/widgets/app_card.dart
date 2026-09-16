@@ -22,7 +22,7 @@ class AppCard extends StatelessWidget {
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(
         borderRadius: AppRadius.radiusXl,
-        side: const BorderSide(color: AppColors.surfaceContainerHigh, width: 1),
+        side: const BorderSide(color: AppColors.outlineVariant, width: 1),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(

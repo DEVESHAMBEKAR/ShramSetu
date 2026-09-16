@@ -1,4 +1,6 @@
+import 'dart:async';
 import '../../../../core/repositories/i_customer_repository.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../models/customer_models.dart';
 
 class MockCustomerRepository implements ICustomerRepository {
@@ -92,7 +94,15 @@ class MockCustomerRepository implements ICustomerRepository {
 
   @override
   Future<List<Worker>> getEligibleWorkers(String serviceId) async {
-    await Future.delayed(const Duration(milliseconds: 500));
+    await Future.delayed(const Duration(milliseconds: 150));
+    try {
+      final recommended = await DI.fairMatchService.getRecommendedWorkers(serviceId: serviceId);
+      if (recommended.isNotEmpty) {
+        return recommended.map((r) => r.worker).toList();
+      }
+    } catch (_) {
+      // Fallback to standard mock filtering
+    }
     return workers.where((w) => w.categoryId == serviceId).toList();
   }
 
@@ -155,6 +165,20 @@ class MockCustomerRepository implements ICustomerRepository {
         'postal_code': '411038',
       }
     });
+
+    try {
+      DI.notificationRepo.sendPushNotification(
+        recipientUserId: workerId,
+        type: 'booking_requested',
+        title: 'New Service Request',
+        body: 'You have a new booking request for $scheduledDate at $scheduledTime.',
+        data: {
+          'bookingId': newId,
+          'status': 'pending',
+        },
+      );
+    } catch (_) {}
+
     return newId;
   }
 
@@ -221,5 +245,15 @@ class MockCustomerRepository implements ICustomerRepository {
       _mockBookings[index]['status'] = 'cancelled';
     }
     return true;
+  }
+
+  @override
+  Stream<List<Map<String, dynamic>>> watchCustomerBookings() {
+    return Stream.value(List<Map<String, dynamic>>.from(_mockBookings));
+  }
+
+  @override
+  Stream<Map<String, dynamic>?> watchBookingDetails(String bookingId) {
+    return Stream.fromFuture(getBookingDetails(bookingId));
   }
 }

@@ -21,6 +21,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   String _searchQuery = '';
   late Future<List<Worker>> _workersFuture;
   late ServiceCategory _currentCategory;
+  List<ServiceCategory> _availableCategories = [];
 
   @override
   void initState() {
@@ -28,6 +29,50 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     _currentCategory = widget.initialCategory ??
         const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
     _loadWorkers();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await DI.customerRepo.getActiveServices();
+      if (mounted && cats.isNotEmpty) {
+        setState(() {
+          _availableCategories = cats;
+        });
+      }
+    } catch (_) {}
+  }
+
+  IconData _mapCategoryIcon(String? iconName) {
+    switch (iconName?.toLowerCase()) {
+      case 'power':
+      case 'bolt':
+      case 'electrical':
+        return Icons.bolt;
+      case 'plumbing':
+      case 'water_drop':
+        return Icons.plumbing;
+      case 'carpenter':
+      case 'carpentry':
+        return Icons.carpenter;
+      case 'cleaning':
+      case 'cleaning_services':
+        return Icons.cleaning_services;
+      case 'painting':
+      case 'format_paint':
+        return Icons.format_paint;
+      case 'appliance':
+      case 'home_repair_service':
+        return Icons.home_repair_service;
+      case 'gardening':
+      case 'yard':
+        return Icons.yard;
+      case 'driver':
+      case 'directions_car':
+        return Icons.directions_car;
+      default:
+        return Icons.handyman;
+    }
   }
 
   void _loadWorkers() {
@@ -131,13 +176,21 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                 ),
               if (Navigator.canPop(context)) const SizedBox(width: 10),
               Container(
-                width: 32,
-                height: 32,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                  color: AppColors.primary,
+                  color: Colors.white,
                   borderRadius: AppRadius.radiusLg,
+                  border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
                 ),
-                child: const Icon(Icons.handyman, size: 18, color: Colors.white),
+                padding: const EdgeInsets.all(2),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: Image.asset(
+                    'assets/images/logo.jpg',
+                    fit: BoxFit.contain,
+                  ),
+                ),
               ),
               const SizedBox(width: 8),
               Column(
@@ -235,13 +288,33 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
             scrollDirection: Axis.horizontal,
             child: Row(
               children: [
-                _buildTradeChip('all', 'All Trades', Icons.handyman),
+                _buildTradeChip('all', 'All (${_currentCategory.name})', Icons.tune, onSelected: () {
+                  setState(() => _activeCategoryFilter = 'all');
+                }),
                 const SizedBox(width: 6),
-                _buildTradeChip('plumbers', 'Plumbers', Icons.plumbing),
+                _buildTradeChip('top_rated', 'Top Rated (4.8+)', Icons.star, onSelected: () {
+                  setState(() => _activeCategoryFilter = 'top_rated');
+                }),
                 const SizedBox(width: 6),
-                _buildTradeChip('electricians', 'Electricians', Icons.bolt),
-                const SizedBox(width: 6),
-                _buildTradeChip('top_rated', 'Top Rated (4.8+)', Icons.star),
+                ..._availableCategories.map((cat) {
+                  final isCurrent = _currentCategory.id == cat.id;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: _buildTradeChip(
+                      cat.id,
+                      cat.name,
+                      _mapCategoryIcon(cat.iconData),
+                      forceSelected: isCurrent && _activeCategoryFilter != 'top_rated',
+                      onSelected: () {
+                        setState(() {
+                          _activeCategoryFilter = cat.id;
+                          _currentCategory = cat;
+                        });
+                        _loadWorkers();
+                      },
+                    ),
+                  );
+                }),
               ],
             ),
           ),
@@ -250,19 +323,16 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     );
   }
 
-  Widget _buildTradeChip(String key, String label, IconData icon) {
-    final isSelected = _activeCategoryFilter == key;
+  Widget _buildTradeChip(
+    String key,
+    String label,
+    IconData icon, {
+    bool? forceSelected,
+    VoidCallback? onSelected,
+  }) {
+    final isSelected = forceSelected ?? (_activeCategoryFilter == key);
     return GestureDetector(
-      onTap: () {
-        setState(() => _activeCategoryFilter = key);
-        if (key == 'electricians') {
-          _currentCategory = const ServiceCategory(id: 'c1', name: 'Electrical', iconData: 'bolt');
-          _loadWorkers();
-        } else if (key == 'plumbers' || key == 'all') {
-          _currentCategory = const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
-          _loadWorkers();
-        }
-      },
+      onTap: onSelected ?? () => setState(() => _activeCategoryFilter = key),
       child: Container(
         height: 32,
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -429,7 +499,16 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                             children: [
                               const Icon(Icons.star, size: 11, color: AppColors.onTertiaryContainer),
                               const SizedBox(width: 2),
-                              Text('${worker.rating.toStringAsFixed(1)} (${worker.reviewCount})', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold, fontSize: 10)),
+                              Text(
+                                worker.rating > 0
+                                    ? '${worker.rating.toStringAsFixed(1)} (${worker.reviewCount})'
+                                    : 'New',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.onTertiaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -438,13 +517,41 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                     const SizedBox(height: 2),
                     Row(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
-                          child: Text('Union Master', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold)),
-                        ),
-                        const SizedBox(width: 6),
-                        Text('${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                        if (worker.customTag != null) ...[
+                          GestureDetector(
+                            onTap: () => _showWhyRecommendedModal(worker),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondaryFixed,
+                                borderRadius: AppRadius.radiusSm,
+                                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.auto_awesome, size: 10, color: AppColors.secondary),
+                                  const SizedBox(width: 3),
+                                  Text(worker.customTag!, style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold)),
+                                  const SizedBox(width: 4),
+                                  const Icon(Icons.info_outline, size: 10, color: AppColors.secondary),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ] else ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
+                            child: Text(
+                              worker.isCoopMaster ? 'Coop Master' : (worker.isUnionGold ? 'Union Gold' : 'Union Master'),
+                              style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
+                        Text('${worker.distanceKm.toStringAsFixed(1)} km away', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -452,9 +559,21 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       children: [
                         Container(width: 5, height: 5, decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle)),
                         const SizedBox(width: 4),
-                        Text('Available in 20 mins', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10, fontWeight: FontWeight.bold)),
+                        Text(
+                          worker.availability.isNotEmpty ? worker.availability : 'Available Today',
+                          style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
                         const SizedBox(width: 4),
-                        Text('• ITI Certified', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                        Expanded(
+                          child: Text(
+                            worker.specializations.isNotEmpty
+                                ? '• ${worker.specializations.take(2).join(' • ')}'
+                                : '• ITI Certified',
+                            style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ],
@@ -517,6 +636,180 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showWhyRecommendedModal(Worker worker) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) {
+        return Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top drag handle
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+
+              // Title Row
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondaryFixed,
+                          borderRadius: AppRadius.radiusMd,
+                        ),
+                        child: const Icon(Icons.auto_awesome, size: 18, color: AppColors.secondary),
+                      ),
+                      const SizedBox(width: 10),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Why We Recommended This Artisan', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          Text('ShramSetu FairMatch • Explainable Matching', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                        ],
+                      ),
+                    ],
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close, size: 20, color: AppColors.outline),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+
+              // Rationale Cards / Items
+              _buildReasonItem(
+                icon: Icons.verified_user,
+                iconColor: AppColors.onTertiaryContainer,
+                bgColor: AppColors.tertiaryContainer,
+                title: 'Verified Trade Certification',
+                description: 'Credentials and trade background are certified by the Pune District Labour Cooperative Federation.',
+              ),
+              const SizedBox(height: 10),
+              _buildReasonItem(
+                icon: Icons.location_on_outlined,
+                iconColor: AppColors.primary,
+                bgColor: AppColors.surfaceContainerLow,
+                title: 'Immediate Service Proximity',
+                description: 'Located approximately ${worker.distanceKm.toStringAsFixed(1)} km away to ensure punctual diagnostic arrival.',
+              ),
+              const SizedBox(height: 10),
+              _buildReasonItem(
+                icon: Icons.star_outline,
+                iconColor: AppColors.secondary,
+                bgColor: AppColors.secondaryFixed,
+                title: 'High Customer Satisfaction',
+                description: '${worker.rating > 0 ? worker.rating.toStringAsFixed(1) : "Top"} community rating with proven service quality.',
+              ),
+              const SizedBox(height: 10),
+              _buildReasonItem(
+                icon: Icons.balance_outlined,
+                iconColor: AppColors.primary,
+                bgColor: AppColors.surfaceContainerLow,
+                title: 'Fair Opportunity Distribution',
+                description: 'Work is balanced equitably across member artisans so you get a dedicated, unburdened specialist.',
+              ),
+              const SizedBox(height: 20),
+
+              // Model Version & Cooperative Promise Tag
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusLg,
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shield_outlined, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '100% Direct Cooperative • Model fairmatch_v1 • Zero Private Data Leaks',
+                        style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Got it button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Got it', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReasonItem({
+    required IconData icon,
+    required Color iconColor,
+    required Color bgColor,
+    required String title,
+    required String description,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: AppRadius.radiusMd,
+          ),
+          child: Icon(icon, size: 16, color: iconColor),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+              const SizedBox(height: 2),
+              Text(description, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

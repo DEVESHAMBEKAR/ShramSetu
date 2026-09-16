@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 
@@ -15,6 +18,7 @@ class WorkerJobDetailScreen extends StatefulWidget {
 
 class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
   late Future<List<JobRequest>> _jobFuture;
+  StreamSubscription<List<JobRequest>>? _jobsSub;
   final List<TextEditingController> _otpControllers = List.generate(4, (_) => TextEditingController());
   final List<FocusNode> _otpFocusNodes = List.generate(4, (_) => FocusNode());
   bool _otpVerified = false;
@@ -24,10 +28,17 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
   void initState() {
     super.initState();
     _refreshData();
+    _jobsSub = DI.workerRepo.watchWorkerBookings().listen(
+      (_) {
+        if (mounted) _refreshData();
+      },
+      onError: (_) {},
+    );
   }
 
   @override
   void dispose() {
+    _jobsSub?.cancel();
     for (var c in _otpControllers) {
       c.dispose();
     }
@@ -70,39 +81,64 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            backgroundColor: Color(0xFFF8F9FC),
+            backgroundColor: AppColors.background,
             body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
           );
         }
         if (snapshot.hasError) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF8F9FC),
+            backgroundColor: AppColors.background,
             body: Center(child: Text('Error loading job: ${snapshot.error}')),
           );
         }
 
         final jobs = snapshot.data ?? [];
-        final job = jobs.firstWhere(
-          (j) => j.id == widget.jobId,
-          orElse: () => JobRequest(
-            id: widget.jobId,
-            customerId: '',
-            customerName: 'Ananya Sharma',
-            customerLocation: 'Flat 402, Sai Shraddha Apts, Ideal Colony, Paud Road, Kothrud, Pune - 411038',
-            customerPhone: '+919876543210',
-            serviceName: 'Plumbing Inspection & Tap Leakage Repair',
-            date: 'Today',
-            time: '11:00 AM – 12:00 PM',
-            baseAmount: 399,
-            laborAllowance: 86,
-            status: BookingStatus.inProgress,
-            distanceKm: '1.8 KM',
-            createdAt: '10 mins ago',
-          ),
-        );
+        final jobIndex = jobs.indexWhere((j) => j.id == widget.jobId);
+        if (jobIndex == -1) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: AppBar(
+              title: Text('Job Details', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
+              backgroundColor: Colors.white,
+              elevation: 0,
+            ),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.work_off_outlined, size: 64, color: AppColors.outline),
+                    const SizedBox(height: 16),
+                    Text('Job Not Found', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    const SizedBox(height: 8),
+                    Text(
+                      'This service assignment is no longer active or could not be loaded.',
+                      textAlign: TextAlign.center,
+                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      ),
+                      child: const Text('Return to Jobs'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        final job = jobs[jobIndex];
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FC),
+          backgroundColor: AppColors.background,
           appBar: _buildHeader(job),
           body: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(
@@ -137,7 +173,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       scrolledUnderElevation: 1,
       shadowColor: Colors.black.withValues(alpha: 0.05),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: Color(0xFF111111)),
+        icon: const Icon(Icons.arrow_back, color: AppColors.primary),
         onPressed: () => Navigator.of(context).pop(),
       ),
       title: Column(
@@ -150,7 +186,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -0.2,
                 ),
               ),
@@ -158,20 +194,20 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3FCEF),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    CircleAvatar(radius: 3, backgroundColor: Color(0xFF00875A)),
+                    CircleAvatar(radius: 3, backgroundColor: AppColors.onTertiaryContainer),
                     SizedBox(width: 4),
                     Text(
                       'LIVE',
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                       ),
                     ),
                   ],
@@ -183,7 +219,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
             job.serviceName,
             style: const TextStyle(
               fontSize: 11,
-              color: Color(0xFF6C6C70),
+              color: AppColors.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
@@ -196,17 +232,17 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           margin: const EdgeInsets.only(right: 8),
           child: OutlinedButton.icon(
             onPressed: () {},
-            icon: const Icon(Icons.support_agent, size: 16, color: Color(0xFF111111)),
+            icon: const Icon(Icons.support_agent, size: 16, color: AppColors.primary),
             label: const Text(
               'Help',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF111111),
+                color: AppColors.primary,
               ),
             ),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: Color(0xFFE5E5EA)),
+              side: const BorderSide(color: AppColors.outlineVariant),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
             ),
@@ -217,14 +253,14 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           height: 32,
           margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
           decoration: const BoxDecoration(
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
           child: const Text(
             'RP',
             style: TextStyle(
-              color: Colors.white,
+              color: AppColors.onPrimary,
               fontWeight: FontWeight.w800,
               fontSize: 11,
             ),
@@ -240,7 +276,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -261,7 +297,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     width: 8,
                     height: 8,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF00875A),
+                      color: AppColors.onTertiaryContainer,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -271,7 +307,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
@@ -280,16 +316,16 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
+                  color: AppColors.background,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  border: Border.all(color: AppColors.outlineVariant),
                 ),
                 child: const Text(
                   'ShramSetu Partner',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF6C6C70),
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
               ),
@@ -310,12 +346,12 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                           style: const TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                             letterSpacing: -0.3,
                           ),
                         ),
                         const SizedBox(width: 4),
-                        const Icon(Icons.verified, size: 16, color: Color(0xFF00875A)),
+                        const Icon(Icons.verified, size: 16, color: AppColors.onTertiaryContainer),
                       ],
                     ),
                     const SizedBox(height: 2),
@@ -323,21 +359,21 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       job.serviceName,
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF6C6C70),
+                        color: AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const Icon(Icons.schedule, size: 14, color: Color(0xFF111111)),
+                        const Icon(Icons.schedule, size: 14, color: AppColors.primary),
                         const SizedBox(width: 4),
                         Text(
                           '${job.date}, ${job.time}',
                           style: const TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                           ),
                         ),
                       ],
@@ -350,10 +386,10 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 height: 48,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: const Color(0xFFF8F9FA),
-                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  color: AppColors.background,
+                  border: Border.all(color: AppColors.outlineVariant),
                 ),
-                child: const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
+                child: const Icon(Icons.person, color: AppColors.onSurfaceVariant, size: 28),
               ),
             ],
           ),
@@ -361,21 +397,21 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFEFEFF4)),
+              border: Border.all(color: AppColors.surfaceContainerLow),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.location_on, size: 16, color: Color(0xFF6C6C70)),
+                const Icon(Icons.location_on, size: 16, color: AppColors.onSurfaceVariant),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     job.customerLocation,
                     style: const TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF333333),
+                      color: AppColors.primary,
                       height: 1.3,
                     ),
                   ),
@@ -397,8 +433,8 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF111111),
-                      foregroundColor: Colors.white,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: AppColors.onPrimary,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       elevation: 0,
                     ),
@@ -411,13 +447,13 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   height: 44,
                   child: OutlinedButton.icon(
                     onPressed: () {},
-                    icon: const Icon(Icons.navigation, size: 16, color: Color(0xFF111111)),
+                    icon: const Icon(Icons.navigation, size: 16, color: AppColors.primary),
                     label: const Text(
                       'Open in Maps',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF111111)),
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      side: const BorderSide(color: AppColors.outlineVariant),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       backgroundColor: Colors.white,
                     ),
@@ -439,7 +475,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -462,20 +498,20 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: 0.5,
                     ),
                   ),
                   Text(
                     'Step ${stepIndex + 1} of 5 active',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3FCEF),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
@@ -483,7 +519,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF00875A),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -548,14 +584,14 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     Color iconBg;
     Color iconColor;
     if (isCompleted) {
-      iconBg = const Color(0xFF00875A);
-      iconColor = Colors.white;
+      iconBg = AppColors.onTertiaryContainer;
+      iconColor = AppColors.onTertiary;
     } else if (isCurrent) {
-      iconBg = const Color(0xFF111111);
-      iconColor = Colors.white;
+      iconBg = AppColors.primary;
+      iconColor = AppColors.onPrimary;
     } else {
-      iconBg = const Color(0xFFF0F0F4);
-      iconColor = const Color(0xFFA0A0A5);
+      iconBg = AppColors.surfaceContainerLow;
+      iconColor = AppColors.outline;
     }
 
     return IntrinsicHeight(
@@ -577,7 +613,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 Expanded(
                   child: Container(
                     width: 1.5,
-                    color: isCompleted ? const Color(0xFF00875A) : const Color(0xFFE5E5EA),
+                    color: isCompleted ? AppColors.onTertiaryContainer : AppColors.outlineVariant,
                   ),
                 ),
             ],
@@ -599,7 +635,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
-                              color: isCurrent || isCompleted ? const Color(0xFF111111) : const Color(0xFFA0A0A5),
+                              color: isCurrent || isCompleted ? AppColors.primary : AppColors.outline,
                             ),
                           ),
                           if (isCurrent) ...[
@@ -607,7 +643,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF111111),
+                                color: AppColors.primary,
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
@@ -615,7 +651,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white,
+                                  color: AppColors.onPrimary,
                                   letterSpacing: 0.5,
                                 ),
                               ),
@@ -625,7 +661,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       ),
                       Text(
                         time,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                        style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -634,7 +670,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     subtitle,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isCurrent || isCompleted ? const Color(0xFF6C6C70) : const Color(0xFFA0A0A5),
+                      color: isCurrent || isCompleted ? AppColors.onSurfaceVariant : AppColors.outline,
                     ),
                   ),
                 ],
@@ -655,7 +691,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -699,8 +735,8 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF111111),
-                  foregroundColor: Colors.white,
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   elevation: 0,
                 ),
@@ -711,9 +747,9 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFBFBFD),
+              color: AppColors.background,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFEAEAEA)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,14 +759,14 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   children: [
                     const Row(
                       children: [
-                        Icon(Icons.key, size: 16, color: Color(0xFF111111)),
+                        Icon(Icons.key, size: 16, color: AppColors.primary),
                         SizedBox(width: 6),
                         Text(
                           'Customer Completion OTP',
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                           ),
                         ),
                       ],
@@ -738,7 +774,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFE5E5EA),
+                        color: AppColors.outlineVariant,
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: const Text(
@@ -746,7 +782,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF6C6C70),
+                          color: AppColors.onSurfaceVariant,
                         ),
                       ),
                     ),
@@ -755,7 +791,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 const SizedBox(height: 6),
                 Text(
                   'Enter the 4-digit code provided by ${job.customerName} after job inspection. Upon submission, ₹${job.totalAmount.toInt()}.00 will be instantly transferred via UPI.',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70), height: 1.35),
+                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.35),
                 ),
                 const SizedBox(height: 12),
                 if (_otpVerified)
@@ -763,13 +799,13 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3FCEF),
+                      color: AppColors.tertiaryContainer,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.3)),
+                      border: Border.all(color: AppColors.onTertiaryContainer.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       children: [
-                        Icon(Icons.check_circle, size: 16, color: Color(0xFF00875A)),
+                        Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -777,7 +813,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                             style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF006644),
+                              color: AppColors.onTertiaryContainer,
                             ),
                           ),
                         ),
@@ -801,7 +837,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                           style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                           ),
                           decoration: InputDecoration(
                             counterText: '',
@@ -810,11 +846,11 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                             fillColor: Colors.white,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFFE5E5EA)),
+                              borderSide: const BorderSide(color: AppColors.outlineVariant),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: Color(0xFF111111), width: 1.5),
+                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
                             ),
                           ),
                           onChanged: (val) => _onOtpChanged(i, val),
@@ -839,7 +875,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -858,27 +894,27 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: 0.5,
                 ),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3FCEF),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified_user, size: 12, color: Color(0xFF00875A)),
+                    Icon(Icons.verified_user, size: 12, color: AppColors.onTertiaryContainer),
                     SizedBox(width: 3),
                     Text(
                       'Escrow Secured',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                       ),
                     ),
                   ],
@@ -888,10 +924,10 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           ),
           const SizedBox(height: 12),
           _buildSettlementRow('Base Visit & Inspection Fee', '₹${job.baseAmount.toInt()}.00'),
-          const Divider(height: 16, color: Color(0xFFF0F0F4)),
+          const Divider(height: 16, color: AppColors.surfaceContainerLow),
           _buildSettlementRow('Skill & Labor Allowance', '₹${job.laborAllowance.toInt()}.00'),
           if (_hardwareBillAdded) ...[
-            const Divider(height: 16, color: Color(0xFFF0F0F4)),
+            const Divider(height: 16, color: AppColors.surfaceContainerLow),
             _buildSettlementRow('Extra Brass Valve & Washer Ring', '+ ₹140.00', isHighlight: true),
           ],
           const SizedBox(height: 12),
@@ -905,19 +941,19 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     _hardwareBillAdded = true;
                   });
                 },
-                icon: const Icon(Icons.receipt_long, size: 16, color: Color(0xFF111111)),
+                icon: const Icon(Icons.receipt_long, size: 16, color: AppColors.primary),
                 label: const Text(
                   '+ Add Hardware Parts Bill',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                   ),
                 ),
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE5E5EA)),
+                  side: const BorderSide(color: AppColors.outlineVariant),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  backgroundColor: const Color(0xFFF8F9FA),
+                  backgroundColor: AppColors.background,
                 ),
               ),
             ),
@@ -925,7 +961,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF111111),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -939,7 +975,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFFA0A0A5),
+                        color: AppColors.outline,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -947,7 +983,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       'Instant Direct UPI • Rahul Patil',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Color(0xFFE5E5EA),
+                        color: AppColors.outlineVariant,
                       ),
                     ),
                   ],
@@ -977,7 +1013,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: isHighlight ? const Color(0xFF7A4100) : const Color(0xFF6C6C70),
+            color: isHighlight ? AppColors.onWarningContainer : AppColors.onSurfaceVariant,
             fontWeight: isHighlight ? FontWeight.w700 : FontWeight.w500,
           ),
         ),
@@ -985,7 +1021,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           value,
           style: TextStyle(
             fontSize: 12,
-            color: isHighlight ? const Color(0xFF7A4100) : const Color(0xFF111111),
+            color: isHighlight ? AppColors.onWarningContainer : AppColors.primary,
             fontWeight: FontWeight.w700,
           ),
         ),
@@ -997,9 +1033,9 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8F9FA),
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1009,14 +1045,14 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
             children: [
               const Row(
                 children: [
-                  Icon(Icons.shield, size: 16, color: Color(0xFF111111)),
+                  Icon(Icons.shield, size: 16, color: AppColors.primary),
                   SizedBox(width: 6),
                   Text(
                     'ShramSetu Guild On-Duty Liaison',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -1024,7 +1060,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3FCEF),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
@@ -1032,7 +1068,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                   style: TextStyle(
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF00875A),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -1041,14 +1077,14 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
           const SizedBox(height: 6),
           const Text(
             'Facing technical blockers or dispute on site? Kothrud ward senior union coordinator is available for immediate assistance.',
-            style: TextStyle(fontSize: 11, color: Color(0xFF6C6C70), height: 1.3),
+            style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.3),
           ),
           const SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: Border.all(color: const Color(0xFFE5E5EA)),
+              border: Border.all(color: AppColors.outlineVariant),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
@@ -1056,19 +1092,19 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.phone_in_talk, size: 15, color: Color(0xFF111111)),
+                    Icon(Icons.phone_in_talk, size: 15, color: AppColors.primary),
                     SizedBox(width: 6),
                     Text(
                       'Call Kothrud Ward Liaison',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                   ],
                 ),
-                Icon(Icons.chevron_right, size: 16, color: Color(0xFF6C6C70)),
+                Icon(Icons.chevron_right, size: 16, color: AppColors.onSurfaceVariant),
               ],
             ),
           ),

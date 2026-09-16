@@ -13,6 +13,7 @@ abstract class IAdminRepository {
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId);
 
   Future<List<JobRequest>> getBookings();
+  Stream<List<JobRequest>> watchBookings();
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);
 
   Future<List<PaymentRecord>> getPayments();

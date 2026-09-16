@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -80,8 +80,8 @@ class _AdminCustomersScreenState extends State<AdminCustomersScreen> {
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.tertiaryFixed, borderRadius: AppRadius.radiusSm),
-                  child: Text(customer.status, style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryFixed)),
+                  decoration: BoxDecoration(color: AppColors.statusContainerFromString(customer.status), borderRadius: AppRadius.radiusSm),
+                  child: Text(customer.status, style: AppTypography.labelSm.copyWith(color: AppColors.statusTextColorFromString(customer.status), fontWeight: FontWeight.w700)),
                 ),
               ],
             ),

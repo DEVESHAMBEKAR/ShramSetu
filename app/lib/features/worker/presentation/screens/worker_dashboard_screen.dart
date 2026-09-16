@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -15,11 +16,24 @@ class WorkerDashboardScreen extends StatefulWidget {
 
 class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
   late Future<List<dynamic>> _dataFuture;
+  StreamSubscription<List<JobRequest>>? _jobsSub;
 
   @override
   void initState() {
     super.initState();
     _refreshData();
+    _jobsSub = DI.workerRepo.watchWorkerBookings().listen(
+      (_) {
+        if (mounted) _refreshData();
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _jobsSub?.cancel();
+    super.dispose();
   }
 
   void _refreshData() {
@@ -40,7 +54,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
-            backgroundColor: Color(0xFFF8F9FA),
+            backgroundColor: AppColors.background,
             body: Center(
               child: CircularProgressIndicator(color: AppColors.primary),
             ),
@@ -48,14 +62,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         }
         if (snapshot.hasError) {
           return Scaffold(
-            backgroundColor: const Color(0xFFF8F9FA),
+            backgroundColor: AppColors.background,
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.spacingLg),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 48, color: Colors.red),
+                    const Icon(Icons.error_outline, size: 48, color: AppColors.error),
                     const SizedBox(height: 12),
                     Text('Failed to load dashboard: ${snapshot.error}', textAlign: TextAlign.center),
                     const SizedBox(height: 16),
@@ -78,7 +92,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             .toList();
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF8F9FA),
+          backgroundColor: AppColors.background,
           appBar: _buildAppBar(worker),
           body: RefreshIndicator(
             color: AppColors.primary,
@@ -140,7 +154,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     width: 7,
                     height: 7,
                     decoration: const BoxDecoration(
-                      color: Color(0xFF00875A),
+                      color: AppColors.onTertiaryContainer,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -150,7 +164,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF6C6C70),
+                      color: AppColors.onSurfaceVariant,
                       letterSpacing: -0.2,
                     ),
                   ),
@@ -161,7 +175,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -175,8 +189,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 10),
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            border: Border.all(color: const Color(0xFFE5E5EA)),
+            color: AppColors.background,
+            border: Border.all(color: AppColors.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           alignment: Alignment.center,
@@ -186,7 +200,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 TextSpan(
                   text: 'म',
                   style: TextStyle(
-                    color: Color(0xFF00875A),
+                    color: AppColors.onTertiaryContainer,
                     fontWeight: FontWeight.w800,
                     fontSize: 12,
                   ),
@@ -194,7 +208,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 TextSpan(
                   text: '/EN',
                   style: TextStyle(
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                     fontWeight: FontWeight.w700,
                     fontSize: 12,
                   ),
@@ -208,13 +222,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           height: 34,
           margin: const EdgeInsets.only(right: 8),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8F9FA),
-            border: Border.all(color: const Color(0xFFE5E5EA)),
+            color: AppColors.background,
+            border: Border.all(color: AppColors.outlineVariant),
             borderRadius: BorderRadius.circular(8),
           ),
           child: const Icon(
             Icons.support_agent,
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             size: 18,
           ),
         ),
@@ -223,7 +237,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           height: 34,
           margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
           decoration: const BoxDecoration(
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
@@ -232,7 +246,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 ? worker.name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
                 : 'PT',
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.onPrimary,
               fontWeight: FontWeight.w800,
               fontSize: 12,
             ),
@@ -249,7 +263,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -269,17 +283,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     height: 52,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFFF0F0F4),
-                      border: Border.all(color: const Color(0xFFF8F9FA), width: 2),
+                      color: AppColors.surfaceContainerLow,
+                      border: Border.all(color: AppColors.background, width: 2),
                     ),
                     clipBehavior: Clip.antiAlias,
                     child: worker.profileImage.isNotEmpty
                         ? Image.network(
                             worker.profileImage,
                             fit: BoxFit.cover,
-                            errorBuilder: (ctx, err, stack) => const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
+                            errorBuilder: (ctx, err, stack) => const Icon(Icons.person, color: AppColors.onSurfaceVariant, size: 28),
                           )
-                        : const Icon(Icons.person, color: Color(0xFF6C6C70), size: 28),
+                        : const Icon(Icons.person, color: AppColors.onSurfaceVariant, size: 28),
                   ),
                   Positioned(
                     bottom: 0,
@@ -288,7 +302,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       width: 18,
                       height: 18,
                       decoration: BoxDecoration(
-                        color: const Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 2),
                       ),
@@ -310,7 +324,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                               letterSpacing: -0.3,
                             ),
                             maxLines: 1,
@@ -321,7 +335,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFE3FCEF),
+                            color: AppColors.tertiaryContainer,
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: const Text(
@@ -329,7 +343,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
-                              color: Color(0xFF00875A),
+                              color: AppColors.onTertiaryContainer,
                             ),
                           ),
                         ),
@@ -340,7 +354,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       '${worker.skills.isNotEmpty ? worker.skills.join(', ') : 'Master Artisan'} • Pipe Specialist',
                       style: const TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF6C6C70),
+                        color: AppColors.onSurfaceVariant,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -352,21 +366,21 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8F9FA),
-                            border: Border.all(color: const Color(0xFFE5E5EA)),
+                            color: AppColors.background,
+                            border: Border.all(color: AppColors.outlineVariant),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.verified, size: 13, color: Color(0xFF00875A)),
+                              Icon(Icons.verified, size: 13, color: AppColors.onTertiaryContainer),
                               SizedBox(width: 3),
                               Text(
                                 'ITI Certified',
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF111111),
+                                  color: AppColors.primary,
                                 ),
                               ),
                             ],
@@ -376,8 +390,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8F9FA),
-                            border: Border.all(color: const Color(0xFFE5E5EA)),
+                            color: AppColors.background,
+                            border: Border.all(color: AppColors.outlineVariant),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -385,7 +399,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                             style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF6C6C70),
+                              color: AppColors.onSurfaceVariant,
                             ),
                           ),
                         ),
@@ -398,11 +412,11 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
-                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  color: AppColors.background,
+                  border: Border.all(color: AppColors.outlineVariant),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(Icons.badge_outlined, color: Color(0xFF111111), size: 20),
+                child: const Icon(Icons.badge_outlined, color: AppColors.primary, size: 20),
               ),
             ],
           ),
@@ -410,8 +424,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              border: Border.all(color: const Color(0xFFE5E5EA)),
+              color: AppColors.background,
+              border: Border.all(color: AppColors.outlineVariant),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -423,12 +437,12 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       width: 10,
                       height: 10,
                       decoration: BoxDecoration(
-                        color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                        color: isOnline ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                         shape: BoxShape.circle,
                         boxShadow: isOnline
                             ? [
                                 BoxShadow(
-                                  color: const Color(0xFF00875A).withValues(alpha: 0.4),
+                                  color: AppColors.onTertiaryContainer.withValues(alpha: 0.4),
                                   blurRadius: 6,
                                   spreadRadius: 2,
                                 )
@@ -447,7 +461,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
-                                color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                                color: isOnline ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -455,7 +469,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                               isOnline ? ' • Receiving Jobs in ${worker.serviceLocation}' : ' • On Break',
                               style: const TextStyle(
                                 fontSize: 12,
-                                color: Color(0xFF6C6C70),
+                                color: AppColors.onSurfaceVariant,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -466,7 +480,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                           isOnline ? '3.5 km priority radius • Instant alerts' : 'Tap switch to resume shifts',
                           style: const TextStyle(
                             fontSize: 11,
-                            color: Color(0xFF6C6C70),
+                            color: AppColors.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -484,7 +498,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     height: 28,
                     padding: const EdgeInsets.all(2),
                     decoration: BoxDecoration(
-                      color: isOnline ? const Color(0xFF111111) : const Color(0xFFE5E5EA),
+                      color: isOnline ? AppColors.primary : AppColors.outlineVariant,
                       borderRadius: BorderRadius.circular(16),
                     ),
                     alignment: isOnline ? Alignment.centerRight : Alignment.centerLeft,
@@ -498,7 +512,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       child: Icon(
                         isOnline ? Icons.check : Icons.close,
                         size: 14,
-                        color: isOnline ? const Color(0xFF00875A) : const Color(0xFF6C6C70),
+                        color: isOnline ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -517,7 +531,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.05),
@@ -535,20 +549,20 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFFF0B3),
+                  color: AppColors.warningContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.bolt, size: 14, color: Color(0xFF7A4100)),
+                    const Icon(Icons.bolt, size: 14, color: AppColors.onWarningContainer),
                     const SizedBox(width: 4),
                     Text(
                       'URGENT DISPATCH • ${request.distanceKm}',
                       style: const TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF7A4100),
+                        color: AppColors.onWarningContainer,
                         letterSpacing: 0.2,
                       ),
                     ),
@@ -557,13 +571,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               ),
               Row(
                 children: [
-                  const Icon(Icons.schedule, size: 13, color: Color(0xFF6C6C70)),
+                  const Icon(Icons.schedule, size: 13, color: AppColors.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     request.createdAt,
                     style: const TextStyle(
                       fontSize: 11,
-                      color: Color(0xFF6C6C70),
+                      color: AppColors.onSurfaceVariant,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -585,21 +599,21 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                         letterSpacing: -0.4,
                       ),
                     ),
                     const SizedBox(height: 3),
                     Row(
                       children: [
-                        const Icon(Icons.near_me, size: 14, color: Color(0xFF111111)),
+                        const Icon(Icons.near_me, size: 14, color: AppColors.primary),
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
                             request.customerLocation,
                             style: const TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF6C6C70),
+                              color: AppColors.onSurfaceVariant,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -613,8 +627,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
-                  border: Border.all(color: const Color(0xFFE5E5EA)),
+                  color: AppColors.background,
+                  border: Border.all(color: AppColors.outlineVariant),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
@@ -625,7 +639,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                         letterSpacing: -0.5,
                       ),
                     ),
@@ -634,7 +648,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -647,8 +661,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8F9FA),
-              border: Border.all(color: const Color(0xFFEFEFF4)),
+              color: AppColors.background,
+              border: Border.all(color: AppColors.surfaceContainerLow),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -661,10 +675,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       height: 24,
                       decoration: BoxDecoration(
                         color: Colors.white,
-                        border: Border.all(color: const Color(0xFFE5E5EA)),
+                        border: Border.all(color: AppColors.outlineVariant),
                         borderRadius: BorderRadius.circular(6),
                       ),
-                      child: const Icon(Icons.plumbing, size: 15, color: Color(0xFF111111)),
+                      child: const Icon(Icons.plumbing, size: 15, color: AppColors.primary),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -673,7 +687,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF111111),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -685,13 +699,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.calendar_today, size: 13, color: Color(0xFF6C6C70)),
+                        const Icon(Icons.calendar_today, size: 13, color: AppColors.onSurfaceVariant),
                         const SizedBox(width: 5),
                         Text(
                           '${request.date} • ${request.time}',
                           style: const TextStyle(
                             fontSize: 12,
-                            color: Color(0xFF6C6C70),
+                            color: AppColors.onSurfaceVariant,
                           ),
                         ),
                       ],
@@ -701,7 +715,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                   ],
@@ -713,13 +727,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE3FCEF).withValues(alpha: 0.7),
-              border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.2)),
+              color: AppColors.tertiaryContainer.withValues(alpha: 0.7),
+              border: Border.all(color: AppColors.onTertiaryContainer.withValues(alpha: 0.2)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Row(
               children: [
-                Icon(Icons.verified, size: 16, color: Color(0xFF00875A)),
+                Icon(Icons.verified, size: 16, color: AppColors.onTertiaryContainer),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -727,7 +741,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF006644),
+                      color: AppColors.onTertiaryContainer,
                     ),
                   ),
                 ),
@@ -750,8 +764,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF111111),
-                foregroundColor: Colors.white,
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
@@ -779,17 +793,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected);
                       _refreshData();
                     },
-                    icon: const Icon(Icons.redo, size: 15, color: Color(0xFF6C6C70)),
+                    icon: const Icon(Icons.redo, size: 15, color: AppColors.onSurfaceVariant),
                     label: const Text(
                       'Pass to Guild',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      side: const BorderSide(color: AppColors.outlineVariant),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       backgroundColor: Colors.white,
                     ),
@@ -802,17 +816,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   height: 40,
                   child: OutlinedButton.icon(
                     onPressed: () {},
-                    icon: const Icon(Icons.call, size: 15, color: Color(0xFF6C6C70)),
+                    icon: const Icon(Icons.call, size: 15, color: AppColors.onSurfaceVariant),
                     label: const Text(
                       'Call Society',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE5E5EA)),
+                      side: const BorderSide(color: AppColors.outlineVariant),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       backgroundColor: Colors.white,
                     ),
@@ -838,7 +852,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF111111),
+                color: AppColors.primary,
                 letterSpacing: 0.5,
               ),
             ),
@@ -847,7 +861,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               style: const TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF6C6C70),
+                color: AppColors.onSurfaceVariant,
               ),
             ),
           ],
@@ -864,17 +878,17 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             _buildMetricCard(
               title: "Today's Earnings",
               icon: Icons.payments_outlined,
-              iconColor: const Color(0xFF00875A),
+              iconColor: AppColors.onTertiaryContainer,
               mainValue: '₹${worker.earnings.toInt()}',
               badgeText: '+6% vs y\'day',
-              badgeColor: const Color(0xFF00875A),
-              badgeBg: const Color(0xFFE3FCEF),
+              badgeColor: AppColors.onTertiaryContainer,
+              badgeBg: AppColors.tertiaryContainer,
               footer: 'Direct Escrow Payout',
             ),
             _buildMetricCard(
               title: 'Jobs Completed',
               icon: Icons.engineering_outlined,
-              iconColor: const Color(0xFF111111),
+              iconColor: AppColors.primary,
               mainValue: '${worker.completedJobs} / ${worker.completedJobs + 1}',
               showProgress: true,
               footer: '1 in queue for today',
@@ -882,20 +896,20 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             _buildMetricCard(
               title: 'Partner Rating',
               icon: Icons.star,
-              iconColor: const Color(0xFFFFAB00),
-              mainValue: worker.rating.toStringAsFixed(2),
-              subValue: '/ 5.0',
+              iconColor: AppColors.starRating,
+              mainValue: worker.rating > 0 ? worker.rating.toStringAsFixed(1) : 'New',
+              subValue: worker.rating > 0 ? '/ 5.0' : '',
               badgeText: '100% On-Time',
-              badgeColor: const Color(0xFF00875A),
-              footer: '126 verified reviews',
+              badgeColor: AppColors.onTertiaryContainer,
+              footer: worker.reviewCount > 0 ? '${worker.reviewCount} verified reviews' : 'No reviews yet',
             ),
             _buildMetricCard(
               title: 'Guild Standing',
               icon: Icons.military_tech_outlined,
-              iconColor: const Color(0xFF111111),
+              iconColor: AppColors.primary,
               mainValue: 'Top 5%',
               badgeText: 'Gold Badge Tier',
-              badgeColor: const Color(0xFF111111),
+              badgeColor: AppColors.primary,
               footer: 'Kothrud Cluster',
             ),
           ],
@@ -921,7 +935,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -942,7 +956,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF6C6C70),
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
               Icon(icon, size: 16, color: iconColor),
@@ -960,7 +974,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -971,7 +985,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF6C6C70),
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -982,14 +996,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   margin: const EdgeInsets.only(top: 6, bottom: 2),
                   height: 5,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFEFF4),
+                    color: AppColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: FractionallySizedBox(
                     widthFactor: 0.75,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFF111111),
+                        color: AppColors.primary,
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
@@ -1001,7 +1015,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
                     decoration: BoxDecoration(
-                      color: badgeBg ?? const Color(0xFFF8F9FA),
+                      color: badgeBg ?? AppColors.background,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -1009,7 +1023,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: badgeColor ?? const Color(0xFF111111),
+                        color: badgeColor ?? AppColors.primary,
                       ),
                     ),
                   ),
@@ -1020,7 +1034,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             footer,
             style: const TextStyle(
               fontSize: 10,
-              color: Color(0xFF6C6C70),
+              color: AppColors.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
             maxLines: 1,
@@ -1045,7 +1059,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -1054,7 +1068,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   width: 20,
                   height: 20,
                   decoration: const BoxDecoration(
-                    color: Color(0xFFE5E5EA),
+                    color: AppColors.outlineVariant,
                     shape: BoxShape.circle,
                   ),
                   alignment: Alignment.center,
@@ -1063,7 +1077,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -1074,7 +1088,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF111111),
+                color: AppColors.primary,
               ),
             ),
           ],
@@ -1121,7 +1135,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -1136,10 +1150,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             width: 36,
             height: 36,
             decoration: const BoxDecoration(
-              color: Color(0xFFE3FCEF),
+              color: AppColors.tertiaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check, color: Color(0xFF00875A), size: 18),
+            child: const Icon(Icons.check, color: AppColors.onTertiaryContainer, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -1153,7 +1167,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
                     const SizedBox(width: 6),
@@ -1161,7 +1175,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       time,
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF6C6C70),
+                        color: AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -1171,7 +1185,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   service,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(0xFF6C6C70),
+                    color: AppColors.onSurfaceVariant,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -1179,14 +1193,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 const SizedBox(height: 4),
                 const Row(
                   children: [
-                    Icon(Icons.bolt, size: 12, color: Color(0xFF00875A)),
+                    Icon(Icons.bolt, size: 12, color: AppColors.onTertiaryContainer),
                     SizedBox(width: 2),
                     Text(
                       'Instant UPI • ★ 5.0',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                       ),
                     ),
                   ],
@@ -1202,7 +1216,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 style: const TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111111),
+                  color: AppColors.primary,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -1210,7 +1224,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE3FCEF),
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
@@ -1218,7 +1232,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF00875A),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -1233,7 +1247,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
+        color: AppColors.primary,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -1253,7 +1267,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     ),
                     child: const Icon(
                       Icons.health_and_safety,
-                      color: Color(0xFF99F89E),
+                      color: AppColors.tertiaryFixed,
                       size: 18,
                     ),
                   ),
@@ -1273,7 +1287,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         'Pune District Trade Union Trust',
                         style: TextStyle(
                           fontSize: 11,
-                          color: Color(0xFFA0A0A5),
+                          color: AppColors.outline,
                         ),
                       ),
                     ],
@@ -1283,7 +1297,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00875A),
+                  color: AppColors.onTertiaryContainer,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
@@ -1302,7 +1316,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             'Insurance cover up to ₹50,000 active for today\'s shifts covering workplace injury, transit, and tool damages.',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFFE5E5EA),
+              color: AppColors.outlineVariant,
               height: 1.4,
             ),
           ),
@@ -1318,7 +1332,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.call, size: 16, color: Color(0xFFFFD180)),
+                    Icon(Icons.call, size: 16, color: AppColors.starRating),
                     SizedBox(width: 6),
                     Text(
                       'Union Helpline: 1800-209-4092',
@@ -1341,7 +1355,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),

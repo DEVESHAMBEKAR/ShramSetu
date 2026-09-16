@@ -66,7 +66,7 @@ class _AdminWelfareScreenState extends State<AdminWelfareScreen> {
                   decoration: BoxDecoration(color: AppColors.surfaceContainerHigh, borderRadius: AppRadius.radiusLg),
                   child: Icon(
                     item.type == 'Loan' ? Icons.account_balance : Icons.health_and_safety,
-                    color: item.type == 'Loan' ? AppColors.primary : AppColors.tertiaryContainer,
+                    color: item.type == 'Loan' ? AppColors.primary : AppColors.onTertiaryContainer,
                   ),
                 ),
                 const SizedBox(width: AppSpacing.spacingMd),
@@ -77,7 +77,7 @@ class _AdminWelfareScreenState extends State<AdminWelfareScreen> {
                       Text(item.title, style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
                       Text(item.details, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
                       const SizedBox(height: 4),
-                      Text('Status: ${item.status}', style: AppTypography.labelSm.copyWith(color: AppColors.secondary)),
+                      Text('Status: ${item.status}', style: AppTypography.labelSm.copyWith(color: AppColors.statusTextColorFromString(item.status), fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),

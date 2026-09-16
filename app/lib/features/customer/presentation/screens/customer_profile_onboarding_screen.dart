@@ -9,6 +9,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
+import '../../../../shared/widgets/map_location_picker_screen.dart';
 
 class CustomerProfileOnboardingScreen extends StatefulWidget {
   const CustomerProfileOnboardingScreen({super.key});
@@ -29,6 +30,11 @@ class _CustomerProfileOnboardingScreenState
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _postalCodeController = TextEditingController();
+
+  // Location state
+  double? _latitude;
+  double? _longitude;
+  bool _isDetectingLocation = false;
 
   // State
   File? _selectedImage;
@@ -61,6 +67,112 @@ class _CustomerProfileOnboardingScreenState
       }
     } catch (_) {
       // Image pick is optional — silently ignore errors
+    }
+  }
+
+  // ─────────────────────── Location Detection & Picker ───────────────────────
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _isDetectingLocation = true);
+    try {
+      final result = await DI.locationService.getCurrentPosition();
+      if (!mounted) return;
+
+      if (result.isSuccess && result.coordinates != null) {
+        final coords = result.coordinates!;
+        setState(() {
+          _latitude = coords.latitude;
+          _longitude = coords.longitude;
+        });
+
+        final address = await DI.locationService.reverseGeocode(
+          coords.latitude,
+          coords.longitude,
+        );
+
+        if (mounted && address != null) {
+          setState(() {
+            if (address.addressLine.isNotEmpty) {
+              _addressLineController.text = address.addressLine;
+            }
+            if (address.area.isNotEmpty) {
+              _areaController.text = address.area;
+            }
+            if (address.city.isNotEmpty) {
+              _cityController.text = address.city;
+            }
+            if (address.state.isNotEmpty) {
+              _stateController.text = address.state;
+            }
+            if (address.postalCode.isNotEmpty) {
+              _postalCodeController.text = address.postalCode;
+            }
+          });
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('GPS location detected. Please review and confirm your address.'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      } else {
+        final msg = result.errorMessage ?? 'Could not detect location. You can enter it manually.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(msg),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error detecting location: $e'),
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDetectingLocation = false);
+    }
+  }
+
+  Future<void> _pickOnMap() async {
+    final result = await Navigator.of(context).push<LocationPickerResult>(
+      MaterialPageRoute(
+        builder: (_) => MapLocationPickerScreen(
+          initialLatitude: _latitude,
+          initialLongitude: _longitude,
+          title: 'Pick Home Address',
+        ),
+      ),
+    );
+
+    if (result != null && mounted) {
+      setState(() {
+        _latitude = result.latitude;
+        _longitude = result.longitude;
+      });
+
+      final addr = result.address;
+      if (addr != null) {
+        setState(() {
+          if (addr.addressLine.isNotEmpty) _addressLineController.text = addr.addressLine;
+          if (addr.area.isNotEmpty) _areaController.text = addr.area;
+          if (addr.city.isNotEmpty) _cityController.text = addr.city;
+          if (addr.state.isNotEmpty) _stateController.text = addr.state;
+          if (addr.postalCode.isNotEmpty) _postalCodeController.text = addr.postalCode;
+        });
+      }
     }
   }
 
@@ -113,7 +225,7 @@ class _CustomerProfileOnboardingScreenState
       return;
     }
 
-    // Step 3: Save address
+    // Step 3: Save address with coordinates
     try {
       await DI.userRepo.createAddress(
         userId: userId,
@@ -123,6 +235,8 @@ class _CustomerProfileOnboardingScreenState
         state: _stateController.text.trim(),
         postalCode: _postalCodeController.text.trim(),
         label: 'Home',
+        latitude: _latitude,
+        longitude: _longitude,
       );
     } catch (e) {
       setState(() {
@@ -266,6 +380,70 @@ class _CustomerProfileOnboardingScreenState
                       .copyWith(color: AppColors.onSurfaceVariant),
                 ),
                 const SizedBox(height: AppSpacing.spacingSm),
+
+                // Location Action Row: GPS & Map Picker
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.outlineVariant),
+                          shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        ),
+                        onPressed: _isDetectingLocation ? null : _fetchCurrentLocation,
+                        icon: _isDetectingLocation
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                              )
+                            : const Icon(Icons.my_location, size: 16, color: AppColors.secondary),
+                        label: Text(
+                          _isDetectingLocation ? 'Detecting...' : 'Use Current GPS',
+                          style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.outlineVariant),
+                          shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                        ),
+                        onPressed: _pickOnMap,
+                        icon: const Icon(Icons.map_outlined, size: 16, color: AppColors.primary),
+                        label: Text(
+                          'Pick on Map',
+                          style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (_latitude != null && _longitude != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.check_circle, size: 14, color: AppColors.onTertiaryContainer),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Coordinates locked (${_latitude!.toStringAsFixed(4)}, ${_longitude!.toStringAsFixed(4)})',
+                        style: AppTypography.labelSm.copyWith(
+                          fontSize: 10,
+                          color: AppColors.onTertiaryContainer,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.spacingSm),
+
                 _buildCard(
                   children: [
                     _buildTextField(

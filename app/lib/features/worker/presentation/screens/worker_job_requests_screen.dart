@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -14,11 +15,24 @@ class WorkerJobRequestsScreen extends StatefulWidget {
 
 class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
   late Future<List<JobRequest>> _jobsFuture;
+  StreamSubscription<List<JobRequest>>? _jobsSub;
 
   @override
   void initState() {
     super.initState();
     _refresh();
+    _jobsSub = DI.workerRepo.watchWorkerBookings().listen(
+      (_) {
+        if (mounted) _refresh();
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _jobsSub?.cancel();
+    super.dispose();
   }
 
   void _refresh() {
@@ -30,7 +44,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white.withValues(alpha: 0.95),
         elevation: 0,
@@ -41,7 +55,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             letterSpacing: -0.4,
           ),
         ),
@@ -63,10 +77,10 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE5E5EA).withValues(alpha: 0.5),
+                      color: AppColors.outlineVariant.withValues(alpha: 0.5),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.assignment_outlined, size: 36, color: Color(0xFF6C6C70)),
+                    child: const Icon(Icons.assignment_outlined, size: 36, color: AppColors.onSurfaceVariant),
                   ),
                   const SizedBox(height: 16),
                   const Text(
@@ -74,13 +88,13 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                   const SizedBox(height: 6),
                   const Text(
                     'New customer bookings will appear here instantly',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+                    style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -123,7 +137,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE5E5EA)),
+          border: Border.all(color: AppColors.outlineVariant),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -141,15 +155,15 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE3FCEF),
+                    color: AppColors.bookingStatusContainer(job.status),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     job.status.name.toUpperCase(),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF00875A),
+                      color: AppColors.bookingStatusTextColor(job.status),
                       letterSpacing: 0.3,
                     ),
                   ),
@@ -159,7 +173,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                   ),
                 ),
               ],
@@ -170,7 +184,7 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
               style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF111111),
+                color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 2),
@@ -178,19 +192,19 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
               job.serviceName,
               style: const TextStyle(
                 fontSize: 12,
-                color: Color(0xFF6C6C70),
+                color: AppColors.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.near_me, size: 14, color: Color(0xFF6C6C70)),
+                const Icon(Icons.near_me, size: 14, color: AppColors.onSurfaceVariant),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     job.customerLocation,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+                    style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -203,11 +217,11 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.schedule, size: 13, color: Color(0xFF6C6C70)),
+                    const Icon(Icons.schedule, size: 13, color: AppColors.onSurfaceVariant),
                     const SizedBox(width: 4),
                     Text(
                       '${job.date} • ${job.time}',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                      style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -218,10 +232,10 @@ class _WorkerJobRequestsScreenState extends State<WorkerJobRequestsScreen> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF111111),
+                        color: AppColors.primary,
                       ),
                     ),
-                    Icon(Icons.chevron_right, size: 16, color: Color(0xFF111111)),
+                    Icon(Icons.chevron_right, size: 16, color: AppColors.primary),
                   ],
                 ),
               ],

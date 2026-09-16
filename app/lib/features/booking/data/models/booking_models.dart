@@ -36,6 +36,9 @@ class BookingFlowState {
   String? selectedDate;
   String? selectedTime;
   String? address;
+  String? addressId;
+  double? latitude;
+  double? longitude;
 
   BookingFlowState({
     this.selectedCategory,
@@ -43,6 +46,9 @@ class BookingFlowState {
     this.selectedDate,
     this.selectedTime,
     this.address = 'Flat 402, Sai Shraddha Apts, Ideal Colony, Kothrud, Pune - 411038',
+    this.addressId,
+    this.latitude,
+    this.longitude,
   });
 }
 

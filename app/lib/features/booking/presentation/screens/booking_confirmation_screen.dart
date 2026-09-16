@@ -93,7 +93,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.end,
                           children: [
                             Text('Status', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                            Text('Confirmed', style: AppTypography.labelMd.copyWith(color: AppColors.tertiaryContainer, fontWeight: FontWeight.bold)),
+                            Text('Confirmed', style: AppTypography.labelMd.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ],

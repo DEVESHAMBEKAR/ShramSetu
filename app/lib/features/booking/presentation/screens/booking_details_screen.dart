@@ -1,5 +1,6 @@
 import '../../../../core/config/dependency_injection.dart';
 import 'package:flutter/material.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -17,6 +18,89 @@ class BookingDetailsScreen extends StatefulWidget {
 class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   String _paymentMode = 'upi';
   bool _isSubmitting = false;
+  String? _pendingBookingId;
+  late Razorpay _razorpay;
+
+  @override
+  void initState() {
+    super.initState();
+    _razorpay = Razorpay();
+    _razorpay.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
+    _razorpay.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
+    _razorpay.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
+  }
+
+  Future<void> _handlePaymentSuccess(PaymentSuccessResponse response) async {
+    if (_pendingBookingId == null) return;
+    if (!mounted) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      // CRITICAL: Verify payment server-side — never trust client callback alone
+      final verified = await DI.paymentRepo.verifyPayment(
+        bookingId: _pendingBookingId!,
+        razorpayOrderId: response.orderId ?? '',
+        razorpayPaymentId: response.paymentId ?? '',
+        razorpaySignature: response.signature ?? '',
+      );
+
+      if (!mounted) return;
+
+      if (verified) {
+        final bookingId = _pendingBookingId!;
+        _pendingBookingId = null;
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => BookingConfirmationScreen(bookingId: bookingId),
+          ),
+          (route) => false,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Payment verification failed. Please contact support.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Verification error: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  void _handlePaymentError(PaymentFailureResponse response) {
+    _pendingBookingId = null;
+    if (!mounted) return;
+    final msg = response.message ?? 'Payment cancelled or failed';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Payment failed: $msg'),
+        backgroundColor: Colors.red,
+      ),
+    );
+    setState(() => _isSubmitting = false);
+  }
+
+  void _handleExternalWallet(ExternalWalletResponse response) {
+    // External wallets (Paytm etc.) redirect externally — treat as pending
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Redirecting to ${response.walletName}...')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,7 +242,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: const Color(0xFF262626)),
+        border: Border.all(color: AppColors.onPrimaryFixedVariant.withValues(alpha: 0.3)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.1),
@@ -178,7 +262,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               borderRadius: AppRadius.radiusLg,
               border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
             ),
-            child: const Icon(Icons.verified_user, color: Color(0xFF34D399), size: 20),
+            child: const Icon(Icons.verified_user, color: AppColors.tertiaryFixed, size: 20),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -192,18 +276,18 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xFF34D399).withValues(alpha: 0.2),
+                        color: AppColors.tertiaryContainer.withValues(alpha: 0.2),
                         borderRadius: AppRadius.radiusFull,
-                        border: Border.all(color: const Color(0xFF34D399).withValues(alpha: 0.4)),
+                        border: Border.all(color: AppColors.tertiaryFixed.withValues(alpha: 0.4)),
                       ),
-                      child: Text('100% SAFE', style: AppTypography.labelSm.copyWith(color: const Color(0xFF34D399), fontSize: 8, fontWeight: FontWeight.bold)),
+                      child: Text('100% SAFE', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryFixed, fontSize: 8, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
                 const SizedBox(height: 4),
                 Text(
                   'Your ₹$total is safely locked in Pune Union Escrow and released to Rahul strictly after OTP approval upon complete satisfaction.',
-                  style: AppTypography.bodySm.copyWith(color: const Color(0xFFCBD5E1), fontSize: 11),
+                  style: AppTypography.bodySm.copyWith(color: AppColors.primaryFixedDim, fontSize: 11),
                 ),
               ],
             ),
@@ -449,37 +533,54 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           final date = bookingFlowState.selectedDate ?? '2023-11-01';
                           final time = bookingFlowState.selectedTime ?? '10:00 AM';
 
+                          // Step 1: Create the booking record
                           final newBookingId = await DI.customerRepo.createBooking(
                             workerId: workerId,
                             serviceId: categoryId,
                             scheduledDate: date,
                             scheduledTime: time,
                             amount: total.toDouble(),
+                            addressId: bookingFlowState.addressId,
                           );
 
-                          if (mounted) {
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => BookingConfirmationScreen(bookingId: newBookingId),
-                              ),
-                              (route) => false,
-                            );
+                          if (newBookingId == null) {
+                            throw Exception('Failed to generate booking ID.');
                           }
+
+                          _pendingBookingId = newBookingId;
+
+                          // Step 2: Create Razorpay order via Edge Function
+                          // Amount comes from DB, not from client-side calculation
+                          final orderResult = await DI.paymentRepo.createPaymentOrder(newBookingId);
+
+                          // Step 3: Open Razorpay checkout
+                          final options = <String, dynamic>{
+                            'key': orderResult.keyId,
+                            'amount': orderResult.amountPaise,
+                            'currency': orderResult.currency,
+                            'order_id': orderResult.orderId,
+                            'name': 'ShramSetu',
+                            'description': 'Cooperative Escrow Payment',
+                            'prefill': {'contact': '', 'email': ''},
+                            'theme': {'color': '#5B2EFF'},
+                          };
+                          _razorpay.open(options);
+                          // Payment result handled by _handlePaymentSuccess / _handlePaymentError
                         } catch (e) {
+                          _pendingBookingId = null;
                           if (mounted) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to book: $e')),
+                              SnackBar(content: Text('Failed to initiate payment: $e')),
                             );
+                            setState(() => _isSubmitting = false);
                           }
-                        } finally {
-                          if (mounted) setState(() => _isSubmitting = false);
                         }
                       },
                 icon: _isSubmitting
                     ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.lock_outline, size: 16, color: Color(0xFF34D399)),
+                    : const Icon(Icons.lock_outline, size: 16, color: AppColors.tertiaryFixed),
                 label: Text(
-                  _isSubmitting ? 'Reserving...' : 'Reserve in Escrow',
+                  _isSubmitting ? 'Processing...' : 'Pay via Razorpay',
                   style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold),
                 ),
               ),

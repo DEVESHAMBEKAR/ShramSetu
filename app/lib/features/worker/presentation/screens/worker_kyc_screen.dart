@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -31,9 +31,9 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
 
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
-    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final userId = Supabase.instance.client.auth.currentUser?.id ?? 'mock-worker-id';
     _worker = await DI.workerRepo.getWorkerProfile(userId);
-    _documents = await DI.workerRepo.getVerificationDocuments(userId);
+    _documents = await DI.workerRepo.getVerificationDocuments(_worker?.id ?? userId);
     if (mounted) setState(() => _isLoading = false);
   }
 
@@ -43,36 +43,38 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
       allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png'],
     );
 
-    if (result != null && result.isNotEmpty && result.first.path != null) {
+    if (result.isNotEmpty && result.first.path != null) {
       setState(() => _isUploading = true);
       try {
         final file = File(result.first.path!);
         final fileName = result.first.name;
         final fileSize = file.lengthSync();
-        final ext = file.path.split('.').last;
+        final ext = file.path.split('.').last.toLowerCase();
         
+        final workerId = _worker?.id ?? Supabase.instance.client.auth.currentUser?.id ?? 'worker';
         final timestamp = DateTime.now().millisecondsSinceEpoch;
-        final storagePath = '\/\-\.';
+        final storagePath = '$workerId/$docType-$timestamp.$ext';
+        final mimeType = ext == 'pdf' ? 'application/pdf' : 'image/$ext';
         
-        final url = await DI.storageRepo.uploadFile(
+        await DI.storageRepo.uploadFile(
           bucket: StorageBucket.workerDocuments,
           path: storagePath,
           file: file,
         );
         
         await DI.workerRepo.submitVerificationDocument(
-          _worker!.id,
+          workerId,
           docType,
           storagePath,
           fileName,
-          'application/',
-          fileSize
+          mimeType,
+          fileSize,
         );
         
         await _loadData();
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document uploaded successfully')));
       } catch (e) {
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: ')));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Upload failed: $e')));
       } finally {
         if (mounted) setState(() => _isUploading = false);
       }
@@ -82,14 +84,15 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
   Future<void> _submitVerification() async {
     setState(() => _isUploading = true);
     try {
-      await DI.workerRepo.submitForVerification(_worker!.id);
+      final workerId = _worker?.id ?? Supabase.instance.client.auth.currentUser?.id ?? 'worker';
+      await DI.workerRepo.submitForVerification(workerId);
       await _loadData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Submitted for verification successfully!')));
         Navigator.of(context).pop();
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: ')));
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Submission failed: $e')));
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
@@ -177,9 +180,16 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Status: ', style: AppTypography.titleMd.copyWith(color: textColor, fontWeight: FontWeight.bold)),
+          Text('Status: $status', style: AppTypography.titleMd.copyWith(color: textColor, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
-          Text('Upload required documents below to get verified and start receiving jobs.', style: AppTypography.bodyMd.copyWith(color: textColor)),
+          Text(
+            status == 'VERIFIED'
+                ? 'Your profile is fully verified. You are eligible for priority guild assignments.'
+                : (status == 'IN REVIEW'
+                    ? 'Documents submitted. Verification typically completes within 24 hours.'
+                    : 'Upload required documents below to get verified and start receiving jobs.'),
+            style: AppTypography.bodyMd.copyWith(color: textColor),
+          ),
         ],
       ),
     );
@@ -187,6 +197,9 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
 
   Widget _buildDocumentTile(String docType, String title, IconData icon) {
     final bool hasDoc = _hasDocument(docType);
+    final doc = _documents.where((d) => d['document_type'] == docType).firstOrNull;
+    final fileName = doc?['file_name']?.toString();
+
     return Card(
       margin: const EdgeInsets.only(bottom: AppSpacing.spacingMd),
       elevation: 0,
@@ -203,7 +216,14 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
           child: Icon(icon, color: hasDoc ? AppColors.onTertiaryFixed : AppColors.onSurfaceVariant),
         ),
         title: Text(title, style: AppTypography.titleMd),
-        subtitle: Text(hasDoc ? 'Uploaded' : 'Pending Upload', style: AppTypography.bodySm.copyWith(color: hasDoc ? AppColors.tertiary : AppColors.error)),
+        subtitle: Text(
+          hasDoc
+              ? (fileName != null ? 'Uploaded: $fileName' : 'Uploaded • Verified')
+              : 'Pending Upload',
+          style: AppTypography.bodySm.copyWith(color: hasDoc ? AppColors.tertiary : AppColors.error),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         trailing: hasDoc 
           ? const Icon(Icons.check_circle, color: AppColors.tertiary)
           : TextButton.icon(

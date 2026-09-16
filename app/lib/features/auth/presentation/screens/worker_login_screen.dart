@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 
@@ -108,7 +109,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FC),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -163,30 +164,30 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                 Navigator.of(context).pushReplacementNamed('/');
               }
             },
-            icon: const Icon(Icons.arrow_back, color: Color(0xFF111111)),
+            icon: const Icon(Icons.arrow_back, color: AppColors.primary),
             style: IconButton.styleFrom(
               backgroundColor: Colors.white,
               elevation: 0,
-              side: const BorderSide(color: Color(0xFFE5E5EA)),
+              side: const BorderSide(color: AppColors.outlineVariant),
             ),
           ),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFECEEF0),
+              color: AppColors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.engineering, size: 14, color: Color(0xFF111111)),
+                const Icon(Icons.engineering, size: 14, color: AppColors.primary),
                 const SizedBox(width: 4),
                 Text(
                   _isOtpSent ? 'Partner Auth: Step 2/2' : 'Partner Portal: Step 1/2',
                   style: const TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF6C6C70),
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -203,21 +204,28 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: const Color(0xFF111111),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 6,
                   offset: const Offset(0, 2),
                 ),
               ],
             ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.handyman, color: Colors.white, size: 22),
+            padding: const EdgeInsets.all(4),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.asset(
+                'assets/images/logo.jpg',
+                fit: BoxFit.contain,
+              ),
+            ),
           ),
           const SizedBox(width: 10),
           Column(
@@ -230,7 +238,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -238,7 +246,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3FCEF),
+                      color: AppColors.tertiaryContainer,
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: const Text(
@@ -246,7 +254,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF00875A),
+                        color: AppColors.onTertiaryContainer,
                         letterSpacing: 0.5,
                       ),
                     ),
@@ -258,7 +266,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF6C6C70),
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -279,7 +287,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF111111),
+              color: AppColors.primary,
               letterSpacing: -0.5,
             ),
           ),
@@ -288,7 +296,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             'Enter your union-registered phone number. Direct OTP dispatch to connect to your active guild bookings.',
             style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF6C6C70),
+              color: AppColors.onSurfaceVariant,
               height: 1.4,
             ),
           ),
@@ -303,18 +311,18 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFEBEE),
+        color: AppColors.errorContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFFCDD2)),
+        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.error_outline, color: Color(0xFFD32F2F), size: 18),
+          const Icon(Icons.error_outline, color: AppColors.error, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               _errorMessage!,
-              style: const TextStyle(fontSize: 12, color: Color(0xFFD32F2F), fontWeight: FontWeight.w600),
+              style: const TextStyle(fontSize: 12, color: AppColors.error, fontWeight: FontWeight.w600),
             ),
           ),
         ],
@@ -329,7 +337,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -346,7 +354,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF6C6C70),
+              color: AppColors.onSurfaceVariant,
               letterSpacing: 0.5,
             ),
           ),
@@ -356,7 +364,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE5E5EA)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 12),
             child: Row(
@@ -367,19 +375,19 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   height: 14,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: const Color(0xFFE5E5EA)),
+                    border: Border.all(color: AppColors.outlineVariant),
                   ),
                   child: Column(
                     children: [
-                      Expanded(child: Container(color: const Color(0xFFFF9933))),
+                      Expanded(child: Container(color: AppColors.flagSaffron)),
                       Expanded(
                         child: Container(
                           color: Colors.white,
                           alignment: Alignment.center,
-                          child: const Icon(Icons.circle, size: 3, color: Color(0xFF000080)),
+                          child: const Icon(Icons.circle, size: 3, color: AppColors.flagNavy),
                         ),
                       ),
-                      Expanded(child: Container(color: const Color(0xFF138808))),
+                      Expanded(child: Container(color: AppColors.flagGreen)),
                     ],
                   ),
                 ),
@@ -389,11 +397,11 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 10),
-                const VerticalDivider(width: 1, indent: 12, endIndent: 12, color: Color(0xFFE5E5EA)),
+                const VerticalDivider(width: 1, indent: 12, endIndent: 12, color: AppColors.outlineVariant),
                 const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
@@ -407,7 +415,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                       letterSpacing: 1.5,
                     ),
                     decoration: const InputDecoration(
@@ -416,7 +424,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                       hintStyle: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xFFA0A0A5),
+                        color: AppColors.outline,
                         letterSpacing: 0,
                       ),
                     ),
@@ -427,10 +435,10 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     width: 22,
                     height: 22,
                     decoration: const BoxDecoration(
-                      color: Color(0xFFE3FCEF),
+                      color: AppColors.tertiaryContainer,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.check, size: 14, color: Color(0xFF00875A)),
+                    child: const Icon(Icons.check, size: 14, color: AppColors.onTertiaryContainer),
                   ),
               ],
             ),
@@ -447,7 +455,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5E5EA)),
+        border: Border.all(color: AppColors.outlineVariant),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.02),
@@ -463,13 +471,13 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             children: [
               Row(
                 children: [
-                  const Text('OTP sent to ', style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70))),
+                  const Text('OTP sent to ', style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant)),
                   Text(
                     '+91 ${_phoneController.text}',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ],
@@ -481,7 +489,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                     decoration: TextDecoration.underline,
                   ),
                 ),
@@ -491,18 +499,18 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           const SizedBox(height: 14),
           _buildOtpInputBoxes(),
           const SizedBox(height: 12),
-          const Divider(height: 1, color: Color(0xFFF0F0F4)),
+          const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(
                 children: [
-                  const Icon(Icons.schedule, size: 14, color: Color(0xFF6C6C70)),
+                  const Icon(Icons.schedule, size: 14, color: AppColors.onSurfaceVariant),
                   const SizedBox(width: 4),
                   Text(
                     _secondsRemaining > 0 ? 'Resend OTP in 00:${_secondsRemaining.toString().padLeft(2, '0')}s' : 'Code expired',
-                    style: const TextStyle(fontSize: 11, color: Color(0xFF6C6C70)),
+                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
                 ],
               ),
@@ -518,7 +526,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: _secondsRemaining == 0 ? const Color(0xFF111111) : const Color(0xFFA0A0A5),
+                    color: _secondsRemaining == 0 ? AppColors.primary : AppColors.outline,
                   ),
                 ),
               ),
@@ -567,7 +575,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isFocused ? const Color(0xFF111111) : const Color(0xFFE5E5EA),
+                    color: isFocused ? AppColors.primary : AppColors.outlineVariant,
                     width: isFocused ? 2 : 1,
                   ),
                   boxShadow: [
@@ -585,7 +593,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                         style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF111111),
+                          color: AppColors.primary,
                         ),
                       )
                     : (isFocused
@@ -593,7 +601,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                             width: 6,
                             height: 6,
                             decoration: const BoxDecoration(
-                              color: Color(0xFF111111),
+                              color: AppColors.primary,
                               shape: BoxShape.circle,
                             ),
                           )
@@ -610,14 +618,14 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE3FCEF).withValues(alpha: 0.7),
+        color: AppColors.tertiaryContainer.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF00875A).withValues(alpha: 0.2)),
+        border: Border.all(color: AppColors.onTertiaryContainer.withValues(alpha: 0.2)),
       ),
       child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.shield, size: 16, color: Color(0xFF00875A)),
+          Icon(Icons.shield, size: 16, color: AppColors.onTertiaryContainer),
           SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -628,7 +636,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF006644),
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
                 SizedBox(height: 2),
@@ -636,7 +644,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                   'Zero middleman deduction. Union escrow directly settles earnings to your linked bank account upon job completion OTP signoff.',
                   style: TextStyle(
                     fontSize: 11,
-                    color: Color(0xFF006644),
+                    color: AppColors.onTertiaryContainer,
                     height: 1.35,
                   ),
                 ),
@@ -655,7 +663,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
       child: ElevatedButton(
         onPressed: _isLoading ? null : _handlePrimaryAction,
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF111111),
+          backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           elevation: 0,
@@ -687,7 +695,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
         const Text(
           'Looking to book home services?',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12, color: Color(0xFF6C6C70)),
+          style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
         ),
         const SizedBox(height: 8),
         GestureDetector(
@@ -697,25 +705,46 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFECEEF0),
+              color: AppColors.surfaceContainerLow,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE5E5EA)),
+              border: Border.all(color: AppColors.outlineVariant),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.home_repair_service, size: 14, color: Color(0xFF111111)),
+                Icon(Icons.home_repair_service, size: 14, color: AppColors.primary),
                 SizedBox(width: 6),
                 Text(
                   'Switch to Customer Sign-in →',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                   ),
                 ),
               ],
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        GestureDetector(
+          onTap: () {
+            Navigator.of(context).pushNamed('/login/admin');
+          },
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.secondary),
+              SizedBox(width: 5),
+              Text(
+                'Federation Official? Admin Console Sign-in →',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.secondary,
+                ),
+              ),
+            ],
           ),
         ),
       ],

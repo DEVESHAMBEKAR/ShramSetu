@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../shared/widgets/app_logo.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -28,6 +27,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final user = await DI.authRepo.getCurrentUser();
     if (user != null) {
+      DI.notificationService.registerDeviceToken(userId: user.id);
       final role = await DI.userRepo.getUserRole(user.id);
       if (mounted) {
         if (role == 'CUSTOMER') {
@@ -66,7 +66,25 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const AppLogo(size: 140),
+            Container(
+              width: 140,
+              height: 140,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              padding: const EdgeInsets.all(16),
+              child: ClipOval(
+                child: Image.asset('assets/images/logo.jpg', fit: BoxFit.contain),
+              ),
+            ),
             const SizedBox(height: AppSpacing.spacingLg),
             Text(
               'ShramSetu',

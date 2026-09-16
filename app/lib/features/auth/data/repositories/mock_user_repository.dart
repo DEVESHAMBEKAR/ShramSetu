@@ -96,6 +96,8 @@ class MockUserRepository implements IUserRepository {
     required String state,
     required String postalCode,
     String? label,
+    double? latitude,
+    double? longitude,
   }) async {
     final isFirst = (_mockAddresses[userId] ?? []).isEmpty;
     final addr = {
@@ -108,6 +110,8 @@ class MockUserRepository implements IUserRepository {
       'state': state,
       'postal_code': postalCode,
       'is_default': isFirst,
+      if (latitude != null) 'latitude': latitude,
+      if (longitude != null) 'longitude': longitude,
     };
     _mockAddresses[userId] = [...(_mockAddresses[userId] ?? []), addr];
     return CustomerAddress.fromMap(addr);

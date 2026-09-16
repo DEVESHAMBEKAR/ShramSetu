@@ -117,6 +117,8 @@ class SupabaseUserRepository implements IUserRepository {
     required String state,
     required String postalCode,
     String? label,
+    double? latitude,
+    double? longitude,
   }) async {
     // Determine if this is the first address — if so, make it default.
     final existing = await _client
@@ -134,7 +136,7 @@ class SupabaseUserRepository implements IUserRepository {
       // For now, first address is always default.
     }
 
-    final row = await _client.from('addresses').insert({
+    final insertPayload = <String, dynamic>{
       'user_id': userId,
       'label': label ?? 'Home',
       'address_line': addressLine.trim(),
@@ -145,7 +147,11 @@ class SupabaseUserRepository implements IUserRepository {
       'is_default': isFirst,
       'created_at': DateTime.now().toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
-    }).select().single();
+    };
+    if (latitude != null) insertPayload['latitude'] = latitude;
+    if (longitude != null) insertPayload['longitude'] = longitude;
+
+    final row = await _client.from('addresses').insert(insertPayload).select().single();
 
     return CustomerAddress.fromMap(row);
   }

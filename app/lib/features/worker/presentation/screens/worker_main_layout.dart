@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/config/dependency_injection.dart';
 import 'worker_dashboard_screen.dart';
 import 'worker_job_requests_screen.dart';
 import 'worker_earnings_screen.dart';
@@ -14,6 +16,14 @@ class WorkerMainLayout extends StatefulWidget {
 class _WorkerMainLayoutState extends State<WorkerMainLayout> {
   int _currentIndex = 0;
 
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      DI.notificationService.requestPermissions();
+    });
+  }
+
   final List<Widget> _screens = [
     const WorkerDashboardScreen(),
     const WorkerJobRequestsScreen(),
@@ -24,13 +34,13 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.background,
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.98),
           border: const Border(
-            top: BorderSide(color: Color(0xFFE5E5EA), width: 1),
+            top: BorderSide(color: AppColors.outlineVariant, width: 1),
           ),
           boxShadow: [
             BoxShadow(
@@ -73,12 +83,12 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
               duration: const Duration(milliseconds: 150),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
               decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF111111) : Colors.transparent,
+                color: isSelected ? AppColors.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(
                 isSelected ? activeIcon : inactiveIcon,
-                color: isSelected ? Colors.white : const Color(0xFF6C6C70),
+                color: isSelected ? Colors.white : AppColors.onSurfaceVariant,
                 size: 20,
               ),
             ),
@@ -87,7 +97,7 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
               label,
               style: TextStyle(
                 fontSize: 11,
-                color: isSelected ? const Color(0xFF111111) : const Color(0xFF6C6C70),
+                color: isSelected ? AppColors.primary : AppColors.onSurfaceVariant,
                 fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
                 letterSpacing: -0.2,
               ),

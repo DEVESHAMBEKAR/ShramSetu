@@ -100,9 +100,14 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                     Text('Completed Jobs: ${worker.completedJobs}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
                     Row(
                       children: [
-                        const Icon(Icons.star, size: 14, color: Colors.orange),
+                        const Icon(Icons.star, size: 14, color: AppColors.starRating),
                         const SizedBox(width: 2),
-                        Text(worker.rating.toString(), style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                        Text(
+                          worker.rating > 0
+                              ? '${worker.rating.toStringAsFixed(1)} (${worker.reviewCount})'
+                              : 'No reviews',
+                          style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                        ),
                       ],
                     ),
                   ],
@@ -120,13 +125,12 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                           child: const Text('Reject'),
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: AppSpacing.spacingMd),
                       Expanded(
                         child: ElevatedButton(
                           onPressed: () {
                             () async { await DI.adminRepo.approveWorker(worker.id); _refreshData(); }();
                           },
-                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
                           child: const Text('Approve'),
                         ),
                       ),
@@ -145,22 +149,22 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
   Color _getVerifBgColor(VerificationStatus status) {
     switch (status) {
       case VerificationStatus.approved:
-        return AppColors.tertiaryFixed;
+        return AppColors.tertiaryContainer;
       case VerificationStatus.pending:
-        return AppColors.surfaceContainer;
+        return AppColors.warningContainer;
       case VerificationStatus.rejected:
         return AppColors.errorContainer;
       default:
-        return AppColors.surfaceContainer;
+        return AppColors.surfaceContainerLow;
     }
   }
 
   Color _getVerifTextColor(VerificationStatus status) {
     switch (status) {
       case VerificationStatus.approved:
-        return AppColors.onTertiaryFixed;
+        return AppColors.onTertiaryContainer;
       case VerificationStatus.pending:
-        return AppColors.onSurfaceVariant;
+        return AppColors.onWarningContainer;
       case VerificationStatus.rejected:
         return AppColors.onErrorContainer;
       default:

@@ -1,10 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
-import '../../data/models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
 class AdminBookingsScreen extends StatefulWidget {
@@ -16,11 +16,24 @@ class AdminBookingsScreen extends StatefulWidget {
 
 class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
   late Future<List<JobRequest>> _bookingsFuture;
+  StreamSubscription<List<JobRequest>>? _bookingsSub;
 
   @override
   void initState() {
     super.initState();
     _refreshData();
+    _bookingsSub = DI.adminRepo.watchBookings().listen(
+      (_) {
+        if (mounted) _refreshData();
+      },
+      onError: (_) {},
+    );
+  }
+
+  @override
+  void dispose() {
+    _bookingsSub?.cancel();
+    super.dispose();
   }
 
   void _refreshData() {
@@ -68,8 +81,8 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
                     Text('Order #${booking.id}', style: AppTypography.titleMd.copyWith(color: AppColors.primary)),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: _getStatusColor(booking.status), borderRadius: AppRadius.radiusSm),
-                      child: Text(booking.status.name.toUpperCase(), style: AppTypography.labelSm.copyWith(color: AppColors.onPrimary)),
+                      decoration: BoxDecoration(color: AppColors.bookingStatusContainer(booking.status), borderRadius: AppRadius.radiusSm),
+                      child: Text(booking.status.name.toUpperCase(), style: AppTypography.labelSm.copyWith(color: AppColors.bookingStatusTextColor(booking.status), fontWeight: FontWeight.w700)),
                     ),
                   ],
                 ),
@@ -133,18 +146,5 @@ class _AdminBookingsScreenState extends State<AdminBookingsScreen> {
     );
         }
       );
-  }
-
-  Color _getStatusColor(BookingStatus status) {
-    switch (status) {
-      case BookingStatus.completed:
-        return AppColors.tertiaryFixed;
-      case BookingStatus.inProgress:
-        return AppColors.secondary;
-      case BookingStatus.rejected:
-        return AppColors.error;
-      default:
-        return AppColors.primary;
-    }
   }
 }

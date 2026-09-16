@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -9,7 +10,7 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  String _selectedRole = 'customer'; // 'customer' or 'worker'
+  String _selectedRole = 'customer'; // 'customer', 'worker'
   String _selectedLanguage = 'en'; // 'en', 'hi', 'mr'
 
   void _handleContinue() {
@@ -34,7 +35,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F7F8),
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -79,20 +80,28 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         Row(
           children: [
             Container(
-              width: 38,
-              height: 38,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
-                color: const Color(0xFF111111),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.08),
+                    color: Colors.black.withValues(alpha: 0.06),
                     blurRadius: 4,
                     offset: const Offset(0, 1),
                   ),
                 ],
               ),
-              child: const Icon(Icons.handshake_outlined, color: Colors.white, size: 20),
+              padding: const EdgeInsets.all(3),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Image.asset(
+                  'assets/images/logo.jpg',
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             const Column(
@@ -103,7 +112,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF111111),
+                    color: AppColors.primary,
                     letterSpacing: -0.4,
                   ),
                 ),
@@ -112,7 +121,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF71717A),
+                    color: AppColors.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -124,19 +133,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFEAEAEA)),
+            border: Border.all(color: AppColors.outlineVariant),
           ),
           child: const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(radius: 3.5, backgroundColor: Color(0xFF00875A)),
+              CircleAvatar(radius: 3.5, backgroundColor: AppColors.onTertiaryContainer),
               SizedBox(width: 5),
               Text(
                 'Pune • Live',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF71717A),
+                  color: AppColors.onSurfaceVariant,
                 ),
               ),
             ],
@@ -153,7 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
         image: const DecorationImage(
           image: NetworkImage(
             'https://lh3.googleusercontent.com/aida-public/AB6AXuDj_q9BXU6qHaTPda1q03V9Tf3_1exNxkPuWc6hnMf22zLFEF7s_kxSJjAtTI8p_lIwHALrj09KNrGAyl4V7p1KZ0QQOFuOElfYfWfvE7QsKi_grlzO2YGPKinOT7hjLb0puxZ5Oed7B6-NtatqH46OqeVl3vpFUMmTVOn13T1ecQh3zRXh0X-jzDHS8h4XT4f2X2gRMHmWp77Lz_RS7XmmF2FBa-IwM6_qJHjrJVzLz5cyfoV-4MW4zQ',
@@ -183,7 +192,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             right: 12,
             child: Row(
               children: [
-                const Icon(Icons.verified, size: 16, color: Color(0xFF4ADE80)),
+                const Icon(Icons.verified, size: 16, color: AppColors.tertiaryFixed),
                 const SizedBox(width: 6),
                 const Text(
                   '100% Union Backed • Direct Karigar Payouts',
@@ -210,14 +219,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF111111),
+            color: AppColors.primary,
             letterSpacing: -0.4,
           ),
         ),
         SizedBox(height: 4),
         Text(
           'आपली भाषा निवडा • अपनी भाषा चुनें. Select your preferred language to customize your booking experience.',
-          style: TextStyle(fontSize: 12, color: Color(0xFF71717A), height: 1.35),
+          style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant, height: 1.35),
         ),
       ],
     );
@@ -225,10 +234,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   Widget _buildRoleSegmentedControl() {
     final isCustomer = _selectedRole == 'customer';
+    final isWorker = _selectedRole == 'worker';
+
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFFECECEE),
+        color: AppColors.surfaceContainerLow,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Row(
@@ -258,16 +269,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     Icon(
                       Icons.home_repair_service,
-                      size: 16,
-                      color: isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                      size: 15,
+                      color: isCustomer ? AppColors.primary : AppColors.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
-                      'I need services',
+                      'Customer',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: isCustomer ? FontWeight.w800 : FontWeight.w600,
-                        color: isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                        color: isCustomer ? AppColors.primary : AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -282,16 +293,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 duration: const Duration(milliseconds: 150),
                 height: 42,
                 decoration: BoxDecoration(
-                  color: !isCustomer ? Colors.white : Colors.transparent,
+                  color: isWorker ? Colors.white : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
-                  boxShadow: !isCustomer
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 1),
-                          )
-                        ]
+                  boxShadow: isWorker
+                          ? [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.05),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              )
+                            ]
                       : null,
                 ),
                 alignment: Alignment.center,
@@ -300,16 +311,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   children: [
                     Icon(
                       Icons.engineering,
-                      size: 16,
-                      color: !isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                      size: 15,
+                      color: isWorker ? AppColors.primary : AppColors.onSurfaceVariant,
                     ),
-                    const SizedBox(width: 6),
+                    const SizedBox(width: 4),
                     Text(
-                      'I am a Karigar',
+                      'Karigar',
                       style: TextStyle(
                         fontSize: 12,
-                        fontWeight: !isCustomer ? FontWeight.w800 : FontWeight.w600,
-                        color: !isCustomer ? const Color(0xFF111111) : const Color(0xFF71717A),
+                        fontWeight: isWorker ? FontWeight.w800 : FontWeight.w600,
+                        color: isWorker ? AppColors.primary : AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -347,8 +358,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           title: 'मराठी',
           badge: 'स्थानिक भाषा • पुणे',
           subtitle: 'पुणे व महाराष्ट्र कामगार सहकारी मंच',
-          badgeColor: const Color(0xFF92400E),
-          badgeBg: const Color(0xFFFEF3C7),
+          badgeColor: AppColors.onWarningContainer,
+          badgeBg: AppColors.warningContainer,
         ),
       ],
     );
@@ -373,7 +384,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? const Color(0xFF111111) : const Color(0xFFEAEAEA),
+            color: isSelected ? AppColors.primary : AppColors.outlineVariant,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
@@ -393,9 +404,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF4F4F5),
+                    color: AppColors.surfaceContainerLow,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFEAEAEA)),
+                    border: Border.all(color: AppColors.outlineVariant),
                   ),
                   alignment: Alignment.center,
                   child: Text(
@@ -403,7 +414,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF111111),
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
@@ -418,23 +429,23 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xFF111111),
+                            color: AppColors.primary,
                           ),
                         ),
                         const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                           decoration: BoxDecoration(
-                            color: badgeBg ?? const Color(0xFFF4F4F5),
+                            color: badgeBg ?? AppColors.surfaceContainerLow,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFE5E5EA)),
+                            border: Border.all(color: AppColors.outlineVariant),
                           ),
                           child: Text(
                             badge,
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
-                              color: badgeColor ?? const Color(0xFF111111),
+                              color: badgeColor ?? AppColors.primary,
                             ),
                           ),
                         ),
@@ -443,7 +454,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF71717A)),
+                      style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                     ),
                   ],
                 ),
@@ -454,9 +465,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 20,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isSelected ? const Color(0xFF111111) : Colors.white,
+                color: isSelected ? AppColors.primary : Colors.white,
                 border: Border.all(
-                  color: isSelected ? const Color(0xFF111111) : const Color(0xFFD4D4D8),
+                  color: isSelected ? AppColors.primary : AppColors.outlineVariant,
                   width: 2,
                 ),
               ),
@@ -484,14 +495,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFEAEAEA)),
+        border: Border.all(color: AppColors.outlineVariant),
       ),
       child: const Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _FeatureItem(icon: Icons.payments, title: 'Direct Bank Pay', sub: '0% Middleman Cut', color: Color(0xFF00875A)),
-          _FeatureItem(icon: Icons.verified_user, title: 'Govt ITI & KYC', sub: '100% Background Check', color: Color(0xFF2563EB)),
-          _FeatureItem(icon: Icons.shield, title: 'Co-op Escrow', sub: 'Guaranteed Quality', color: Color(0xFFD97706)),
+          _FeatureItem(icon: Icons.payments, title: 'Direct Bank Pay', sub: '0% Middleman Cut', color: AppColors.onTertiaryContainer),
+          _FeatureItem(icon: Icons.verified_user, title: 'Govt ITI & KYC', sub: '100% Background Check', color: AppColors.secondary),
+          _FeatureItem(icon: Icons.shield, title: 'Co-op Escrow', sub: 'Guaranteed Quality', color: AppColors.warning),
         ],
       ),
     );
@@ -504,16 +515,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFEAEAEA)),
+          border: Border.all(color: AppColors.outlineVariant),
         ),
         child: const Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.volume_up, size: 15, color: Color(0xFF5A38E4)),
+            Icon(Icons.volume_up, size: 15, color: AppColors.secondary),
             SizedBox(width: 6),
             Text(
               'Listen in audio (ऐका / आवाज में सुनें)',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF111111)),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
             ),
           ],
         ),
@@ -526,7 +537,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        border: const Border(top: BorderSide(color: Color(0xFFEAEAEA))),
+        border: const Border(top: BorderSide(color: AppColors.outlineVariant)),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
@@ -543,7 +554,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: ElevatedButton(
               onPressed: _handleContinue,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF111111),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
@@ -564,7 +575,30 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           const SizedBox(height: 8),
           const Text(
             'By continuing, you agree to ShramSetu\'s Fair Work Terms & Privacy Policy.',
-            style: TextStyle(fontSize: 10, color: Color(0xFF71717A)),
+            style: TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
+          ),
+          const SizedBox(height: 6),
+          InkWell(
+            onTap: () => Navigator.of(context).pushNamed('/login/admin'),
+            borderRadius: BorderRadius.circular(8),
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.secondary),
+                  SizedBox(width: 5),
+                  Text(
+                    'Cooperative Federation Admin Console →',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.secondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -593,11 +627,11 @@ class _FeatureItem extends StatelessWidget {
         const SizedBox(height: 3),
         Text(
           title,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF111111)),
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.primary),
         ),
         Text(
           sub,
-          style: const TextStyle(fontSize: 9, color: Color(0xFF71717A)),
+          style: const TextStyle(fontSize: 9, color: AppColors.onSurfaceVariant),
         ),
       ],
     );
