@@ -64,11 +64,35 @@ class MockAuthRepository implements IAuthRepository {
 
   @override
   Future<bool> login(String email, String password) async {
-    if (email.contains('admin') && password == 'admin123') {
+    final cleanEmail = email.trim().toLowerCase();
+    // Allow standard admin demo, developer/admin email (ambekardevesh2@gmail.com), or any valid non-empty email
+    final isAllowed = cleanEmail.isNotEmpty && password.isNotEmpty;
+
+    if (isAllowed) {
       _isLoggedIn = true;
       _mockRole = 'ADMIN';
+      final adminId = 'admin_${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+
+      _currentUser = User.fromJson(<String, dynamic>{
+        'id': adminId,
+        'email': cleanEmail,
+        'aud': 'authenticated',
+        'app_metadata': <String, dynamic>{},
+        'user_metadata': <String, dynamic>{'role': 'ADMIN'},
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
       try {
-        await DI.notificationService.registerDeviceToken(userId: 'mock_admin_123');
+        await DI.userRepo.upsertUserProfile(
+          userId: adminId,
+          role: 'ADMIN',
+          phone: '+91 98765 00000',
+          fullName: 'Admin (${cleanEmail.split('@').first})',
+        );
+      } catch (_) {}
+
+      try {
+        await DI.notificationService.registerDeviceToken(userId: adminId);
       } catch (_) {}
       return true;
     }

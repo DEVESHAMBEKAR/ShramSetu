@@ -50,16 +50,18 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
             return;
           } else {
             await DI.authRepo.logout();
-            setState(() => _errorMsg = 'Unauthorized: Admin role required.');
+            setState(() => _errorMsg = 'Unauthorized: Admin role required for ${user.email ?? 'this account'}.');
           }
         } else {
            setState(() => _errorMsg = 'User profile not found.');
         }
       } else {
-        setState(() => _errorMsg = 'Invalid admin credentials');
+        setState(() => _errorMsg = 'Invalid admin credentials. In test mode, enter any valid admin email and password.');
       }
     } catch (e) {
-      setState(() => _errorMsg = e.toString());
+      String msg = e.toString().replaceAll('Exception: ', '').replaceAll('AuthException(message: ', '');
+      if (msg.endsWith(')')) msg = msg.substring(0, msg.length - 1);
+      setState(() => _errorMsg = msg);
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -163,7 +165,26 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                             : const Text('Access Console', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                       ),
                     ),
-
+                    const SizedBox(height: AppSpacing.spacingMd),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryContainer.withValues(alpha: 0.5),
+                        borderRadius: AppRadius.radiusMd,
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Test Credentials: Use your admin email (e.g. ambekardevesh2@gmail.com) or admin@shramsetu.demo with password admin123.',
+                              style: AppTypography.bodySm.copyWith(fontSize: 11, color: AppColors.primary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
