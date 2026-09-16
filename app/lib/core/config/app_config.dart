@@ -1,27 +1,63 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppConfig {
+  static String? _configurationError;
+
+  static String? get configurationError => _configurationError;
+  static bool get hasConfigurationError => _configurationError != null;
+
   static Future<void> initialize() async {
-    await dotenv.load(fileName: ".env");
+    _configurationError = null;
+    try {
+      await dotenv.load(fileName: ".env");
+    } catch (e) {
+      debugPrint('[AppConfig] .env file not found or failed to load: $e');
+    }
 
-    final supabaseUrl = dotenv.env['SUPABASE_URL'] ?? '';
-    final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY'] ?? '';
-    final useMockData = dotenv.env['USE_MOCK_DATA'] == 'true';
+    final supabaseUrl = dotenv.isInitialized ? (dotenv.env['SUPABASE_URL'] ?? '') : '';
+    final supabaseAnonKey = dotenv.isInitialized ? (dotenv.env['SUPABASE_ANON_KEY'] ?? '') : '';
+    final useMock = useMockData;
 
-    if (!useMockData && supabaseUrl.isNotEmpty && supabaseAnonKey.isNotEmpty) {
-      await Supabase.initialize(
-        url: supabaseUrl,
-        anonKey: supabaseAnonKey,
-      );
+    if (!useMock) {
+      // Validate live configuration
+      if (supabaseUrl.isEmpty || !supabaseUrl.startsWith('https://') || supabaseUrl.contains('your-project-id')) {
+        _configurationError = 'Invalid or missing SUPABASE_URL in .env for LIVE mode.';
+        debugPrint('[AppConfig] ERROR: $_configurationError');
+        return;
+      }
+
+      if (supabaseAnonKey.isEmpty || supabaseAnonKey.contains('your-publishable-anon-key')) {
+        _configurationError = 'Invalid or missing SUPABASE_ANON_KEY in .env for LIVE mode.';
+        debugPrint('[AppConfig] ERROR: $_configurationError');
+        return;
+      }
+
+      try {
+        await Supabase.initialize(
+          url: supabaseUrl,
+          anonKey: supabaseAnonKey,
+        );
+        debugPrint('[AppConfig] Connected to Supabase LIVE backend successfully.');
+      } catch (e) {
+        _configurationError = 'Failed to connect to Supabase: $e';
+        debugPrint('[AppConfig] ERROR: $_configurationError');
+      }
+    } else {
+      debugPrint('[AppConfig] Operating in MOCK / TESTING MODE.');
     }
   }
 
   static bool get useMockData {
-    // If true, the app will use local Mock repositories instead of Supabase.
-    // If false, it uses Supabase repositories (which will throw errors if not initialized).
     if (!dotenv.isInitialized) return true;
-    return dotenv.env['USE_MOCK_DATA'] == 'true';
+    final val = dotenv.env['USE_MOCK_DATA'];
+    // Default to mock mode only if explicitly set to true
+    return val == 'true';
+  }
+
+  static String get environmentName {
+    return useMockData ? 'MOCK / TESTING' : 'LIVE';
   }
 
   static SupabaseClient get supabaseClient {

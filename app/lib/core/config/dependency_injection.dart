@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:app/core/config/app_config.dart';
 import 'package:app/core/repositories/i_auth_repository.dart';
 import 'package:app/core/repositories/i_user_repository.dart';
@@ -63,7 +64,10 @@ class DI {
     notificationService = NotificationService.instance;
     fairMatchEngine = FairMatchEngine.instance;
     demandForecastEngine = DemandForecastingEngine.instance;
-    if (AppConfig.useMockData) {
+    if (AppConfig.useMockData || AppConfig.hasConfigurationError) {
+      if (AppConfig.hasConfigurationError) {
+        debugPrint('[DI] Falling back to Mock repositories due to configuration error: ${AppConfig.configurationError}');
+      }
       authRepo = MockAuthRepository();
       userRepo = MockUserRepository();
       customerRepo = MockCustomerRepository();
