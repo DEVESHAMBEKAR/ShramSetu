@@ -4,6 +4,7 @@ import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../features/customer/data/models/customer_profile.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -71,27 +72,41 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         if (otp.length != 6) {
           throw Exception('Please enter the 6-digit OTP code.');
         }
-        final isValid = await DI.authRepo.verifyOtp(_phoneController.text.trim(), otp);
+        final phone = _phoneController.text.trim();
+        final isValid = await DI.authRepo.verifyOtp(phone, otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
           final userId = user?.id ?? 'mock_user_id';
 
+          // 1. Check if customer already exists (by userId or phone)
+          CustomerProfile? profile = await DI.userRepo.getCustomerProfile(userId);
+          profile ??= await DI.userRepo.getCustomerProfileByPhone(phone);
+
+          final effectiveUserId = profile?.id ?? userId;
+
+          // 2. If profile does not exist yet, initialize initial record.
+          // If profile exists, ensure user profile record is maintained without wiping out their name.
           await DI.userRepo.upsertUserProfile(
-            userId: userId,
+            userId: effectiveUserId,
             role: 'CUSTOMER',
-            phone: _phoneController.text.trim(),
+            phone: phone,
+            fullName: (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : null,
           );
 
-          final isComplete = await DI.userRepo.isProfileComplete(userId);
+          // 3. Determine if profile is already complete (has real name and address)
+          final isComplete = (profile?.isComplete == true) || await DI.userRepo.isProfileComplete(effectiveUserId);
 
           if (mounted) {
             if (isComplete) {
+              // Existing customer with complete profile -> go directly to home
               Navigator.of(context).pushReplacementNamed('/customer/home');
             } else {
+              // New or incomplete profile -> complete onboarding
               Navigator.of(context).pushReplacementNamed('/customer/onboarding');
             }
           }
-        } else {
+        }
+ else {
           throw Exception('Invalid OTP. Please try again. (Hint: use 123456 in test mode)');
         }
       }

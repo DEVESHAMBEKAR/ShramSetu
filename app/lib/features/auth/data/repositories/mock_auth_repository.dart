@@ -5,14 +5,14 @@ import '../../../../core/config/dependency_injection.dart';
 class MockAuthRepository implements IAuthRepository {
   bool _isLoggedIn = false;
   String _mockRole = 'CUSTOMER';
+  User? _currentUser;
 
   @override
   Stream<AuthState> get authStateChanges => const Stream.empty(); // Simple mock
 
   @override
   Future<User?> getCurrentUser() async {
-    // Return a dummy user if needed, but for our mock flow, we just return null
-    return null; 
+    return _isLoggedIn ? _currentUser : null;
   }
 
   @override
@@ -31,8 +31,24 @@ class MockAuthRepository implements IAuthRepository {
     await Future.delayed(const Duration(milliseconds: 500));
     if (otp == '123456') {
       _isLoggedIn = true;
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      final userId = (cleanPhone == '9876543210')
+          ? 'mock_customer_01'
+          : (cleanPhone == '9823145890')
+              ? 'mock_customer_02'
+              : 'mock_cust_$cleanPhone';
+
+      _currentUser = User.fromJson(<String, dynamic>{
+        'id': userId,
+        'phone': phone,
+        'aud': 'authenticated',
+        'app_metadata': <String, dynamic>{},
+        'user_metadata': <String, dynamic>{},
+        'created_at': DateTime.now().toIso8601String(),
+      });
+
       try {
-        await DI.notificationService.registerDeviceToken(userId: 'mock_user_123');
+        await DI.notificationService.registerDeviceToken(userId: userId);
       } catch (_) {}
       return true;
     }
@@ -55,6 +71,7 @@ class MockAuthRepository implements IAuthRepository {
   @override
   Future<void> logout() async {
     _isLoggedIn = false;
+    _currentUser = null;
     try {
       await DI.notificationService.deactivateCurrentToken();
     } catch (_) {}

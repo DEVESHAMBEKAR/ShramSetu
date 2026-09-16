@@ -31,30 +31,63 @@ class SupabaseUserRepository implements IUserRepository {
     required String phone,
     String? fullName,
   }) async {
-    // On upsert, if name is not provided we use phone last-4 as placeholder.
-    // This placeholder is later replaced during onboarding.
-    await _client.from('users').upsert({
-      'id': userId,
-      'role': role,
-      'phone': phone,
-      'full_name': fullName ?? 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}',
-      'updated_at': DateTime.now().toIso8601String(),
-    });
-
-    // If role is WORKER, ensure a worker profile row exists.
-    if (role == 'WORKER') {
-      final workerExists = await _client
-          .from('workers')
-          .select('id')
+    try {
+      // Check if user record already exists
+      final existing = await _client
+          .from('users')
+          .select('id, full_name, role')
           .eq('id', userId)
           .maybeSingle();
 
-      if (workerExists == null) {
-        await _client.from('workers').insert({
+      if (existing != null) {
+        final existingName = existing['full_name'] as String?;
+        final updates = <String, dynamic>{
+          'phone': phone,
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+
+        // Only update full_name if explicitly provided, or if previously missing/empty
+        if (fullName != null && fullName.isNotEmpty) {
+          updates['full_name'] = fullName;
+        } else if (existingName == null || existingName.isEmpty) {
+          updates['full_name'] = 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}';
+        }
+
+        await _client.from('users').update(updates).eq('id', userId);
+      } else {
+        await _client.from('users').insert({
           'id': userId,
-          'worker_status': 'PENDING_VERIFICATION',
+          'role': role,
+          'phone': phone,
+          'full_name': fullName ?? 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}',
+          'created_at': DateTime.now().toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
         });
       }
+
+      // If role is WORKER, ensure a worker profile row exists.
+      if (role == 'WORKER') {
+        final workerExists = await _client
+            .from('workers')
+            .select('id')
+            .eq('id', userId)
+            .maybeSingle();
+
+        if (workerExists == null) {
+          await _client.from('workers').insert({
+            'id': userId,
+            'worker_status': 'PENDING_VERIFICATION',
+          });
+        }
+      }
+    } catch (_) {
+      // Fallback: standard upsert if individual query fails
+      await _client.from('users').upsert({
+        'id': userId,
+        'role': role,
+        'phone': phone,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
     }
   }
 
@@ -71,6 +104,28 @@ class SupabaseUserRepository implements IUserRepository {
 
       if (userRow == null) return null;
 
+      final defaultAddr = await getDefaultAddress(userId);
+
+      return CustomerProfile.fromMap(userRow, defaultAddress: defaultAddr);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  @override
+  Future<CustomerProfile?> getCustomerProfileByPhone(String phone) async {
+    try {
+      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+      // Check phone in multiple formats (+91, plain 10-digit)
+      final userRow = await _client
+          .from('users')
+          .select('id, full_name, phone, avatar_url')
+          .or('phone.eq.$phone,phone.eq.+91$cleanPhone,phone.eq.$cleanPhone')
+          .maybeSingle();
+
+      if (userRow == null) return null;
+
+      final userId = userRow['id'] as String;
       final defaultAddr = await getDefaultAddress(userId);
 
       return CustomerProfile.fromMap(userRow, defaultAddress: defaultAddr);

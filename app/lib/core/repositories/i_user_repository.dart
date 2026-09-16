@@ -18,6 +18,9 @@ abstract class IUserRepository {
   /// Load the customer's full profile (including their default address if any).
   Future<CustomerProfile?> getCustomerProfile(String userId);
 
+  /// Load the customer's full profile by phone number (useful during login lookup).
+  Future<CustomerProfile?> getCustomerProfileByPhone(String phone);
+
   /// Update mutable profile fields (full_name, avatar_url only).
   /// Role is never exposed here — prevents privilege escalation.
   Future<void> updateCustomerProfile({
