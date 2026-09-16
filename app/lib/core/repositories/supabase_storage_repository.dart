@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'i_storage_repository.dart';
 
@@ -20,24 +20,24 @@ class SupabaseStorageRepository implements IStorageRepository {
   Future<String> uploadFile({
     required StorageBucket bucket,
     required String path,
-    required File file,
+    required Uint8List fileBytes,
+    String? mimeType,
   }) async {
     final bucketName = _getBucketName(bucket);
-    
-    // Upload the file
-    final extension = file.path.split('.').last;
-    final finalPath = '$path.\$extension';
-    
-    await _client.storage.from(bucketName).upload(
-      finalPath,
-      file,
-      fileOptions: const FileOptions(upsert: true),
+
+    await _client.storage.from(bucketName).uploadBinary(
+      path,
+      fileBytes,
+      fileOptions: FileOptions(
+        upsert: true,
+        contentType: mimeType,
+      ),
     );
 
     if (bucket == StorageBucket.profileImages) {
-      return _client.storage.from(bucketName).getPublicUrl(finalPath);
+      return _client.storage.from(bucketName).getPublicUrl(path);
     } else {
-      return finalPath; // Return the path for private buckets to generate signed URLs later
+      return path; // Return path for private buckets to generate signed URLs later
     }
   }
 

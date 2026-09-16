@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
@@ -37,7 +36,7 @@ class _CustomerProfileOnboardingScreenState
   bool _isDetectingLocation = false;
 
   // State
-  File? _selectedImage;
+  Uint8List? _selectedImageBytes;
   bool _isSaving = false;
   String? _errorMessage;
 
@@ -63,7 +62,8 @@ class _CustomerProfileOnboardingScreenState
         maxHeight: 800,
       );
       if (picked != null && mounted) {
-        setState(() => _selectedImage = File(picked.path));
+        final bytes = await picked.readAsBytes();
+        setState(() => _selectedImageBytes = bytes);
       }
     } catch (_) {
       // Image pick is optional — silently ignore errors
@@ -197,12 +197,13 @@ class _CustomerProfileOnboardingScreenState
     String? avatarUrl;
 
     // Step 1 (optional): Upload profile image if selected
-    if (_selectedImage != null) {
+    if (_selectedImageBytes != null) {
       try {
         avatarUrl = await DI.storageRepo.uploadFile(
           bucket: StorageBucket.profileImages,
           path: '$userId/avatar.jpg',
-          file: _selectedImage!,
+          fileBytes: _selectedImageBytes!,
+          mimeType: 'image/jpeg',
         );
       } catch (_) {
         // Image upload is optional — proceed without it
@@ -601,14 +602,14 @@ class _CustomerProfileOnboardingScreenState
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: AppColors.primaryContainer,
-                image: _selectedImage != null
+                image: _selectedImageBytes != null
                     ? DecorationImage(
-                        image: FileImage(_selectedImage!),
+                        image: MemoryImage(_selectedImageBytes!),
                         fit: BoxFit.cover,
                       )
                     : null,
               ),
-              child: _selectedImage == null
+              child: _selectedImageBytes == null
                   ? const Icon(Icons.person,
                       size: 48, color: AppColors.onPrimaryContainer)
                   : null,

@@ -1,4 +1,6 @@
 import 'package:app/core/config/dependency_injection.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
@@ -7,7 +9,6 @@ import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
 import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../../shared/widgets/map_location_picker_screen.dart';
 import 'worker_kyc_screen.dart';
@@ -30,20 +31,29 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
 
   
   Future<void> _pickAndUploadImage(WorkerProfile worker) async {
+    if (kIsWeb) {
+      // On web, image_picker returns no path — use bytes directly
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile photo upload is available on the mobile app.')),
+      );
+      return;
+    }
+
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 800, maxHeight: 800);
     
     if (pickedFile != null) {
       try {
-        final File file = File(pickedFile.path);
-        // Path in storage bucket: {worker_id}/avatar.ext
-        final storagePath = '${worker.id}/avatar';
+        final Uint8List fileBytes = await pickedFile.readAsBytes();
+        // Path in storage bucket: {worker_id}/avatar.jpg
+        final storagePath = '${worker.id}/avatar.jpg';
         
-        // Use StorageRepo to upload
+        // Use StorageRepo to upload bytes (web-compatible)
         final publicUrl = await DI.storageRepo.uploadFile(
           bucket: StorageBucket.profileImages,
           path: storagePath,
-          file: file,
+          fileBytes: fileBytes,
+          mimeType: 'image/jpeg',
         );
         
         // Update database with new URL

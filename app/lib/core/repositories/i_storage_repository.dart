@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 enum StorageBucket {
   profileImages,
@@ -6,11 +6,13 @@ enum StorageBucket {
 }
 
 abstract class IStorageRepository {
-  /// Uploads a file to a specific bucket and path, returns the public/signed URL or path
+  /// Uploads file bytes to a specific bucket and path, returns the public/signed URL or path.
+  /// Works on both mobile (dart:io) and web (dart:html) since we pass raw bytes.
   Future<String> uploadFile({
     required StorageBucket bucket,
     required String path,
-    required File file,
+    required Uint8List fileBytes,
+    String? mimeType,
   });
 
   /// Deletes a file from storage
