@@ -21,9 +21,12 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.32.0'
           channel: 'stable'
           cache: true
+
+      - name: Prepare environment file
+        working-directory: app
+        run: cp .env.example .env
 
       - name: Install Flutter dependencies
         working-directory: app
@@ -35,7 +38,7 @@ jobs:
           flutter build web \
             --release \
             --base-href /ShramSetu/ \
-            --web-renderer canvaskit
+            --no-wasm-dry-run
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
