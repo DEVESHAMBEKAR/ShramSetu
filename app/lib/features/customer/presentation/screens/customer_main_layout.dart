@@ -132,6 +132,20 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    final isWide = MediaQuery.of(context).size.width >= 800;
+
+    if (isWide) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: Row(
+          children: [
+            _buildDesktopSidebar(),
+            Expanded(child: _screens[_currentIndex]),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
@@ -153,6 +167,103 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDesktopSidebar() {
+    return Container(
+      width: 260,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(right: BorderSide(color: AppColors.outlineVariant, width: 1)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryContainer,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.handyman, color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ShramSetu',
+                        style: AppTypography.titleMd.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        'Service Marketplace',
+                        style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: 16),
+          _buildDesktopNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
+          _buildDesktopNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'),
+          _buildDesktopNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'My Bookings'),
+          _buildDesktopNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile & Settings'),
+          const Spacer(),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.outlineVariant),
+                ),
+                onPressed: () async {
+                  await DI.authRepo.logout();
+                  if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
+                },
+                icon: const Icon(Icons.logout, size: 18),
+                label: const Text('Sign Out'),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopNavItem(int index, IconData iconOutlined, IconData iconFilled, String label) {
+    final isSelected = _currentIndex == index;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        tileColor: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+        leading: Icon(
+          isSelected ? iconFilled : iconOutlined,
+          color: isSelected ? AppColors.primary : AppColors.outline,
+        ),
+        title: Text(
+          label,
+          style: AppTypography.labelLg.copyWith(
+            color: isSelected ? AppColors.primary : AppColors.outline,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          ),
+        ),
+        onTap: () => setState(() => _currentIndex = index),
       ),
     );
   }

@@ -1,6 +1,8 @@
 import 'i_review_repository.dart';
 import '../models/review_models.dart';
 import '../config/dependency_injection.dart';
+import '../services/shared_booking_store.dart';
+import '../../features/customer/data/repositories/mock_customer_repository.dart';
 
 /// In-memory mock review repository for testing and offline development
 class MockReviewRepository implements IReviewRepository {
@@ -22,13 +24,23 @@ class MockReviewRepository implements IReviewRepository {
     }
 
     final existing = _reviewsByBooking[bookingId];
+    String workerId = existing?.workerId ?? 'mock-worker-id';
+    try {
+      final booking = DI.customerRepo is MockCustomerRepository 
+          ? SharedBookingStore.instance.getBookingDetails(bookingId) 
+          : null;
+      if (booking != null && booking['worker_id'] != null) {
+        workerId = booking['worker_id'] as String;
+      }
+    } catch (_) {}
+
     final review = ReviewModel(
       id: existing?.id ?? 'rev_mock_${DateTime.now().millisecondsSinceEpoch}',
       bookingId: bookingId,
       customerId: existing?.customerId ?? 'mock-customer-id',
       customerName: existing?.customerName ?? 'Priya D.',
       customerAvatarUrl: existing?.customerAvatarUrl,
-      workerId: existing?.workerId ?? 'mock-worker-id',
+      workerId: workerId,
       rating: rating,
       comment: comment?.trim(),
       createdAt: existing?.createdAt ?? DateTime.now(),

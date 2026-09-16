@@ -18,7 +18,7 @@ class SupabaseNotificationRepository implements INotificationRepository {
       final res = await _supabase.rpc('register_device_token', params: {
         'p_fcm_token': token,
         'p_platform': platform,
-        ?'p_device_id': deviceId,
+        if (deviceId != null) 'p_device_id': deviceId,
       });
 
       if (res is Map && res['success'] == true) {

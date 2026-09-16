@@ -17,7 +17,14 @@ class MockAuthRepository implements IAuthRepository {
 
   @override
   Future<String?> getUserRole() async {
-    return _isLoggedIn ? _mockRole : null;
+    if (!_isLoggedIn) return null;
+    if (_currentUser != null) {
+      try {
+        final role = await DI.userRepo.getUserRole(_currentUser!.id);
+        if (role != null) return role;
+      } catch (_) {}
+    }
+    return _mockRole;
   }
 
   @override

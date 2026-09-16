@@ -13,6 +13,8 @@ import 'features/admin/presentation/screens/admin_login_screen.dart';
 import 'features/admin/presentation/screens/admin_main_layout.dart';
 import 'features/auth/presentation/screens/worker_login_screen.dart';
 
+import 'core/widgets/role_guard.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AppConfig.initialize();
@@ -37,11 +39,27 @@ class ShramSetuApp extends StatelessWidget {
         '/onboarding': (context) => const OnboardingScreen(),
         '/login/customer': (context) => const CustomerLoginScreen(),
         '/login/worker': (context) => const WorkerLoginScreen(),
-        '/customer/onboarding': (context) => const CustomerProfileOnboardingScreen(),
-        '/customer/home': (context) => const CustomerMainLayout(),
-        '/worker/dashboard': (context) => const WorkerMainLayout(),
+        '/customer/onboarding': (context) => const RoleGuard(
+              requiredRole: 'CUSTOMER',
+              fallbackRoute: '/login/customer',
+              child: CustomerProfileOnboardingScreen(),
+            ),
+        '/customer/home': (context) => const RoleGuard(
+              requiredRole: 'CUSTOMER',
+              fallbackRoute: '/login/customer',
+              child: CustomerMainLayout(),
+            ),
+        '/worker/dashboard': (context) => const RoleGuard(
+              requiredRole: 'WORKER',
+              fallbackRoute: '/login/worker',
+              child: WorkerMainLayout(),
+            ),
         '/login/admin': (context) => const AdminLoginScreen(),
-        '/admin/home': (context) => const AdminMainLayout(),
+        '/admin/home': (context) => const RoleGuard(
+              requiredRole: 'ADMIN',
+              fallbackRoute: '/login/admin',
+              child: AdminMainLayout(),
+            ),
       },
     );
   }

@@ -1,5 +1,5 @@
 import '../../../../core/repositories/i_worker_repository.dart';
-import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/services/shared_booking_store.dart';
 import '../models/worker_models.dart';
 
 class MockWorkerRepository implements IWorkerRepository {
@@ -11,7 +11,6 @@ class MockWorkerRepository implements IWorkerRepository {
   }
 
   late WorkerProfile currentWorker;
-  List<JobRequest> _jobRequests = [];
 
   void _initDemoData() {
     currentWorker = WorkerProfile(
@@ -32,24 +31,6 @@ class MockWorkerRepository implements IWorkerRepository {
       guildName: 'Pune Plumbers Guild',
       guildId: '#128',
     );
-
-    _jobRequests = [
-      JobRequest(
-        id: 'j1',
-        customerId: 'c1',
-        customerName: 'Ananya Sharma',
-        customerLocation: 'Flat 402, Sai Shraddha Apts',
-        customerPhone: '+91 91234 56789',
-        serviceName: 'Plumbing Inspection',
-        date: 'Today',
-        time: '11:00 AM',
-        baseAmount: 399.0,
-        laborAllowance: 86.0,
-        status: BookingStatus.pending,
-        distanceKm: '1.8 km',
-        createdAt: '4m ago',
-      ),
-    ];
   }
 
   @override
@@ -84,35 +65,22 @@ class MockWorkerRepository implements IWorkerRepository {
 
   @override
   Future<List<JobRequest>> getWorkerBookings() async {
-    return _jobRequests;
+    return SharedBookingStore.instance.getWorkerBookings();
   }
 
   @override
   Stream<List<JobRequest>> watchWorkerBookings() {
-    return Stream.value(List<JobRequest>.from(_jobRequests));
+    return SharedBookingStore.instance.watchWorkerBookings();
   }
 
   @override
   Future<List<JobRequest>> getJobRequests(String workerId) async {
-    return _jobRequests;
+    return SharedBookingStore.instance.getWorkerBookings(workerId: workerId);
   }
 
   @override
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
-    final index = _jobRequests.indexWhere((j) => j.id == bookingId);
-    if (index != -1) {
-      final job = _jobRequests[index];
-      _jobRequests[index] = job.copyWith(status: newStatus);
-      try {
-        await DI.notificationRepo.sendPushNotification(
-          recipientUserId: job.customerId,
-          type: 'booking_status',
-          title: 'Booking Update',
-          body: 'Booking status updated to ${newStatus.label}',
-          data: {'bookingId': bookingId, 'status': newStatus.toDbString()},
-        );
-      } catch (_) {}
-    }
+    await SharedBookingStore.instance.updateBookingStatus(bookingId, newStatus);
   }
 
   @override

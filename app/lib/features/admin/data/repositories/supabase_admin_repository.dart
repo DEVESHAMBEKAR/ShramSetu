@@ -20,10 +20,10 @@ class SupabaseAdminRepository implements IAdminRepository {
     final activeBookingsRes = await _client.from('bookings').select('id').inFilter('status', ['pending', 'accepted', 'inProgress']).count(CountOption.exact);
 
     return AdminDashboardStats(
-      totalWorkers: totalWorkersRes.count ?? 0,
-      verifiedWorkers: verifiedWorkersRes.count ?? 0,
-      pendingVerifications: pendingRes.count ?? 0,
-      activeBookings: activeBookingsRes.count ?? 0,
+      totalWorkers: totalWorkersRes.count,
+      verifiedWorkers: verifiedWorkersRes.count,
+      pendingVerifications: pendingRes.count,
+      activeBookings: activeBookingsRes.count,
       escrowLocked: 0.0,
       welfarePool: 0.0,
       fairWorkIndex: 98.5,

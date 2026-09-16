@@ -1,4 +1,5 @@
 import '../../../../core/repositories/i_admin_repository.dart';
+import '../../../../core/services/shared_booking_store.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
@@ -13,7 +14,6 @@ class MockAdminRepository implements IAdminRepository {
 
   late AdminDashboardStats _dashboardStats;
   List<WorkerProfile> _workers = [];
-  List<JobRequest> _bookings = [];
   List<PaymentRecord> _payments = [];
   List<Complaint> _complaints = [];
   List<WelfareRecord> _welfareRecords = [];
@@ -21,13 +21,16 @@ class MockAdminRepository implements IAdminRepository {
   List<AdminService> _services = [];
 
   @override
-  Future<AdminDashboardStats> getDashboardStats() async => _dashboardStats;
+  Future<AdminDashboardStats> getDashboardStats() async {
+    _recalculateStats();
+    return _dashboardStats;
+  }
   @override
   Future<List<WorkerProfile>> getWorkers() async => _workers;
   @override
-  Future<List<JobRequest>> getBookings() async => _bookings;
+  Future<List<JobRequest>> getBookings() async => SharedBookingStore.instance.getAllBookings();
   @override
-  Stream<List<JobRequest>> watchBookings() => Stream.value(List<JobRequest>.from(_bookings));
+  Stream<List<JobRequest>> watchBookings() => SharedBookingStore.instance.watchAllBookings();
   @override
   Future<List<PaymentRecord>> getPayments() async => _payments;
   @override
@@ -107,19 +110,17 @@ class MockAdminRepository implements IAdminRepository {
 
   @override
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
-    final index = _bookings.indexWhere((b) => b.id == bookingId);
-    if (index != -1) {
-      _bookings[index] = _bookings[index].copyWith(status: newStatus);
-      
-    }
+    await SharedBookingStore.instance.updateBookingStatus(bookingId, newStatus);
+    _recalculateStats();
   }
 
   void _recalculateStats() {
+    final bookings = SharedBookingStore.instance.getAllBookings();
     _dashboardStats = AdminDashboardStats(
       totalWorkers: _workers.length,
       verifiedWorkers: _workers.where((w) => w.verificationStatus == VerificationStatus.approved).length,
       pendingVerifications: _workers.where((w) => w.verificationStatus == VerificationStatus.pending).length,
-      activeBookings: _bookings.where((b) => b.status != BookingStatus.completed && b.status != BookingStatus.rejected).length,
+      activeBookings: bookings.where((b) => b.status != BookingStatus.completed && b.status != BookingStatus.rejected && b.status != BookingStatus.cancelled).length,
       escrowLocked: 148200.0,
       welfarePool: 482000.0,
       fairWorkIndex: 88.0,
@@ -186,36 +187,7 @@ class MockAdminRepository implements IAdminRepository {
       AdminCustomerProfile(id: 'C2', name: 'Neha Sharma', phone: '+91 9988776656', totalBookings: 12, lastBooking: DateTime.now().subtract(const Duration(days: 10)), status: 'Active'),
     ];
 
-    _bookings = [
-      JobRequest(
-        id: 'SS-8941',
-        customerId: 'C1',
-        customerName: 'Amit Patil',
-        customerLocation: 'Kothrud, Pune',
-        customerPhone: '+91 9988776655',
-        serviceName: 'Plumbing Repair',
-        date: 'Today',
-        time: '10:00 AM',
-        baseAmount: 100,
-        laborAllowance: 20,
-        status: BookingStatus.inProgress,
-        createdAt: DateTime.now().toString(),
-      ),
-      JobRequest(
-        id: 'SS-8942',
-        customerId: 'C2',
-        customerName: 'Neha Sharma',
-        customerLocation: 'Baner, Pune',
-        customerPhone: '+91 9988776656',
-        serviceName: 'AC Servicing',
-        date: 'Yesterday',
-        time: '04:00 PM',
-        baseAmount: 600,
-        laborAllowance: 200,
-        status: BookingStatus.completed,
-        createdAt: DateTime.now().subtract(const Duration(days: 1)).toString(),
-      ),
-    ];
+
 
     _payments = [
       PaymentRecord(id: 'P1', bookingId: 'SS-8942', customerName: 'Neha Sharma', workerName: 'Ganesh Shinde', amount: 800, status: PaymentStatus.paid, date: DateTime.now().subtract(const Duration(days: 1)), method: 'UPI'),
