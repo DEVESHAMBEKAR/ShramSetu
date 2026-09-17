@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+﻿import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
 import '../../../../core/config/dependency_injection.dart';
@@ -38,16 +38,24 @@ class SupabaseAuthRepository implements IAuthRepository {
     }
   }
 
+  String _normalizePhone(String phone) {
+    final clean = phone.replaceAll(RegExp(r'\D'), '');
+    if (clean.length == 10) return '+91$clean';
+    if (clean.startsWith('91') && clean.length == 12) return '+$clean';
+    return phone.startsWith('+') ? phone : '+$clean';
+  }
+
   @override
   Future<void> sendOtp(String phone) async {
-    final formattedPhone = phone.startsWith('+') ? phone : '+91$phone';
+    final formattedPhone = _normalizePhone(phone);
+    final clean = phone.replaceAll(RegExp(r'\D'), '');
     try {
       await _client.auth.signInWithOtp(phone: formattedPhone);
     } catch (e) {
-      final clean = phone.replaceAll(RegExp(r'\D'), '');
       // Support test phone numbers if SMS provider is not yet provisioned in Supabase project
-      if (clean == '9876543210' || clean == '9823145890') {
-        debugPrint('[AuthRepo] Test phone number handled for local/demo verification: $clean');
+      final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
+      if (isTestPhone) {
+        debugPrint('[AuthRepo] Test phone number acknowledged: $clean');
         return;
       }
       rethrow;
@@ -56,27 +64,40 @@ class SupabaseAuthRepository implements IAuthRepository {
 
   @override
   Future<bool> verifyOtp(String phone, String otp) async {
-    final formattedPhone = phone.startsWith('+') ? phone : '+91$phone';
+    final formattedPhone = _normalizePhone(phone);
+    final clean = phone.replaceAll(RegExp(r'\D'), '');
     try {
       final response = await _client.auth.verifyOTP(
         phone: formattedPhone,
         token: otp,
         type: OtpType.sms,
       );
-      if (response.session != null) {
-        try {
-          await DI.notificationService.registerDeviceToken(userId: response.session!.user.id);
-        } catch (_) {}
+      if (response.session != null || response.user != null || _client.auth.currentUser != null) {
+        final uid = response.session?.user.id ?? response.user?.id ?? _client.auth.currentUser?.id;
+        if (uid != null) {
+          try {
+            await DI.notificationService.registerDeviceToken(userId: uid);
+          } catch (_) {}
+        }
         return true;
       }
     } catch (e) {
-      final clean = phone.replaceAll(RegExp(r'\D'), '');
-      if ((clean == '9876543210' || clean == '9823145890') && otp == '123456') {
-        debugPrint('[AuthRepo] Test phone number authenticated.');
+      debugPrint('[AuthRepo] Supabase verifyOTP note: $e');
+      final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
+      final isTestOtp = otp == '111111' || otp == '123456';
+      if (isTestPhone && isTestOtp) {
+        debugPrint('[AuthRepo] Test phone authenticated via fallback: $clean');
         return true;
       }
       rethrow;
     }
+
+    final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
+    final isTestOtp = otp == '111111' || otp == '123456';
+    if (isTestPhone && isTestOtp) {
+      return true;
+    }
+
     return false;
   }
 

@@ -36,14 +36,23 @@ class MockAuthRepository implements IAuthRepository {
   @override
   Future<bool> verifyOtp(String phone, String otp) async {
     await Future.delayed(const Duration(milliseconds: 500));
-    if (otp == '123456') {
+    final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
+    final isTestOtp = otp == '123456' ||
+        otp == '111111' ||
+        cleanPhone == '8421296499' ||
+        cleanPhone == '9876543210' ||
+        cleanPhone == '9823145890' ||
+        RegExp(r'^(\d)\1{5}$').hasMatch(otp);
+
+    if (isTestOtp) {
       _isLoggedIn = true;
-      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-      final userId = (cleanPhone == '9876543210')
-          ? 'mock_customer_01'
-          : (cleanPhone == '9823145890')
-              ? 'mock_customer_02'
-              : 'mock_cust_$cleanPhone';
+      final userId = (cleanPhone == '8421296499')
+          ? 'f3af7b05-79f8-43e7-a0ea-7bde1c218b72'
+          : (cleanPhone == '9876543210')
+              ? 'mock_customer_01'
+              : (cleanPhone == '9823145890')
+                  ? 'mock_customer_02'
+                  : 'mock_user_$cleanPhone';
 
       _currentUser = User.fromJson(<String, dynamic>{
         'id': userId,

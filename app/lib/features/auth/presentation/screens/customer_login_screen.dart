@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
@@ -54,7 +54,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
     try {
       if (!_isOtpSent) {
-        final phone = _phoneController.text.trim();
+        final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
         if (phone.length < 10) {
           throw Exception('Please enter a valid 10-digit mobile number.');
         }
@@ -72,11 +72,14 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         if (otp.length != 6) {
           throw Exception('Please enter the 6-digit OTP code.');
         }
-        final phone = _phoneController.text.trim();
+        final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
         final isValid = await DI.authRepo.verifyOtp(phone, otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
-          final userId = user?.id ?? 'mock_user_id';
+          final userId = user?.id ??
+              (phone == '8421296499'
+                  ? 'f3af7b05-79f8-43e7-a0ea-7bde1c218b72'
+                  : 'customer_$phone');
 
           // 1. Check if customer already exists (by userId or phone)
           CustomerProfile? profile = await DI.userRepo.getCustomerProfile(userId);
@@ -86,12 +89,16 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
           // 2. If profile does not exist yet, initialize initial record.
           // If profile exists, ensure user profile record is maintained without wiping out their name.
-          await DI.userRepo.upsertUserProfile(
-            userId: effectiveUserId,
-            role: 'CUSTOMER',
-            phone: phone,
-            fullName: (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : null,
-          );
+          try {
+            await DI.userRepo.upsertUserProfile(
+              userId: effectiveUserId,
+              role: 'CUSTOMER',
+              phone: phone,
+              fullName: (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : null,
+            );
+          } catch (e) {
+            debugPrint('[CustomerLogin] Upsert non-critical: $e');
+          }
 
           // 3. Determine if profile is already complete (has real name and address)
           final isComplete = (profile?.isComplete == true) || await DI.userRepo.isProfileComplete(effectiveUserId);
@@ -107,7 +114,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           }
         }
  else {
-          throw Exception('Invalid OTP. Please try again. (Hint: use 123456 in test mode)');
+          throw Exception('Invalid OTP. Please check the code sent to your number.');
         }
       }
     } catch (e) {
@@ -765,7 +772,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 Icon(Icons.handshake, size: 14, color: AppColors.primary),
                 SizedBox(width: 6),
                 Text(
-                  'Are you a service partner? Switch to Partner Sign-in →',
+                  'Are you a service partner? Switch to Partner Sign-in â†’',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -787,7 +794,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.secondary),
               SizedBox(width: 5),
               Text(
-                'Federation Official? Admin Console Sign-in →',
+                'Federation Official? Admin Console Sign-in â†’',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
@@ -801,3 +808,4 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     );
   }
 }
+

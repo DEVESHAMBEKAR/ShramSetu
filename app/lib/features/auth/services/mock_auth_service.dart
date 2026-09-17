@@ -1,4 +1,4 @@
-class MockAuthService {
+﻿class MockAuthService {
   /// Simulates sending an OTP to the given phone number.
   Future<void> sendOtp(String phoneNumber) async {
     // Simulate network delay
@@ -15,9 +15,8 @@ class MockAuthService {
     // Simulate network delay
     await Future.delayed(const Duration(seconds: 1));
     
-    // In a real app, this would call Supabase auth.verifyOTP.
-    // For mock purposes, '123456' is the valid mock OTP.
-    if (otp == '123456') {
+    // For mock/test purposes, '123456', '111111', or any repeated-digit OTP is valid.
+    if (otp == '123456' || otp == '111111' || RegExp(r'^(\d)\1{5}$').hasMatch(otp)) {
       return true;
     }
     return false;
