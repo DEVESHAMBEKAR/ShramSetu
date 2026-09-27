@@ -36,6 +36,22 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
+    if (email.isEmpty || !RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email)) {
+      setState(() {
+        _isLoading = false;
+        _errorMsg = 'Please enter a valid admin email address.';
+      });
+      return;
+    }
+
+    if (password.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _errorMsg = 'Please enter your password.';
+      });
+      return;
+    }
+
     try {
       final success = await DI.authRepo.login(email, password);
 

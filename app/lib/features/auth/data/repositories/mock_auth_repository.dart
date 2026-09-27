@@ -67,10 +67,12 @@ class MockAuthRepository implements IAuthRepository {
   @override
   Future<bool> login(String email, String password) async {
     final cleanEmail = email.trim().toLowerCase();
-    // Allow standard admin demo, developer/admin email (ambekardevesh2@gmail.com), or any valid non-empty email
-    final isAllowed = cleanEmail.isNotEmpty && password.isNotEmpty;
+    final isValidEmail = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(cleanEmail);
+    if (!isValidEmail || password.length < 6) {
+      return false;
+    }
 
-    if (isAllowed) {
+    if (true) {
       _isLoggedIn = true;
       _mockRole = 'ADMIN';
       final adminId = 'admin_${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';

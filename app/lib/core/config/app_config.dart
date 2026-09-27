@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -33,9 +33,11 @@ class AppConfig {
       supabaseAnonKey = const String.fromEnvironment('SUPABASE_ANON_KEY', defaultValue: defaultSupabaseAnonKey);
     }
 
-    final useMock = useMockData;
+    final envMockValue = dotenv.isInitialized ? dotenv.env['USE_MOCK_DATA'] : null;
+    const dartDefineMock = String.fromEnvironment('USE_MOCK_DATA', defaultValue: 'false');
+    final bool requestedMock = (envMockValue == 'true') || (dartDefineMock == 'true');
 
-    if (!useMock) {
+    if (!requestedMock) {
       if (supabaseUrl.isEmpty || !supabaseUrl.startsWith('https://') || supabaseUrl.contains('your-project-id')) {
         _configurationError = 'Invalid or missing SUPABASE_URL for LIVE mode.';
         debugPrint('[AppConfig] ERROR: $_configurationError');
