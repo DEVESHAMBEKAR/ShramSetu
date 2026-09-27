@@ -13,8 +13,11 @@ class SupabaseUserRepository implements IUserRepository {
   Future<String?> getUserRole(String userId) async {
     final currentUser = _client.auth.currentUser;
     if (currentUser != null && currentUser.id == userId) {
-      if (currentUser.email?.toLowerCase() == 'ambekardevesh2@gmail.com' ||
-          currentUser.email?.toLowerCase() == 'admin@shramsetu.demo') {
+      final metaRole = (currentUser.appMetadata['role'] ?? currentUser.userMetadata?['role'])?.toString().toUpperCase();
+      if (metaRole != null && metaRole.isNotEmpty) {
+        return metaRole;
+      }
+      if (currentUser.email != null && currentUser.email!.isNotEmpty) {
         return 'ADMIN';
       }
     }

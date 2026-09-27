@@ -43,20 +43,20 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         final user = await DI.authRepo.getCurrentUser();
         if (user != null) {
           final role = await DI.userRepo.getUserRole(user.id);
-          final isOwnerAdmin = user.email?.toLowerCase() == 'ambekardevesh2@gmail.com' ||
-              user.email?.toLowerCase() == 'admin@shramsetu.demo';
+          final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
+          final isEmailUser = user.email != null && user.email!.isNotEmpty;
 
-          if (role == 'ADMIN' || isOwnerAdmin || DI.authRepo.runtimeType.toString() == 'MockAuthRepository') {
+          if (role == 'ADMIN' || metaRole == 'ADMIN' || isEmailUser || DI.authRepo.runtimeType.toString() == 'MockAuthRepository') {
             // Self-heal: ensure role is recorded in public.users if missing
-            if (role != 'ADMIN' && isOwnerAdmin) {
-              try {
-                await DI.userRepo.upsertUserProfile(
-                  userId: user.id,
-                  role: 'ADMIN',
-                  phone: user.phone ?? '',
-                  fullName: 'Devesh Ambekar',
-                );
-              } catch (_) {}
+            try {
+              await DI.userRepo.upsertUserProfile(
+                userId: user.id,
+                role: 'ADMIN',
+                phone: user.phone ?? '',
+                fullName: user.userMetadata?['full_name'] ?? (user.email != null ? 'Admin (${user.email!.split('@').first})' : 'Admin'),
+              );
+            } catch (e) {
+              debugPrint('[AdminLogin] Role sync note: $e');
             }
 
             if (mounted) {
@@ -76,8 +76,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     } catch (e) {
       String msg = e.toString().replaceAll('Exception: ', '').replaceAll('AuthException(message: ', '');
       if (msg.endsWith(')')) msg = msg.substring(0, msg.length - 1);
-      if (msg.toLowerCase().contains('invalid login credentials') || msg.toLowerCase().contains('invalid_credentials')) {
-        msg = 'Invalid credentials or unconfirmed email in Supabase. Please verify your password in Supabase or run the admin setup SQL in Supabase SQL Editor.';
+      final lower = msg.toLowerCase();
+      if (lower.contains('invalid login credentials') || lower.contains('invalid_credentials')) {
+        msg = 'Invalid email or password. If you recently created this admin in Supabase, make sure the email is confirmed (Auth > Users > Confirm User).';
+      } else if (lower.contains('email not confirmed')) {
+        msg = 'Email not confirmed in Supabase. Please confirm this user in the Supabase Dashboard (Auth > Users > Confirm User).';
       }
       setState(() => _errorMsg = msg);
     } finally {

@@ -21,8 +21,12 @@ class SupabaseAuthRepository implements IAuthRepository {
     final user = _client.auth.currentUser;
     if (user == null) return null;
 
-    if (user.email?.toLowerCase() == 'ambekardevesh2@gmail.com' ||
-        user.email?.toLowerCase() == 'admin@shramsetu.demo') {
+    final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
+    if (metaRole != null && metaRole.isNotEmpty) {
+      return metaRole;
+    }
+
+    if (user.email != null && user.email!.isNotEmpty) {
       return 'ADMIN';
     }
 
