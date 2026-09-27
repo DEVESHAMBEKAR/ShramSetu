@@ -107,20 +107,27 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
   }
 
   Widget _buildProgressStepper() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacingSm),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          _buildStep('Service', true),
-          _buildLine(true),
-          _buildStep('Worker', true),
-          _buildLine(true),
-          _buildStep('Time', true, current: true),
-          _buildLine(false),
-          _buildStep('Pay', false),
-        ],
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableForLines = constraints.maxWidth - 200;
+        final lineWidth = (availableForLines / 3).clamp(8.0, 30.0);
+
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: AppSpacing.spacingSm),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildStep('Service', true),
+              _buildLine(true, width: lineWidth),
+              _buildStep('Worker', true),
+              _buildLine(true, width: lineWidth),
+              _buildStep('Time', true, current: true),
+              _buildLine(false, width: lineWidth),
+              _buildStep('Pay', false),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -151,9 +158,9 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
     );
   }
 
-  Widget _buildLine(bool completed) {
+  Widget _buildLine(bool completed, {double width = 30.0}) {
     return Container(
-      width: 30,
+      width: width,
       height: 2,
       color: completed ? AppColors.tertiaryFixedDim : AppColors.outlineVariant,
       margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 12),

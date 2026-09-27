@@ -11,6 +11,22 @@ class SupabaseUserRepository implements IUserRepository {
 
   @override
   Future<String?> getUserRole(String userId) async {
+    // 1. Authoritative check in public.users table first
+    try {
+      final response = await _client
+          .from('users')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+      if (response != null && response['role'] != null) {
+        final dbRole = response['role'].toString().trim().toUpperCase();
+        if (dbRole.isNotEmpty) return dbRole;
+      }
+    } catch (_) {
+      // If database query fails, fallback to session metadata
+    }
+
+    // 2. Auth session metadata fallback
     final currentUser = _client.auth.currentUser;
     if (currentUser != null && currentUser.id == userId) {
       final metaRole = (currentUser.appMetadata['role'] ?? currentUser.userMetadata?['role'])?.toString().toUpperCase();
@@ -21,17 +37,7 @@ class SupabaseUserRepository implements IUserRepository {
         return 'ADMIN';
       }
     }
-    try {
-      final response = await _client
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .maybeSingle();
-      if (response != null) return response['role'] as String?;
-      return null;
-    } catch (e) {
-      return null;
-    }
+    return null;
   }
 
   @override

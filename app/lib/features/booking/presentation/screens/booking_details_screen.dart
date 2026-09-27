@@ -176,23 +176,29 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _buildStepItem('Service', isDone: true),
-          _buildStepDivider(isDone: true),
-          _buildStepItem('Worker', isDone: true),
-          _buildStepDivider(isDone: true),
-          _buildStepItem('Address', isDone: true),
-          _buildStepDivider(isDone: false),
-          _buildStepItem('Payment', isCurrent: true),
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 340;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _buildStepItem('Service', isDone: true, compact: isCompact),
+              _buildStepDivider(isDone: true),
+              _buildStepItem('Worker', isDone: true, compact: isCompact),
+              _buildStepDivider(isDone: true),
+              _buildStepItem('Address', isDone: true, compact: isCompact),
+              _buildStepDivider(isDone: false),
+              _buildStepItem('Payment', isCurrent: true, compact: isCompact),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildStepItem(String title, {bool isDone = false, bool isCurrent = false}) {
+  Widget _buildStepItem(String title, {bool isDone = false, bool isCurrent = false, bool compact = false}) {
     return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           width: 18,
@@ -216,15 +222,17 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   ),
                 ),
         ),
-        const SizedBox(width: 4),
-        Text(
-          title,
-          style: AppTypography.labelSm.copyWith(
-            color: isCurrent ? AppColors.primary : (isDone ? AppColors.onTertiaryContainer : AppColors.outline),
-            fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-            fontSize: 10,
+        if (!compact || isCurrent) ...[
+          const SizedBox(width: 4),
+          Text(
+            title,
+            style: AppTypography.labelSm.copyWith(
+              color: isCurrent ? AppColors.primary : (isDone ? AppColors.onTertiaryContainer : AppColors.outline),
+              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
+              fontSize: 10,
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

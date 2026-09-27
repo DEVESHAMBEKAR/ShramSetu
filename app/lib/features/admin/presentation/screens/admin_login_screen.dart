@@ -62,7 +62,8 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
           final isEmailUser = user.email != null && user.email!.isNotEmpty;
 
-          if (role == 'ADMIN' || metaRole == 'ADMIN' || isEmailUser || DI.authRepo.runtimeType.toString() == 'MockAuthRepository') {
+          final isExplicitNonAdmin = role != null && role.toUpperCase() != 'ADMIN';
+          if (!isExplicitNonAdmin && (role == 'ADMIN' || metaRole == 'ADMIN' || isEmailUser || DI.authRepo.runtimeType.toString() == 'MockAuthRepository')) {
             // Self-heal: ensure role is recorded in public.users if missing
             try {
               await DI.userRepo.upsertUserProfile(

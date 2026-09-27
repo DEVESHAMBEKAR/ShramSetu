@@ -41,6 +41,7 @@ class _RoleGuardState extends State<RoleGuard> {
       final role = await DI.authRepo.getUserRole() ?? await DI.userRepo.getUserRole(user.id);
       final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
       final isOwnerAdmin = widget.requiredRole == 'ADMIN' &&
+          (role == null || role.toUpperCase() == 'ADMIN') &&
           (user.email != null && user.email!.isNotEmpty);
 
       if ((role != null && role.toUpperCase() == widget.requiredRole.toUpperCase()) ||

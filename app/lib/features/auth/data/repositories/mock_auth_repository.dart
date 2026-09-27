@@ -72,35 +72,32 @@ class MockAuthRepository implements IAuthRepository {
       return false;
     }
 
-    if (true) {
-      _isLoggedIn = true;
-      _mockRole = 'ADMIN';
-      final adminId = 'admin_${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
+    _isLoggedIn = true;
+    _mockRole = 'ADMIN';
+    final adminId = 'admin_${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
 
-      _currentUser = User.fromJson(<String, dynamic>{
-        'id': adminId,
-        'email': cleanEmail,
-        'aud': 'authenticated',
-        'app_metadata': <String, dynamic>{},
-        'user_metadata': <String, dynamic>{'role': 'ADMIN'},
-        'created_at': DateTime.now().toIso8601String(),
-      });
+    _currentUser = User.fromJson(<String, dynamic>{
+      'id': adminId,
+      'email': cleanEmail,
+      'aud': 'authenticated',
+      'app_metadata': <String, dynamic>{},
+      'user_metadata': <String, dynamic>{'role': 'ADMIN'},
+      'created_at': DateTime.now().toIso8601String(),
+    });
 
-      try {
-        await DI.userRepo.upsertUserProfile(
-          userId: adminId,
-          role: 'ADMIN',
-          phone: '+91 98765 00000',
-          fullName: 'Admin (${cleanEmail.split('@').first})',
-        );
-      } catch (_) {}
+    try {
+      await DI.userRepo.upsertUserProfile(
+        userId: adminId,
+        role: 'ADMIN',
+        phone: '+91 98765 00000',
+        fullName: 'Admin (${cleanEmail.split('@').first})',
+      );
+    } catch (_) {}
 
-      try {
-        await DI.notificationService.registerDeviceToken(userId: adminId);
-      } catch (_) {}
-      return true;
-    }
-    return false;
+    try {
+      await DI.notificationService.registerDeviceToken(userId: adminId);
+    } catch (_) {}
+    return true;
   }
 
   @override

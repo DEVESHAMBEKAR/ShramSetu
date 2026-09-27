@@ -78,6 +78,15 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           final user = await DI.authRepo.getCurrentUser();
           final userId = user?.id ?? 'customer_$phone';
 
+          // Authoritative cross-role protection:
+          // Check if this account is already registered with a different role (WORKER or ADMIN).
+          final existingRole = await DI.userRepo.getUserRole(userId);
+          if (existingRole != null && existingRole.toUpperCase() != 'CUSTOMER') {
+            await DI.authRepo.logout();
+            final roleName = existingRole.toUpperCase() == 'WORKER' ? 'Worker Partner' : 'Cooperative Administrator';
+            throw Exception('Access denied: This phone number is registered as a $roleName. Please use the corresponding portal to sign in.');
+          }
+
           // 1. Check if customer already exists (by userId or phone)
           CustomerProfile? profile = await DI.userRepo.getCustomerProfile(userId);
           profile ??= await DI.userRepo.getCustomerProfileByPhone(phone);
@@ -196,26 +205,31 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               side: const BorderSide(color: AppColors.outlineVariant),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.verified_user, size: 14, color: AppColors.primary),
-                const SizedBox(width: 4),
-                Text(
-                  _isOtpSent ? 'Step 2 of 2: OTP Verification' : 'Step 1 of 2: Mobile Verification',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.onSurfaceVariant,
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.verified_user, size: 14, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(
+                      _isOtpSent ? 'Step 2 of 2: OTP Verification' : 'Step 1 of 2: Mobile Verification',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -592,79 +606,87 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
   }
 
   Widget _buildOtpInputBoxes() {
-    return Stack(
-      children: [
-        Opacity(
-          opacity: 0.0,
-          child: TextField(
-            controller: _otpController,
-            focusNode: _otpFocusNode,
-            keyboardType: TextInputType.number,
-            inputFormatters: [
-              FilteringTextInputFormatter.digitsOnly,
-              LengthLimitingTextInputFormatter(6),
-            ],
-            onChanged: (val) {
-              setState(() {});
-              if (val.length == 6) {
-                _handlePrimaryAction();
-              }
-            },
-          ),
-        ),
-        GestureDetector(
-          onTap: () => _otpFocusNode.requestFocus(),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: List.generate(6, (index) {
-              final text = _otpController.text;
-              final isFocused = _otpFocusNode.hasFocus && text.length == index;
-              final hasValue = text.length > index;
-              final char = hasValue ? text[index] : '';
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final totalWidth = constraints.maxWidth;
+        final gap = totalWidth < 300 ? 4.0 : 8.0;
+        final boxSize = ((totalWidth - (5 * gap)) / 6).clamp(32.0, 48.0);
 
-              return Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isFocused ? AppColors.primary : AppColors.outlineVariant,
-                    width: isFocused ? 2 : 1,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                alignment: Alignment.center,
-                child: hasValue
-                    ? Text(
-                        char,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
+        return Stack(
+          children: [
+            Opacity(
+              opacity: 0.0,
+              child: TextField(
+                controller: _otpController,
+                focusNode: _otpFocusNode,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
+                onChanged: (val) {
+                  setState(() {});
+                  if (val.length == 6) {
+                    _handlePrimaryAction();
+                  }
+                },
+              ),
+            ),
+            GestureDetector(
+              onTap: () => _otpFocusNode.requestFocus(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: List.generate(6, (index) {
+                  final text = _otpController.text;
+                  final isFocused = _otpFocusNode.hasFocus && text.length == index;
+                  final hasValue = text.length > index;
+                  final char = hasValue ? text[index] : '';
+
+                  return Container(
+                    width: boxSize,
+                    height: boxSize,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(boxSize < 40 ? 8 : 12),
+                      border: Border.all(
+                        color: isFocused ? AppColors.primary : AppColors.outlineVariant,
+                        width: isFocused ? 2 : 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.03),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
                         ),
-                      )
-                    : (isFocused
-                        ? Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
+                      ],
+                    ),
+                    alignment: Alignment.center,
+                    child: hasValue
+                        ? Text(
+                            char,
+                            style: TextStyle(
+                              fontSize: boxSize < 40 ? 15 : 18,
+                              fontWeight: FontWeight.w800,
                               color: AppColors.primary,
-                              shape: BoxShape.circle,
                             ),
                           )
-                        : null),
-              );
-            }),
-          ),
-        ),
-      ],
+                        : (isFocused
+                            ? Container(
+                                width: 6,
+                                height: 6,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                              )
+                            : null),
+                  );
+                }),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
