@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/auth/data/repositories/mock_auth_repository.dart';
 import 'package:app/features/auth/services/mock_auth_service.dart';
 
@@ -12,12 +12,12 @@ void main() {
       mockAuthService = MockAuthService();
     });
 
-    test('1. MockAuthRepository accepts Supabase test OTP 111111 for 8421296499', () async {
-      final isValid = await mockAuthRepo.verifyOtp('8421296499', '111111');
+    test('1. MockAuthRepository accepts repeated digits OTP', () async {
+      final isValid = await mockAuthRepo.verifyOtp('9876543210', '111111');
       expect(isValid, isTrue);
       final user = await mockAuthRepo.getCurrentUser();
       expect(user, isNotNull);
-      expect(user!.id, equals('f3af7b05-79f8-43e7-a0ea-7bde1c218b72'));
+      expect(user!.id, equals('mock_customer_01'));
     });
 
     test('2. MockAuthRepository accepts test OTP 123456 for standard mock phone', () async {
@@ -39,7 +39,7 @@ void main() {
     });
 
     test('5. MockAuthService accepts 111111 and 123456', () async {
-      expect(await mockAuthService.verifyOtp('8421296499', '111111'), isTrue);
+      expect(await mockAuthService.verifyOtp('9876543210', '111111'), isTrue);
       expect(await mockAuthService.verifyOtp('9876543210', '123456'), isTrue);
       expect(await mockAuthService.verifyOtp('9876543210', '000000'), isTrue);
       expect(await mockAuthService.verifyOtp('9876543210', '483921'), isFalse);

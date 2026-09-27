@@ -15,8 +15,8 @@ class AdminLoginScreen extends StatefulWidget {
 }
 
 class _AdminLoginScreenState extends State<AdminLoginScreen> {
-  final _emailController = TextEditingController(text: 'admin@shramsetu.demo');
-  final _passwordController = TextEditingController(text: 'admin123');
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
   bool _isLoading = false;
   String? _errorMsg;
 
@@ -53,7 +53,7 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                 await DI.userRepo.upsertUserProfile(
                   userId: user.id,
                   role: 'ADMIN',
-                  phone: user.phone ?? '+919876543210',
+                  phone: user.phone ?? '',
                   fullName: 'Devesh Ambekar',
                 );
               } catch (_) {}
@@ -181,26 +181,6 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         child: _isLoading
                             ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: AppColors.onPrimary, strokeWidth: 2))
                             : const Text('Access Console', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.spacingMd),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryContainer.withValues(alpha: 0.5),
-                        borderRadius: AppRadius.radiusMd,
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.info_outline, size: 16, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Test Credentials: Use your admin email (e.g. ambekardevesh2@gmail.com) or admin@shramsetu.demo with password admin123.',
-                              style: AppTypography.bodySm.copyWith(fontSize: 11, color: AppColors.primary),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
                   ],

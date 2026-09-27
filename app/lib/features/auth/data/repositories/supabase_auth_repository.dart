@@ -1,4 +1,4 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
 import '../../../../core/config/dependency_injection.dart';
@@ -48,24 +48,12 @@ class SupabaseAuthRepository implements IAuthRepository {
   @override
   Future<void> sendOtp(String phone) async {
     final formattedPhone = _normalizePhone(phone);
-    final clean = phone.replaceAll(RegExp(r'\D'), '');
-    try {
-      await _client.auth.signInWithOtp(phone: formattedPhone);
-    } catch (e) {
-      // Support test phone numbers if SMS provider is not yet provisioned in Supabase project
-      final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
-      if (isTestPhone) {
-        debugPrint('[AuthRepo] Test phone number acknowledged: $clean');
-        return;
-      }
-      rethrow;
-    }
+    await _client.auth.signInWithOtp(phone: formattedPhone);
   }
 
   @override
   Future<bool> verifyOtp(String phone, String otp) async {
     final formattedPhone = _normalizePhone(phone);
-    final clean = phone.replaceAll(RegExp(r'\D'), '');
     try {
       final response = await _client.auth.verifyOTP(
         phone: formattedPhone,
@@ -83,19 +71,7 @@ class SupabaseAuthRepository implements IAuthRepository {
       }
     } catch (e) {
       debugPrint('[AuthRepo] Supabase verifyOTP note: $e');
-      final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
-      final isTestOtp = otp == '111111' || otp == '123456';
-      if (isTestPhone && isTestOtp) {
-        debugPrint('[AuthRepo] Test phone authenticated via fallback: $clean');
-        return true;
-      }
       rethrow;
-    }
-
-    final isTestPhone = clean == '8421296499' || clean == '9876543210' || clean == '9823145890';
-    final isTestOtp = otp == '111111' || otp == '123456';
-    if (isTestPhone && isTestOtp) {
-      return true;
     }
 
     return false;

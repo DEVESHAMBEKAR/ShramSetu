@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
@@ -76,10 +76,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         final isValid = await DI.authRepo.verifyOtp(phone, otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
-          final userId = user?.id ??
-              (phone == '8421296499'
-                  ? 'f3af7b05-79f8-43e7-a0ea-7bde1c218b72'
-                  : 'customer_$phone');
+          final userId = user?.id ?? 'customer_$phone';
 
           // 1. Check if customer already exists (by userId or phone)
           CustomerProfile? profile = await DI.userRepo.getCustomerProfile(userId);
