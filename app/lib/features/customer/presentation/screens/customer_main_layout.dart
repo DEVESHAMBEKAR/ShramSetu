@@ -7,6 +7,7 @@ import '../../../../core/config/app_config.dart';
 import 'customer_home_screen.dart';
 import 'customer_bookings_screen.dart';
 import 'worker_discovery_screen.dart';
+import '../../data/models/customer_profile.dart';
 
 class CustomerMainLayout extends StatefulWidget {
   const CustomerMainLayout({super.key});
@@ -86,49 +87,11 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   void _showSavedAddressesDialog() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.location_on, color: AppColors.primary, size: 24),
-                const SizedBox(width: 10),
-                Text('Saved Addresses', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.home, color: AppColors.primary),
-              title: const Text('Home - Model Colony', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Flat 402, Shanti Heights, Shivajinagar, Pune 411016'),
-              trailing: const Icon(Icons.check_circle, color: AppColors.primary),
-            ),
-            const Divider(),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.work_outline, color: AppColors.outline),
-              title: const Text('Workplace / Office', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Quadron Business Park, Hinjewadi Phase 2, Pune 411057'),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('Done'),
-              ),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) => _SavedAddressesSheet(),
     );
   }
 
@@ -644,3 +607,322 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
     );
   }
 }
+
+class _SavedAddressesSheet extends StatefulWidget {
+  @override
+  State<_SavedAddressesSheet> createState() => _SavedAddressesSheetState();
+}
+
+class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
+  List<CustomerAddress> _addresses = [];
+  bool _isLoading = true;
+  String? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAddresses();
+  }
+
+  Future<void> _loadAddresses() async {
+    setState(() => _isLoading = true);
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      _userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      if (_userId != null) {
+        final list = await DI.userRepo.getUserAddresses(_userId!);
+        if (mounted) setState(() => _addresses = list);
+      }
+    } catch (_) {}
+    if (mounted) setState(() => _isLoading = false);
+  }
+
+  Future<void> _makeDefault(CustomerAddress addr) async {
+    if (_userId == null) return;
+    try {
+      await DI.userRepo.setDefaultAddress(userId: _userId!, addressId: addr.id);
+      await _loadAddresses();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
+  Future<void> _deleteAddress(CustomerAddress addr) async {
+    if (_userId == null) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Address'),
+        content: Text('Are you sure you want to remove "${addr.addressLine}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      try {
+        await DI.userRepo.deleteAddress(userId: _userId!, addressId: addr.id);
+        await _loadAddresses();
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  void _showAddAddressDialog() {
+    final lineCtrl = TextEditingController();
+    final areaCtrl = TextEditingController();
+    final cityCtrl = TextEditingController(text: 'Pune');
+    final pinCtrl = TextEditingController();
+    final stateCtrl = TextEditingController(text: 'Maharashtra');
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Add New Address', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: lineCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'House / Flat / Street *',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g. Flat 301, Silver Oak Society',
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: areaCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Area / Locality *',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g. Kothrud, Shivajinagar, Baner',
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: cityCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'City *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: pinCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'PIN Code *',
+                        border: OutlineInputBorder(),
+                        hintText: '411038',
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (lineCtrl.text.trim().isEmpty || areaCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                  const SnackBar(content: Text('Please fill all required fields.')),
+                );
+                return;
+              }
+              Navigator.pop(dlgCtx);
+              if (_userId != null) {
+                try {
+                  await DI.userRepo.createAddress(
+                    userId: _userId!,
+                    addressLine: lineCtrl.text.trim(),
+                    area: areaCtrl.text.trim(),
+                    city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
+                    state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
+                    postalCode: pinCtrl.text.trim(),
+                  );
+                  await _loadAddresses();
+                } catch (e) {
+                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Save Address'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.location_on, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 10),
+                  Text('Saved Addresses', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: AppColors.primary),
+                tooltip: 'Add Address',
+                onPressed: _showAddAddressDialog,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            )
+          else if (_addresses.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.location_off_outlined, size: 40, color: AppColors.outline),
+                    const SizedBox(height: 8),
+                    const Text('No saved addresses found in your database record.', style: TextStyle(color: AppColors.outline, fontSize: 13)),
+                    const SizedBox(height: 12),
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                      icon: const Icon(Icons.add, size: 16),
+                      label: const Text('Add Home Address'),
+                      onPressed: _showAddAddressDialog,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.5),
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: _addresses.length,
+                separatorBuilder: (context, index) => const Divider(height: 1),
+                itemBuilder: (ctx, i) {
+                  final addr = _addresses[i];
+                  final isHome = addr.area.toLowerCase().contains('home') || i == 0;
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: addr.isDefault ? AppColors.primaryContainer : AppColors.surfaceContainerLow,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(
+                        isHome ? Icons.home_outlined : Icons.location_on_outlined,
+                        color: addr.isDefault ? AppColors.primary : AppColors.outline,
+                        size: 20,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            addr.area.isNotEmpty ? addr.area : addr.city,
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: addr.isDefault ? AppColors.primary : AppColors.onSurface,
+                            ),
+                          ),
+                        ),
+                        if (addr.isDefault)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.tertiaryContainer,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('DEFAULT', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: AppColors.onTertiaryContainer)),
+                          ),
+                      ],
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(addr.addressLine, style: const TextStyle(fontSize: 12)),
+                        Text('${addr.city}, ${addr.state} - ${addr.postalCode}', style: const TextStyle(fontSize: 11, color: AppColors.outline)),
+                      ],
+                    ),
+                    trailing: PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 18, color: AppColors.outline),
+                      onSelected: (val) {
+                        if (val == 'default') _makeDefault(addr);
+                        if (val == 'delete') _deleteAddress(addr);
+                      },
+                      itemBuilder: (_) => [
+                        if (!addr.isDefault)
+                          const PopupMenuItem(value: 'default', child: Row(children: [Icon(Icons.check, size: 16), SizedBox(width: 8), Text('Set as Default')])),
+                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.error), SizedBox(width: 8), Text('Delete', style: TextStyle(color: AppColors.error))])),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Another Address'),
+              onPressed: _showAddAddressDialog,
+            ),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Done'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+

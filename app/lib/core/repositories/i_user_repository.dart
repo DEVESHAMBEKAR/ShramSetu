@@ -53,4 +53,13 @@ abstract class IUserRepository {
 
   /// Get the customer's default address (returns null if none).
   Future<CustomerAddress?> getDefaultAddress(String userId);
+
+  /// Get all saved addresses for a user.
+  Future<List<CustomerAddress>> getUserAddresses(String userId);
+
+  /// Set an address as the default address for the user.
+  Future<void> setDefaultAddress({required String userId, required String addressId});
+
+  /// Delete a saved address.
+  Future<void> deleteAddress({required String userId, required String addressId});
 }

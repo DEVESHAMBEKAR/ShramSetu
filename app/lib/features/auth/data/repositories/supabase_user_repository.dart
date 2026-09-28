@@ -295,4 +295,47 @@ class SupabaseUserRepository implements IUserRepository {
       return null;
     }
   }
+
+  @override
+  Future<List<CustomerAddress>> getUserAddresses(String userId) async {
+    try {
+      final rows = await _client
+          .from('addresses')
+          .select()
+          .eq('user_id', userId)
+          .order('is_default', ascending: false)
+          .order('created_at', ascending: false);
+      return (rows as List).map((r) => CustomerAddress.fromMap(r as Map<String, dynamic>)).toList();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  @override
+  Future<void> setDefaultAddress({required String userId, required String addressId}) async {
+    try {
+      // 1. Unset all defaults for this user
+      await _client
+          .from('addresses')
+          .update({'is_default': false})
+          .eq('user_id', userId);
+
+      // 2. Set the chosen address as default
+      await _client
+          .from('addresses')
+          .update({'is_default': true})
+          .eq('id', addressId);
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> deleteAddress({required String userId, required String addressId}) async {
+    try {
+      await _client
+          .from('addresses')
+          .delete()
+          .eq('id', addressId)
+          .eq('user_id', userId);
+    } catch (_) {}
+  }
 }
