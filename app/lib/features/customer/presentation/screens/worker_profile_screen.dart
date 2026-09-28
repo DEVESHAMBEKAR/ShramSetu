@@ -33,26 +33,31 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Stack(
-        children: [
-          CustomScrollView(
-            slivers: [
-              _buildSliverAppBar(),
-              SliverToBoxAdapter(
-                child: Column(
-                  children: [
-                    _buildFederationBanner(),
-                    _buildHeaderCard(),
-                    _buildTabs(),
-                    _buildTabContent(),
-                    const SizedBox(height: 100), // padding for bottom bar
-                  ],
-                ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Stack(
+            children: [
+              CustomScrollView(
+                slivers: [
+                  _buildSliverAppBar(),
+                  SliverToBoxAdapter(
+                    child: Column(
+                      children: [
+                        _buildFederationBanner(),
+                        _buildHeaderCard(),
+                        _buildTabs(),
+                        _buildTabContent(),
+                        const SizedBox(height: 100), // padding for bottom bar
+                      ],
+                    ),
+                  ),
+                ],
               ),
+              _buildBottomBar(),
             ],
           ),
-          _buildBottomBar(),
-        ],
+        ),
       ),
     );
   }
@@ -82,9 +87,56 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         ],
       ),
       actions: [
-        IconButton(icon: const Icon(Icons.help_outline, color: AppColors.onSurfaceVariant), onPressed: () {}),
+        IconButton(
+          tooltip: 'Cooperative Verification Details',
+          icon: const Icon(Icons.help_outline, color: AppColors.onSurfaceVariant),
+          onPressed: _showFederationHelpModal,
+        ),
         const SizedBox(width: AppSpacing.spacingXs),
       ],
+    );
+  }
+
+  void _showFederationHelpModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.verified_user, color: AppColors.primary, size: 28),
+                const SizedBox(width: 12),
+                Text('Cooperative Verification', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'All artisans on ShramSetu are enrolled members of verified labor cooperatives. They undergo mandatory government skill certification, police background verification, and cooperative insurance coverage.',
+              style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant, height: 1.5),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: AppColors.onPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Understood'),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -277,6 +329,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
         children: List.generate(tabs.length, (index) {
           final isActive = index == _activeTabIndex;
           return GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: () => setState(() => _activeTabIndex = index),
             child: Container(
               margin: const EdgeInsets.only(right: AppSpacing.spacing2xs),
@@ -658,6 +711,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
             const SizedBox(width: AppSpacing.spacingMd),
             Expanded(
               child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
                   bookingFlowState.selectedCategory = widget.category;
                   bookingFlowState.selectedWorker = widget.worker;

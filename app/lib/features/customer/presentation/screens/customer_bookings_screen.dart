@@ -9,7 +9,8 @@ import 'customer_live_tracking_screen.dart';
 import '../widgets/review_rating_modal.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
-  const CustomerBookingsScreen({super.key});
+  final VoidCallback? onExploreServices;
+  const CustomerBookingsScreen({super.key, this.onExploreServices});
 
   @override
   State<CustomerBookingsScreen> createState() => _CustomerBookingsScreenState();
@@ -90,113 +91,143 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
           style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
         ),
       ),
-      body: Column(
-        children: [
-          // Segmented Tabs: Active Bookings vs Past Orders
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
-            child: Container(
-              height: 44,
-              padding: const EdgeInsets.all(3),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppRadius.radiusLg,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedTab = 0),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                          borderRadius: AppRadius.radiusMd,
-                          boxShadow: _selectedTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Active Orders',
-                          style: AppTypography.labelSm.copyWith(
-                            color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: Column(
+            children: [
+              // Segmented Tabs: Active Bookings vs Past Orders
+              Container(
+                color: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
+                child: Container(
+                  height: 44,
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: AppRadius.radiusLg,
                   ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => _selectedTab = 1),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                          borderRadius: AppRadius.radiusMd,
-                          boxShadow: _selectedTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
-                        ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          'Past Orders',
-                          style: AppTypography.labelSm.copyWith(
-                            color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
-                            fontWeight: FontWeight.bold,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _selectedTab = 0),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _selectedTab == 0 ? Colors.white : Colors.transparent,
+                              borderRadius: AppRadius.radiusMd,
+                              boxShadow: _selectedTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Active Orders',
+                              style: AppTypography.labelSm.copyWith(
+                                color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                      Expanded(
+                        child: GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: () => setState(() => _selectedTab = 1),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: _selectedTab == 1 ? Colors.white : Colors.transparent,
+                              borderRadius: AppRadius.radiusMd,
+                              boxShadow: _selectedTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              'Past Orders',
+                              style: AppTypography.labelSm.copyWith(
+                                color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-          const Divider(height: 1, color: AppColors.outlineVariant),
+              const Divider(height: 1, color: AppColors.outlineVariant),
 
-          // Bookings Content
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: () async => _refreshBookings(),
-              color: AppColors.secondary,
-              child: Builder(
-                builder: (context) {
-                  if (_isLoading && (_bookings == null || _bookings!.isEmpty)) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
-                  }
-                  if (_errorMessage != null && (_bookings == null || _bookings!.isEmpty)) {
-                    return Center(child: Text('Error: $_errorMessage', style: AppTypography.bodyMd));
-                  }
+              // Bookings Content
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () async => _refreshBookings(),
+                  color: AppColors.secondary,
+                  child: Builder(
+                    builder: (context) {
+                      if (_isLoading && (_bookings == null || _bookings!.isEmpty)) {
+                        return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
+                      }
+                      if (_errorMessage != null && (_bookings == null || _bookings!.isEmpty)) {
+                        return Center(child: Text('Error: $_errorMessage', style: AppTypography.bodyMd));
+                      }
 
-                  final allBookings = _bookings ?? [];
-                  final activeBookings = allBookings.where((b) {
-                    final s = (b['status']?.toString() ?? '').toLowerCase();
-                    return s != 'completed' && s != 'cancelled' && s != 'rejected';
-                  }).toList();
+                      final allBookings = _bookings ?? [];
+                      final activeBookings = allBookings.where((b) {
+                        final s = (b['status']?.toString() ?? '').toLowerCase();
+                        return s != 'completed' && s != 'cancelled' && s != 'rejected';
+                      }).toList();
 
-                  final pastBookings = allBookings.where((b) {
-                    final s = (b['status']?.toString() ?? '').toLowerCase();
-                    return s == 'completed' || s == 'cancelled' || s == 'rejected';
-                  }).toList();
+                      final pastBookings = allBookings.where((b) {
+                        final s = (b['status']?.toString() ?? '').toLowerCase();
+                        return s == 'completed' || s == 'cancelled' || s == 'rejected';
+                      }).toList();
 
-                  final currentList = _selectedTab == 0 ? activeBookings : pastBookings;
+                      final currentList = _selectedTab == 0 ? activeBookings : pastBookings;
 
-                  if (currentList.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            _selectedTab == 0 ? Icons.inventory_2_outlined : Icons.history,
-                            size: 48,
-                            color: AppColors.outline,
+                      if (currentList.isEmpty) {
+                        return Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _selectedTab == 0 ? Icons.inventory_2_outlined : Icons.history,
+                                  size: 56,
+                                  color: AppColors.outline,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  _selectedTab == 0 ? 'No active orders in progress' : 'No past orders yet',
+                                  style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  _selectedTab == 0
+                                      ? 'Book verified union artisans with zero commission and upfront pricing.'
+                                      : 'Completed bookings and ratings history will be displayed here.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                                ),
+                                if (_selectedTab == 0 && widget.onExploreServices != null) ...[
+                                  const SizedBox(height: 18),
+                                  ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppColors.primary,
+                                      foregroundColor: AppColors.onPrimary,
+                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                                    ),
+                                    onPressed: widget.onExploreServices,
+                                    icon: const Icon(Icons.search, size: 18),
+                                    label: const Text('Explore Available Services', style: TextStyle(fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _selectedTab == 0 ? 'No active orders in progress' : 'No past orders yet',
-                            style: AppTypography.titleMd.copyWith(color: AppColors.outline),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
+                        );
+                      }
 
                   return ListView.separated(
                     padding: const EdgeInsets.all(AppSpacing.marginMobile),
@@ -213,7 +244,9 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
           ),
         ],
       ),
-    );
+    ),
+  ),
+);
   }
 
   Widget _buildUrbanCompanyOrderCard(Map<String, dynamic> booking, {required bool isPast}) {

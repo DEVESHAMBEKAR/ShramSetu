@@ -26,11 +26,190 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   }
 
   late final List<Widget> _screens = [
-    const CustomerHomeScreen(),
+    CustomerHomeScreen(onSelectTab: (index) => setState(() => _currentIndex = index)),
     const WorkerDiscoveryScreen(),
-    const CustomerBookingsScreen(),
+    CustomerBookingsScreen(onExploreServices: () => setState(() => _currentIndex = 1)),
     _buildProfileScreen(),
   ];
+
+  void _showSavedAddressesDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.location_on, color: AppColors.primary, size: 24),
+                const SizedBox(width: 10),
+                Text('Saved Addresses', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.home, color: AppColors.primary),
+              title: const Text('Home - Model Colony', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Flat 402, Shanti Heights, Shivajinagar, Pune 411016'),
+              trailing: const Icon(Icons.check_circle, color: AppColors.primary),
+            ),
+            const Divider(),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.work_outline, color: AppColors.outline),
+              title: const Text('Workplace / Office', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Quadron Business Park, Hinjewadi Phase 2, Pune 411057'),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLanguageDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.translate, color: AppColors.primary, size: 24),
+                const SizedBox(width: 10),
+                Text('Language / भाषा / भाषा निवडा', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.radio_button_checked, color: AppColors.primary),
+              title: const Text('English (Default)', style: TextStyle(fontWeight: FontWeight.bold)),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            ListTile(
+              leading: const Icon(Icons.radio_button_unchecked, color: AppColors.outline),
+              title: const Text('मराठी (Marathi)'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            ListTile(
+              leading: const Icon(Icons.radio_button_unchecked, color: AppColors.outline),
+              title: const Text('हिंदी (Hindi)'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showWelfareGuaranteeDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.shield, color: AppColors.primary, size: 24),
+                const SizedBox(width: 10),
+                Text('Cooperative Welfare Guarantee', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              '1. 100% Zero Surge: Union standard rates with no peak surge.\n'
+              '2. Escrow Protection: Payment released to artisan only with your OTP.\n'
+              '3. Insurance Bond: ₹10,000 cooperative transit & accidental damage guarantee.\n'
+              '4. Verified Workers: Police verified & federation certified trade artisans.',
+              style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant, height: 1.6),
+            ),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHelpSupportDialog() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.headset_mic, color: AppColors.primary, size: 24),
+                const SizedBox(width: 10),
+                Text('Union Help & Support', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.phone, color: AppColors.primary),
+              title: const Text('Toll-Free Helpline', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('1800-266-9090 (24x7)'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            ListTile(
+              leading: const Icon(Icons.email, color: AppColors.primary),
+              title: const Text('Email Support', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('support@shramsetu.in'),
+              onTap: () => Navigator.pop(ctx),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildProfileScreen() {
     return Scaffold(
@@ -40,92 +219,107 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
         elevation: 0,
         title: Text('Account & Settings', style: AppTypography.titleLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.radiusXl,
-                border: Border.all(color: AppColors.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.surfaceContainerLow,
-                    child: const Icon(Icons.person, size: 30, color: AppColors.primary),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.radiusXl,
+                    border: Border.all(color: AppColors.outlineVariant),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('ShramSetu Member', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                        const SizedBox(height: 2),
-                        Text('Pune District Cooperative Federation', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
-                      ],
-                    ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: AppColors.surfaceContainerLow,
+                        child: const Icon(Icons.person, size: 30, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('ShramSetu Member', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            const SizedBox(height: 2),
+                            Text('Pune District Cooperative Federation', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            _buildProfileTile(Icons.location_on_outlined, 'Saved Addresses', 'Manage home and work addresses'),
-            _buildProfileTile(Icons.translate, 'Language Settings', 'मराठी / English / हिंदी'),
-            _buildProfileTile(Icons.shield_outlined, 'Cooperative Welfare Guarantee', 'Direct deposit & damage protection policy'),
-            _buildProfileTile(Icons.headset_mic_outlined, 'Union Help & Support', '1800-266-9090 (Toll free)'),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.errorContainer),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
                 ),
-                onPressed: () async {
-                  await DI.authRepo.logout();
-                  if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
-                },
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Logout from ShramSetu'),
-              ),
+                const SizedBox(height: 20),
+                _buildProfileTile(Icons.location_on_outlined, 'Saved Addresses', 'Manage home and work addresses', onTap: _showSavedAddressesDialog),
+                _buildProfileTile(Icons.translate, 'Language Settings', 'मराठी / English / हिंदी', onTap: _showLanguageDialog),
+                _buildProfileTile(Icons.shield_outlined, 'Cooperative Welfare Guarantee', 'Direct deposit & damage protection policy', onTap: _showWelfareGuaranteeDialog),
+                _buildProfileTile(Icons.headset_mic_outlined, 'Union Help & Support', '1800-266-9090 (Toll free)', onTap: _showHelpSupportDialog),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.errorContainer),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                    ),
+                    onPressed: () async {
+                      await DI.authRepo.logout();
+                      if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
+                    },
+                    icon: const Icon(Icons.logout, size: 18),
+                    label: const Text('Logout from ShramSetu'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProfileTile(IconData icon, String title, String subtitle) {
+  Widget _buildProfileTile(IconData icon, String title, String subtitle, {VoidCallback? onTap}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.radiusLg,
         border: Border.all(color: AppColors.outlineVariant),
       ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.primary, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: AppRadius.radiusLg,
+        child: InkWell(
+          borderRadius: AppRadius.radiusLg,
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
               children: [
-                Text(title, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                Icon(icon, color: AppColors.primary, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, color: AppColors.outline, size: 18),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right, color: AppColors.outline, size: 18),
-        ],
+        ),
       ),
     );
   }

@@ -474,6 +474,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Widget _buildPaymentRadio(String value, String title, String subtitle, IconData icon) {
     final isSelected = _paymentMode == value;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _paymentMode = value),
       child: Container(
         padding: const EdgeInsets.all(10),

@@ -11,10 +11,13 @@ import '../../../../shared/widgets/map_location_picker_screen.dart';
 import '../../data/models/customer_models.dart';
 import '../../data/models/customer_profile.dart';
 import 'worker_discovery_screen.dart';
+import 'worker_profile_screen.dart';
 import 'customer_live_tracking_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
-  const CustomerHomeScreen({super.key});
+  final void Function(int tabIndex)? onSelectTab;
+
+  const CustomerHomeScreen({super.key, this.onSelectTab});
 
   @override
   State<CustomerHomeScreen> createState() => _CustomerHomeScreenState();
@@ -139,11 +142,325 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     }
   }
 
-  void _navigateToCategory(ServiceCategory category) {
+  void _navigateToCategory(ServiceCategory category, {String? searchQuery}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => WorkerDiscoveryScreen(initialCategory: category),
+        builder: (_) => WorkerDiscoveryScreen(
+          initialCategory: category,
+          initialSearchQuery: searchQuery,
+        ),
+      ),
+    );
+  }
+
+  void _onTrendingChipTap(String tag) {
+    ServiceCategory? matchedCat;
+    final lowerTag = tag.toLowerCase();
+    if (lowerTag.contains('leak') || lowerTag.contains('tap')) {
+      matchedCat = _categories.firstWhere((c) => c.name.toLowerCase().contains('plumb'), orElse: () => _categories.first);
+    } else if (lowerTag.contains('fan') || lowerTag.contains('switch')) {
+      matchedCat = _categories.firstWhere((c) => c.name.toLowerCase().contains('elect'), orElse: () => _categories.first);
+    } else if (lowerTag.contains('clean')) {
+      matchedCat = _categories.firstWhere((c) => c.name.toLowerCase().contains('clean'), orElse: () => _categories.first);
+    } else if (_categories.isNotEmpty) {
+      matchedCat = _categories.first;
+    }
+
+    if (matchedCat != null) {
+      _navigateToCategory(matchedCat, searchQuery: tag);
+    }
+  }
+
+  void _navigateToWorkerProfile(Worker worker) {
+    final matchedCat = _categories.firstWhere(
+      (c) => c.id == worker.categoryId ||
+             worker.specializations.any((s) => s.toLowerCase().contains(c.name.toLowerCase())),
+      orElse: () => _categories.isNotEmpty
+          ? _categories.first
+          : const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing'),
+    );
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkerProfileScreen(worker: worker, category: matchedCat),
+      ),
+    );
+  }
+
+  void _showNotificationsSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.marginMobile),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.notifications_active, color: AppColors.secondary, size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Union Alerts & Notifications',
+                      style: AppTypography.titleMd.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close, size: 20),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ],
+            ),
+            const Divider(),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.secondaryFixed,
+                  borderRadius: AppRadius.radiusSm,
+                ),
+                child: const Icon(Icons.verified, color: AppColors.onSecondaryFixedVariant, size: 20),
+              ),
+              title: const Text('Cooperative Welfare Active', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('All service bookings include ₹50,000 damage cover and 0% commission pass-through.'),
+            ),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusSm,
+                ),
+                child: const Icon(Icons.handyman, color: AppColors.primary, size: 20),
+              ),
+              title: const Text('Standard Rates Updated', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('Pune District Labor Federation published Q3 standardized fair rate cards.'),
+            ),
+            if (_activeBooking != null)
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.tertiaryContainer,
+                    borderRadius: AppRadius.radiusSm,
+                  ),
+                  child: const Icon(Icons.timelapse, color: AppColors.onTertiaryContainer, size: 20),
+                ),
+                title: const Text('Active Service Assigned', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('Status: ${(_activeBooking!['status'] ?? 'pending').toString().toUpperCase()} • Tap to track'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  final bId = _activeBooking!['id']?.toString() ?? '';
+                  if (bId.isNotEmpty) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => CustomerLiveTrackingScreen(bookingId: bId),
+                      ),
+                    );
+                  }
+                },
+              ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _onProfileAvatarTap() {
+    if (widget.onSelectTab != null) {
+      widget.onSelectTab!(3);
+    } else {
+      _showProfileSheet();
+    }
+  }
+
+  void _showProfileSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.marginMobile),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.surfaceContainerLow,
+                  backgroundImage: (_profile?.avatarUrl != null && _profile!.avatarUrl!.isNotEmpty)
+                      ? NetworkImage(_profile!.avatarUrl!)
+                      : null,
+                  child: (_profile?.avatarUrl == null || _profile!.avatarUrl!.isEmpty)
+                      ? const Icon(Icons.person, size: 24, color: AppColors.primary)
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _profile?.fullName.isNotEmpty == true ? _profile!.fullName : 'ShramSetu Customer',
+                        style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                      Text(
+                        _profile?.phone.isNotEmpty == true ? _profile!.phone : _locationDisplay,
+                        style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const Divider(height: 24),
+            ListTile(
+              leading: const Icon(Icons.location_on_outlined, color: AppColors.primary),
+              title: const Text('Manage Delivery Address', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: Text(_locationDisplay),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showLocationPickerSheet();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.translate, color: AppColors.secondary),
+              title: const Text('Change Language', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('English / मराठी / हिंदी'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showLanguageSwitcher();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout, color: AppColors.error),
+              title: const Text('Logout', style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.error)),
+              onTap: () async {
+                Navigator.pop(ctx);
+                await DI.authRepo.logout();
+                if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showUnionInfoModal() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.secondaryFixed,
+                borderRadius: AppRadius.radiusSm,
+              ),
+              child: const Icon(Icons.handshake, color: AppColors.onSecondaryFixedVariant, size: 20),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'ShramSetu Cooperative',
+                style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'A non-profit union platform organized in partnership with Pune District Labour Cooperative Society.',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Text('• 100% earnings go directly to verified artisans.', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            Text('• Escrow protection ensures your payment is safe.', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            Text('• Transparent standard rate card with zero surge fees.', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+          ],
+        ),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusSm),
+            ),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Understood'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showPromiseDetails(String title, String description) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.all(AppSpacing.marginMobile),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(title, style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(description, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Back to Home'),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -348,53 +665,58 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         child: RefreshIndicator(
           onRefresh: _loadAllData,
           color: AppColors.secondary,
-          child: CustomScrollView(
-            slivers: [
-              // 1. Signature Urban Company App Bar
-              _buildSliverHeader(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1150),
+              child: CustomScrollView(
+                slivers: [
+                  // 1. Signature Urban Company App Bar
+                  _buildSliverHeader(),
 
-              if (_isLoading)
-                const SliverToBoxAdapter(
-                  child: LinearProgressIndicator(
-                    minHeight: 2,
-                    backgroundColor: Colors.transparent,
-                    color: AppColors.secondary,
+                  if (_isLoading)
+                    const SliverToBoxAdapter(
+                      child: LinearProgressIndicator(
+                        minHeight: 2,
+                        backgroundColor: Colors.transparent,
+                        color: AppColors.secondary,
+                      ),
+                    ),
+
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // 2. Location Switcher & Greeting
+                        _buildLocationAndGreeting(),
+
+                        // 3. Search Bar & Trending Chips
+                        _buildSearchAndChips(),
+
+                        // 4. Urban Company Style Trust Banner (Obsidian & Violet)
+                        _buildObsidianTrustBanner(),
+
+                        // 5. In-Progress Booking Live Tracker
+                        _buildActiveJobCard(),
+
+                        // 6. Popular Categories (4-Column Squircle Grid)
+                        _buildCategoriesSection(),
+
+                        // 7. Services Near You (Featured Artisan Cards)
+                        _buildArtisansNearYou(),
+
+                        // 8. Union Promise 3-Column Grid
+                        _buildUnionPromiseGrid(),
+
+                        // 9. Cooperative Helpline Strip
+                        _buildHelplineStrip(),
+
+                        const SizedBox(height: 32),
+                      ],
+                    ),
                   ),
-                ),
-
-              SliverToBoxAdapter(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 2. Location Switcher & Greeting
-                    _buildLocationAndGreeting(),
-
-                    // 3. Search Bar & Trending Chips
-                    _buildSearchAndChips(),
-
-                    // 4. Urban Company Style Trust Banner (Obsidian & Violet)
-                    _buildObsidianTrustBanner(),
-
-                    // 5. In-Progress Booking Live Tracker
-                    _buildActiveJobCard(),
-
-                    // 6. Popular Categories (4-Column Squircle Grid)
-                    _buildCategoriesSection(),
-
-                    // 7. Services Near You (Featured Artisan Cards)
-                    _buildArtisansNearYou(),
-
-                    // 8. Union Promise 3-Column Grid
-                    _buildUnionPromiseGrid(),
-
-                    // 9. Cooperative Helpline Strip
-                    _buildHelplineStrip(),
-
-                    const SizedBox(height: 32),
-                  ],
-                ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -405,9 +727,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return SliverAppBar(
       pinned: true,
       elevation: 0,
-      backgroundColor: Colors.white.withValues(alpha: 0.95),
+      backgroundColor: Colors.white,
       surfaceTintColor: Colors.transparent,
       titleSpacing: AppSpacing.marginMobile,
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(
+          color: AppColors.outlineVariant,
+          height: 1,
+        ),
+      ),
       title: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -457,10 +786,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             ],
           ),
 
-          // Action Controls: Translate Pill & Notification Bell
+          // Action Controls: Translate Pill & Notification Bell & Profile Avatar
           Row(
             children: [
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: _showLanguageSwitcher,
                 child: Container(
                   height: 32,
@@ -486,43 +816,57 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: AppColors.outlineVariant),
-                ),
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    const Icon(Icons.notifications_none, size: 18, color: AppColors.primary),
-                    Positioned(
-                      top: 6,
-                      right: 6,
-                      child: Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: AppColors.secondary,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _showNotificationsSheet,
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.outlineVariant),
                     ),
-                  ],
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        const Icon(Icons.notifications_none, size: 18, color: AppColors.primary),
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Container(
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: AppColors.secondary,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(width: 8),
-              CircleAvatar(
-                radius: 16,
-                backgroundColor: AppColors.surfaceContainerLow,
-                backgroundImage: (_profile?.avatarUrl != null && _profile!.avatarUrl!.isNotEmpty)
-                    ? NetworkImage(_profile!.avatarUrl!)
-                    : null,
-                child: (_profile?.avatarUrl == null || _profile!.avatarUrl!.isEmpty)
-                    ? const Icon(Icons.person, size: 18, color: AppColors.primary)
-                    : null,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: _onProfileAvatarTap,
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: AppColors.surfaceContainerLow,
+                    backgroundImage: (_profile?.avatarUrl != null && _profile!.avatarUrl!.isNotEmpty)
+                        ? NetworkImage(_profile!.avatarUrl!)
+                        : null,
+                    child: (_profile?.avatarUrl == null || _profile!.avatarUrl!.isEmpty)
+                        ? const Icon(Icons.person, size: 18, color: AppColors.primary)
+                        : null,
+                  ),
+                ),
               ),
             ],
           ),
@@ -657,15 +1001,22 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ],
               ),
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: Colors.white,
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
                   borderRadius: AppRadius.radiusLg,
-                  border: Border.all(color: AppColors.outlineVariant),
+                  onTap: _showUnionInfoModal,
+                  child: Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: AppRadius.radiusLg,
+                      border: Border.all(color: AppColors.outlineVariant),
+                    ),
+                    child: const Icon(Icons.handshake, size: 20, color: AppColors.primary),
+                  ),
                 ),
-                child: const Icon(Icons.handshake, size: 20, color: AppColors.primary),
               ),
             ],
           ),
@@ -706,6 +1057,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   child: TextField(
                     controller: _searchController,
                     onChanged: (val) => setState(() => _searchQuery = val),
+                    onSubmitted: (val) {
+                      if (val.trim().isNotEmpty && _categories.isNotEmpty) {
+                        _navigateToCategory(_categories.first, searchQuery: val.trim());
+                      }
+                    },
                     decoration: InputDecoration(
                       hintText: 'Search electrician, plumber, cleaning...',
                       hintStyle: AppTypography.bodySm.copyWith(color: AppColors.outline),
@@ -747,11 +1103,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 }
                 final tag = trendingChips[index - 1];
                 return GestureDetector(
-                  onTap: () {
-                    if (_categories.isNotEmpty) {
-                      _navigateToCategory(_categories.first);
-                    }
-                  },
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _onTrendingChipTap(tag),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
@@ -1131,76 +1484,95 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ],
               ),
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  if (displayCategories.isNotEmpty) _navigateToCategory(displayCategories.first);
+                  if (widget.onSelectTab != null) {
+                    widget.onSelectTab!(1);
+                  } else if (displayCategories.isNotEmpty) {
+                    _navigateToCategory(displayCategories.first);
+                  }
                 },
                 child: Text('View all', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.85,
-            ),
-            itemCount: displayCategories.length > 8 ? 8 : displayCategories.length,
-            itemBuilder: (context, index) {
-              final cat = displayCategories[index];
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final int crossAxisCount = w >= 960 ? 8 : (w >= 650 ? 6 : 4);
+              final double aspectRatio = w >= 960 ? 1.05 : (w >= 650 ? 1.0 : 0.88);
 
-              return GestureDetector(
-                onTap: () => _navigateToCategory(cat),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: AppRadius.radiusLg,
-                    border: Border.all(color: AppColors.outlineVariant),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
-                        blurRadius: 2,
-                        offset: const Offset(0, 1),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLow,
-                          borderRadius: AppRadius.radiusLg,
-                        ),
-                        child: Icon(_mapCategoryIcon(cat.iconData), size: 22, color: AppColors.primary),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        cat.name,
-                        style: AppTypography.labelSm.copyWith(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Text(
-                        'Verified',
-                        style: AppTypography.bodySm.copyWith(
-                          color: AppColors.outline,
-                          fontSize: 9,
-                        ),
-                      ),
-                    ],
-                  ),
+              return GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                  childAspectRatio: aspectRatio,
                 ),
+                itemCount: displayCategories.length > 8 ? 8 : displayCategories.length,
+                itemBuilder: (context, index) {
+                  final cat = displayCategories[index];
+
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: AppRadius.radiusLg,
+                      onTap: () => _navigateToCategory(cat),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: AppRadius.radiusLg,
+                          border: Border.all(color: AppColors.outlineVariant),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.02),
+                              blurRadius: 2,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceContainerLow,
+                                borderRadius: AppRadius.radiusLg,
+                              ),
+                              child: Icon(_mapCategoryIcon(cat.iconData), size: 22, color: AppColors.primary),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              cat.name,
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Verified',
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.outline,
+                                fontSize: 9,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               );
             },
           ),
@@ -1234,8 +1606,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 ],
               ),
               GestureDetector(
+                behavior: HitTestBehavior.opaque,
                 onTap: () {
-                  if (_categories.isNotEmpty) {
+                  if (widget.onSelectTab != null) {
+                    widget.onSelectTab!(1);
+                  } else if (_categories.isNotEmpty) {
                     _navigateToCategory(_categories.first);
                   }
                 },
@@ -1284,6 +1659,29 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     style: AppTypography.bodySm.copyWith(color: AppColors.outline),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _searchQuery = '';
+                        _searchController.clear();
+                      });
+                      if (widget.onSelectTab != null) {
+                        widget.onSelectTab!(1);
+                      } else if (_categories.isNotEmpty) {
+                        _navigateToCategory(_categories.first);
+                      }
+                    },
+                    icon: const Icon(Icons.explore_outlined, size: 14),
+                    label: const Text('Explore All Trades'),
+                  ),
                 ],
               ),
             )
@@ -1304,168 +1702,167 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildArtisanCard(Worker worker) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
         borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 4,
-            offset: const Offset(0, 1),
+        onTap: () => _navigateToWorkerProfile(worker),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.spacingMd),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: AppRadius.radiusXl,
+            border: Border.all(color: AppColors.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.03),
+                blurRadius: 4,
+                offset: const Offset(0, 1),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Column(
             children: [
-              Stack(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.surfaceContainerLow,
-                    backgroundImage: worker.imageUrl.isNotEmpty ? NetworkImage(worker.imageUrl) : null,
-                    child: worker.imageUrl.isEmpty ? const Icon(Icons.person, size: 28, color: AppColors.primary) : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: AppColors.onTertiaryContainer,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                  Stack(
+                    children: [
+                      CircleAvatar(
+                        radius: 28,
+                        backgroundColor: AppColors.surfaceContainerLow,
+                        backgroundImage: worker.imageUrl.isNotEmpty ? NetworkImage(worker.imageUrl) : null,
+                        child: worker.imageUrl.isEmpty ? const Icon(Icons.person, size: 28, color: AppColors.primary) : null,
                       ),
-                      child: const Icon(Icons.check, size: 10, color: Colors.white),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          width: 18,
+                          height: 18,
+                          decoration: BoxDecoration(
+                            color: AppColors.onTertiaryContainer,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                          ),
+                          child: const Icon(Icons.check, size: 10, color: Colors.white),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text('₹${worker.rate.toStringAsFixed(0)}', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                                Text('Standard diag.', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.secondaryFixed,
+                                borderRadius: AppRadius.radiusSm,
+                              ),
+                              child: Text(
+                                'Union Master',
+                                style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixedVariant, fontWeight: FontWeight.bold, fontSize: 9),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Text('• ${worker.specializations.isNotEmpty ? worker.specializations.first : "Certified Artisan"}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        Text('Pune Trades & Guild Certified', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                      ],
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              const SizedBox(height: 10),
+
+              // Stats Strip
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusLg,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text('₹${worker.rate.toStringAsFixed(0)}', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                            Text('Standard diag.', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
-                          ],
-                        ),
-                      ],
-                    ),
                     Row(
                       children: [
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                           decoration: BoxDecoration(
-                            color: AppColors.secondaryFixed,
+                            color: AppColors.onTertiaryContainer,
                             borderRadius: AppRadius.radiusSm,
                           ),
-                          child: Text(
-                            'Union Master',
-                            style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixedVariant, fontWeight: FontWeight.bold, fontSize: 9),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.star, size: 11, color: Colors.white),
+                              const SizedBox(width: 2),
+                              Text(worker.rating.toStringAsFixed(1), style: AppTypography.labelSm.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        Text('• ${worker.specializations.isNotEmpty ? worker.specializations.first : "Certified Artisan"}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+                        const SizedBox(width: 6),
+                        Text('${worker.reviewCount} reviews', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Text('Pune Trades & Guild Certified', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                    Text('• ${worker.experience}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
+                    Text('• ${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
                   ],
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-          // Stats Strip
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: AppRadius.radiusLg,
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: AppColors.onTertiaryContainer,
-                        borderRadius: AppRadius.radiusSm,
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.star, size: 11, color: Colors.white),
-                          const SizedBox(width: 2),
-                          Text(worker.rating.toStringAsFixed(1), style: AppTypography.labelSm.copyWith(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
-                        ],
-                      ),
+                      onPressed: () => _navigateToWorkerProfile(worker),
+                      icon: const Icon(Icons.lock_outline, size: 14, color: AppColors.tertiaryFixed),
+                      label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                     ),
-                    const SizedBox(width: 6),
-                    Text('${worker.reviewCount} reviews', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
-                  ],
-                ),
-                Text('• ${worker.experience}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
-                Text('• ${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-
-          // Action Buttons
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 10),
                   ),
-                  onPressed: () {
-                    if (_categories.isNotEmpty) {
-                      _navigateToCategory(_categories.first);
-                    }
-                  },
-                  icon: const Icon(Icons.lock_outline, size: 14, color: AppColors.tertiaryFixed),
-                  label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton(
-                style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: AppColors.outlineVariant),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                ),
-                onPressed: () {
-                  if (_categories.isNotEmpty) {
-                    _navigateToCategory(_categories.first);
-                  }
-                },
-                child: Text('Profile', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 8),
+                  OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(color: AppColors.outlineVariant),
+                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    ),
+                    onPressed: () => _navigateToWorkerProfile(worker),
+                    child: Text('Profile', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1494,9 +1891,24 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildPromiseItem(Icons.account_balance, 'Direct Bank Pay', '0% cut to worker'),
-                _buildPromiseItem(Icons.price_check, 'Fixed Rate Card', 'No surge pricing'),
-                _buildPromiseItem(Icons.verified_user, '₹50,000 Cover', 'Damage protection'),
+                _buildPromiseItem(
+                  Icons.account_balance,
+                  'Direct Bank Pay',
+                  '0% cut to worker',
+                  '100% of your booking payment is disbursed directly to the verified artisan’s bank account. ShramSetu charges 0% middleman commission.',
+                ),
+                _buildPromiseItem(
+                  Icons.price_check,
+                  'Fixed Rate Card',
+                  'No surge pricing',
+                  'Standardized rates certified by the Pune District Labour Cooperative Society. No surge pricing during peak hours or bad weather.',
+                ),
+                _buildPromiseItem(
+                  Icons.verified_user,
+                  '₹50,000 Cover',
+                  'Damage protection',
+                  'All bookings on ShramSetu include up to ₹50,000 accidental damage protection covered by the Cooperative Welfare Fund.',
+                ),
               ],
             ),
           ],
@@ -1505,23 +1917,33 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     );
   }
 
-  Widget _buildPromiseItem(IconData icon, String title, String subtitle) {
+  Widget _buildPromiseItem(IconData icon, String title, String subtitle, String description) {
     return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceContainerLow,
-              borderRadius: AppRadius.radiusLg,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: AppRadius.radiusLg,
+          onTap: () => _showPromiseDetails(title, description),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Column(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: AppRadius.radiusLg,
+                  ),
+                  child: Icon(icon, size: 20, color: AppColors.primary),
+                ),
+                const SizedBox(height: 6),
+                Text(title, style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
+                Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 9), textAlign: TextAlign.center),
+              ],
             ),
-            child: Icon(icon, size: 20, color: AppColors.primary),
           ),
-          const SizedBox(height: 6),
-          Text(title, style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold, fontSize: 10), textAlign: TextAlign.center),
-          Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 9), textAlign: TextAlign.center),
-        ],
+        ),
       ),
     );
   }

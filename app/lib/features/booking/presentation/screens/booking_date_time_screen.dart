@@ -170,6 +170,7 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
   Widget _buildDateChip(String date) {
     final isSelected = _selectedDate == date;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _selectedDate = date),
       child: Container(
         margin: const EdgeInsets.only(right: AppSpacing.spacingSm),
@@ -190,6 +191,7 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
   Widget _buildTimeChip(String time) {
     final isSelected = _selectedTime == time;
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _selectedTime = time),
       child: Container(
         alignment: Alignment.center,
@@ -216,6 +218,7 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
       ),
       child: SafeArea(
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: isReady
               ? () {
                   bookingFlowState.selectedDate = _selectedDate;

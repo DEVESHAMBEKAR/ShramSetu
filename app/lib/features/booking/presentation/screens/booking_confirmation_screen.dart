@@ -138,6 +138,7 @@ class BookingConfirmationScreen extends StatelessWidget {
                         const SizedBox(height: AppSpacing.spacingSm),
                       ],
                       GestureDetector(
+                        behavior: HitTestBehavior.opaque,
                         onTap: () {
                           Navigator.of(context).pushNamedAndRemoveUntil('/customer/home', (route) => false);
                         },

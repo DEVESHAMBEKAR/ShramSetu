@@ -356,38 +356,43 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
         onRefresh: _loadBookingDetails,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Order Reference Header Strip
-              _buildOrderRefHeader(),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 850),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 1. Order Reference Header Strip
+                  _buildOrderRefHeader(),
 
-              // 2. Live Status Hero Card
-              _buildStatusHeroCard(status, workerName, workerLocation, customerAddress),
+                  // 2. Live Status Hero Card
+                  _buildStatusHeroCard(status, workerName, workerLocation, customerAddress),
 
-              // 3. Visual Route & Location Map HUD
-              _buildMapHud(workerName),
+                  // 3. Visual Route & Location Map HUD
+                  _buildMapHud(workerName),
 
-              // 4. Worker Trust & Direct Communications Card
-              _buildWorkerCard(workerName, workerAvatar, workerRating, jobsCompleted, workerPhone),
+                  // 4. Worker Trust & Direct Communications Card
+                  _buildWorkerCard(workerName, workerAvatar, workerRating, jobsCompleted, workerPhone),
 
-              // 5. 4-Digit Escrow Release Security Box
-              _buildEscrowSecurityBox(otpCode, workerName, status),
+                  // 5. 4-Digit Escrow Release Security Box
+                  _buildEscrowSecurityBox(otpCode, workerName, status),
 
-              // 6. Service Milestones Progress Timeline
-              _buildMilestoneTimeline(status),
+                  // 6. Service Milestones Progress Timeline
+                  _buildMilestoneTimeline(status),
 
-              // 7. Job & Fare Summary
-              _buildFareSummaryCard(serviceName, serviceDesc, baseAmount, laborAllowance, totalEscrow),
+                  // 7. Job & Fare Summary
+                  _buildFareSummaryCard(serviceName, serviceDesc, baseAmount, laborAllowance, totalEscrow),
 
-              // 8. Action Buttons (Reschedule / Cancel / Rate)
-              _buildActionButtons(status, workerName, serviceName),
+                  // 8. Action Buttons (Reschedule / Cancel / Rate)
+                  _buildActionButtons(status, workerName, serviceName),
 
-              // 9. Cooperative Assurance Footer
-              _buildAssuranceFooter(workerName),
+                  // 9. Cooperative Assurance Footer
+                  _buildAssuranceFooter(workerName),
 
-              const SizedBox(height: AppSpacing.spacing2xl),
-            ],
+                  const SizedBox(height: AppSpacing.spacing2xl),
+                ],
+              ),
+            ),
           ),
         ),
       ),

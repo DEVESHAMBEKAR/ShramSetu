@@ -9,8 +9,9 @@ import 'worker_profile_screen.dart';
 
 class WorkerDiscoveryScreen extends StatefulWidget {
   final ServiceCategory? initialCategory;
+  final String? initialSearchQuery;
 
-  const WorkerDiscoveryScreen({super.key, this.initialCategory});
+  const WorkerDiscoveryScreen({super.key, this.initialCategory, this.initialSearchQuery});
 
   @override
   State<WorkerDiscoveryScreen> createState() => _WorkerDiscoveryScreenState();
@@ -19,6 +20,7 @@ class WorkerDiscoveryScreen extends StatefulWidget {
 class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   String _activeCategoryFilter = 'all';
   String _searchQuery = '';
+  late final TextEditingController _searchController;
   late Future<List<Worker>> _workersFuture;
   late ServiceCategory _currentCategory;
   List<ServiceCategory> _availableCategories = [];
@@ -26,10 +28,18 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   @override
   void initState() {
     super.initState();
+    _searchQuery = widget.initialSearchQuery ?? '';
+    _searchController = TextEditingController(text: _searchQuery);
     _currentCategory = widget.initialCategory ??
         const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
     _loadWorkers();
     _loadCategories();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCategories() async {
@@ -86,69 +96,74 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
-            // 1. Urban Company Header Strip
-            _buildHeader(),
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1100),
+            child: Column(
+              children: [
+                // 1. Urban Company Header Strip
+                _buildHeader(),
 
-            // 2. Search & Trade Chips Section
-            _buildSearchAndFilters(),
+                // 2. Search & Trade Chips Section
+                _buildSearchAndFilters(),
 
-            // 3. Certified Union Guild Banner
-            _buildGuildBanner(),
+                // 3. Certified Union Guild Banner
+                _buildGuildBanner(),
 
-            // 4. Specialist List Header
-            _buildListHeader(),
+                // 4. Specialist List Header
+                _buildListHeader(),
 
-            // 5. Workers List View
-            Expanded(
-              child: FutureBuilder<List<Worker>>(
-                future: _workersFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
-                  }
-                  if (snapshot.hasError) {
-                    return Center(child: Text('Error: ${snapshot.error}', style: AppTypography.bodyMd));
-                  }
+                // 5. Workers List View
+                Expanded(
+                  child: FutureBuilder<List<Worker>>(
+                    future: _workersFuture,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
+                      }
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}', style: AppTypography.bodyMd));
+                      }
 
-                  final allWorkers = snapshot.data ?? [];
-                  final filtered = allWorkers.where((w) {
-                    if (_searchQuery.isNotEmpty && !w.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-                      return false;
-                    }
-                    if (_activeCategoryFilter == 'top_rated' && w.rating < 4.8) {
-                      return false;
-                    }
-                    return true;
-                  }).toList();
+                      final allWorkers = snapshot.data ?? [];
+                      final filtered = allWorkers.where((w) {
+                        if (_searchQuery.isNotEmpty && !w.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
+                          return false;
+                        }
+                        if (_activeCategoryFilter == 'top_rated' && w.rating < 4.8) {
+                          return false;
+                        }
+                        return true;
+                      }).toList();
 
-                  if (filtered.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(Icons.search_off, size: 48, color: AppColors.outline),
-                          const SizedBox(height: 8),
-                          Text('No union artisans found matching criteria', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
-                        ],
-                      ),
-                    );
-                  }
+                      if (filtered.isEmpty) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(Icons.search_off, size: 48, color: AppColors.outline),
+                              const SizedBox(height: 8),
+                              Text('No union artisans found matching criteria', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
+                            ],
+                          ),
+                        );
+                      }
 
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 24),
-                    itemCount: filtered.length,
-                    separatorBuilder: (context, index) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      final worker = filtered[index];
-                      return _buildWorkerCard(worker);
+                      return ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 24),
+                        itemCount: filtered.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 12),
+                        itemBuilder: (context, index) {
+                          final worker = filtered[index];
+                          return _buildWorkerCard(worker);
+                        },
+                      );
                     },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -267,6 +282,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
+                    controller: _searchController,
                     onChanged: (val) => setState(() => _searchQuery = val),
                     decoration: InputDecoration(
                       hintText: 'Search verified union artisans...',
@@ -276,7 +292,16 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                     ),
                   ),
                 ),
-                const Icon(Icons.mic_none, size: 18, color: AppColors.outline),
+                if (_searchQuery.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.clear, size: 18, color: AppColors.outline),
+                    onPressed: () {
+                      _searchController.clear();
+                      setState(() => _searchQuery = '');
+                    },
+                  )
+                else
+                  const Icon(Icons.mic_none, size: 18, color: AppColors.outline),
                 const SizedBox(width: 10),
               ],
             ),
@@ -332,6 +357,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   }) {
     final isSelected = forceSelected ?? (_activeCategoryFilter == key);
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onSelected ?? () => setState(() => _activeCategoryFilter = key),
       child: Container(
         height: 32,
@@ -437,7 +463,19 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   }
 
   Widget _buildWorkerCard(Worker worker) {
-    return Container(
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: AppRadius.radiusXl,
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
+            ),
+          );
+        },
+        child: Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -519,6 +557,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       children: [
                         if (worker.customTag != null) ...[
                           GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () => _showWhyRecommendedModal(worker),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -636,7 +675,9 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
           ),
         ],
       ),
-    );
+    ),
+    ),
+  );
   }
 
   void _showWhyRecommendedModal(Worker worker) {
