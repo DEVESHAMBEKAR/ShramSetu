@@ -338,4 +338,30 @@ class SupabaseUserRepository implements IUserRepository {
           .eq('user_id', userId);
     } catch (_) {}
   }
+
+  @override
+  Future<void> updateAddress({
+    required String userId,
+    required String addressId,
+    required String addressLine,
+    required String area,
+    required String city,
+    required String state,
+    required String postalCode,
+  }) async {
+    try {
+      await _client
+          .from('addresses')
+          .update({
+            'address_line': addressLine.trim(),
+            'area': area.trim(),
+            'city': city.trim(),
+            'state': state.trim(),
+            'postal_code': postalCode.trim(),
+            'updated_at': DateTime.now().toIso8601String(),
+          })
+          .eq('id', addressId)
+          .eq('user_id', userId);
+    } catch (_) {}
+  }
 }

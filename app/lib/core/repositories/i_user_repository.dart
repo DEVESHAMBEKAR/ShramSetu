@@ -62,4 +62,15 @@ abstract class IUserRepository {
 
   /// Delete a saved address.
   Future<void> deleteAddress({required String userId, required String addressId});
+
+  /// Update an existing address.
+  Future<void> updateAddress({
+    required String userId,
+    required String addressId,
+    required String addressLine,
+    required String area,
+    required String city,
+    required String state,
+    required String postalCode,
+  });
 }

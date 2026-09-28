@@ -21,6 +21,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   String _customerName = 'ShramSetu Member';
   String _customerSubtitle = 'Pune District Cooperative Federation';
   String? _customerAvatar;
+  String? _currentUserId;
 
   @override
   void initState() {
@@ -34,7 +35,17 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   Future<void> _loadCustomerProfile() async {
     try {
       final user = await DI.authRepo.getCurrentUser();
-      final userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      String? userId = user?.id;
+      if (userId == null && !AppConfig.useMockData) {
+        try {
+          userId = AppConfig.supabaseClient.auth.currentUser?.id;
+        } catch (_) {}
+      }
+      if (userId == null && AppConfig.useMockData) {
+        userId = 'mock_customer_01';
+      }
+      _currentUserId = userId;
+
       if (userId != null) {
         final profile = await DI.userRepo.getCustomerProfile(userId);
         final userData = await DI.userRepo.getUserProfile(userId);
@@ -85,13 +96,26 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   ];
 
   void _showSavedAddressesDialog() {
+    final userId = _currentUserId;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading your customer profile, please try again in a moment...')),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => _SavedAddressesSheet(),
+      builder: (ctx) => _SavedAddressesSheet(
+        userId: userId,
+        customerName: _customerName,
+        onAddressChanged: () {
+          _loadCustomerProfile();
+        },
+      ),
     );
   }
 
@@ -609,6 +633,16 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
 }
 
 class _SavedAddressesSheet extends StatefulWidget {
+  final String userId;
+  final String customerName;
+  final VoidCallback? onAddressChanged;
+
+  const _SavedAddressesSheet({
+    required this.userId,
+    required this.customerName,
+    this.onAddressChanged,
+  });
+
   @override
   State<_SavedAddressesSheet> createState() => _SavedAddressesSheetState();
 }
@@ -616,7 +650,6 @@ class _SavedAddressesSheet extends StatefulWidget {
 class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
   List<CustomerAddress> _addresses = [];
   bool _isLoading = true;
-  String? _userId;
 
   @override
   void initState() {
@@ -627,20 +660,16 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
   Future<void> _loadAddresses() async {
     setState(() => _isLoading = true);
     try {
-      final user = await DI.authRepo.getCurrentUser();
-      _userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
-      if (_userId != null) {
-        final list = await DI.userRepo.getUserAddresses(_userId!);
-        if (mounted) setState(() => _addresses = list);
-      }
+      final list = await DI.userRepo.getUserAddresses(widget.userId);
+      if (mounted) setState(() => _addresses = list);
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _makeDefault(CustomerAddress addr) async {
-    if (_userId == null) return;
     try {
-      await DI.userRepo.setDefaultAddress(userId: _userId!, addressId: addr.id);
+      await DI.userRepo.setDefaultAddress(userId: widget.userId, addressId: addr.id);
+      widget.onAddressChanged?.call();
       await _loadAddresses();
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -648,7 +677,6 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
   }
 
   Future<void> _deleteAddress(CustomerAddress addr) async {
-    if (_userId == null) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -666,7 +694,8 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
     );
     if (confirmed == true) {
       try {
-        await DI.userRepo.deleteAddress(userId: _userId!, addressId: addr.id);
+        await DI.userRepo.deleteAddress(userId: widget.userId, addressId: addr.id);
+        widget.onAddressChanged?.call();
         await _loadAddresses();
       } catch (e) {
         if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
@@ -753,23 +782,121 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
                 return;
               }
               Navigator.pop(dlgCtx);
-              if (_userId != null) {
-                try {
-                  await DI.userRepo.createAddress(
-                    userId: _userId!,
-                    addressLine: lineCtrl.text.trim(),
-                    area: areaCtrl.text.trim(),
-                    city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
-                    state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
-                    postalCode: pinCtrl.text.trim(),
-                  );
-                  await _loadAddresses();
-                } catch (e) {
-                  if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
+              try {
+                await DI.userRepo.createAddress(
+                  userId: widget.userId,
+                  addressLine: lineCtrl.text.trim(),
+                  area: areaCtrl.text.trim(),
+                  city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
+                  state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
+                  postalCode: pinCtrl.text.trim(),
+                );
+                widget.onAddressChanged?.call();
+                await _loadAddresses();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
               }
             },
             child: const Text('Save Address'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showEditAddressDialog(CustomerAddress addr) {
+    final lineCtrl = TextEditingController(text: addr.addressLine);
+    final areaCtrl = TextEditingController(text: addr.area);
+    final cityCtrl = TextEditingController(text: addr.city.isNotEmpty ? addr.city : 'Pune');
+    final pinCtrl = TextEditingController(text: addr.postalCode);
+    final stateCtrl = TextEditingController(text: addr.state.isNotEmpty ? addr.state : 'Maharashtra');
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.edit_location_alt_outlined, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Edit Address', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: lineCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'House / Flat / Street *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: areaCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Area / Locality *',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: cityCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'City *',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: pinCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'PIN Code *',
+                        border: OutlineInputBorder(),
+                      ),
+                      keyboardType: TextInputType.number,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (lineCtrl.text.trim().isEmpty || areaCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                  const SnackBar(content: Text('Please fill all required fields.')),
+                );
+                return;
+              }
+              Navigator.pop(dlgCtx);
+              try {
+                await DI.userRepo.updateAddress(
+                  userId: widget.userId,
+                  addressId: addr.id,
+                  addressLine: lineCtrl.text.trim(),
+                  area: areaCtrl.text.trim(),
+                  city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
+                  state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
+                  postalCode: pinCtrl.text.trim(),
+                );
+                widget.onAddressChanged?.call();
+                await _loadAddresses();
+              } catch (e) {
+                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+              }
+            },
+            child: const Text('Save Changes'),
           ),
         ],
       ),
@@ -792,11 +919,21 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.location_on, color: AppColors.primary, size: 24),
-                  const SizedBox(width: 10),
-                  Text('Saved Addresses', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 8),
+                      Text('Saved Addresses', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Delivery addresses for ${widget.customerName}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.outline),
+                  ),
                 ],
               ),
               IconButton(
@@ -820,12 +957,21 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
                   children: [
                     const Icon(Icons.location_off_outlined, size: 40, color: AppColors.outline),
                     const SizedBox(height: 8),
-                    const Text('No saved addresses found in your database record.', style: TextStyle(color: AppColors.outline, fontSize: 13)),
-                    const SizedBox(height: 12),
+                    Text(
+                      'No saved addresses for ${widget.customerName}.',
+                      style: const TextStyle(color: AppColors.outline, fontSize: 13, fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Add your home or work address below to receive verified artisan services.',
+                      style: TextStyle(color: AppColors.outline, fontSize: 11),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 14),
                     ElevatedButton.icon(
                       style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
                       icon: const Icon(Icons.add, size: 16),
-                      label: const Text('Add Home Address'),
+                      label: const Text('Add Delivery Address'),
                       onPressed: _showAddAddressDialog,
                     ),
                   ],
@@ -890,11 +1036,13 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
                       icon: const Icon(Icons.more_vert, size: 18, color: AppColors.outline),
                       onSelected: (val) {
                         if (val == 'default') _makeDefault(addr);
+                        if (val == 'edit') _showEditAddressDialog(addr);
                         if (val == 'delete') _deleteAddress(addr);
                       },
                       itemBuilder: (_) => [
                         if (!addr.isDefault)
                           const PopupMenuItem(value: 'default', child: Row(children: [Icon(Icons.check, size: 16), SizedBox(width: 8), Text('Set as Default')])),
+                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 16), SizedBox(width: 8), Text('Edit Address')])),
                         const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 16, color: AppColors.error), SizedBox(width: 8), Text('Delete', style: TextStyle(color: AppColors.error))])),
                       ],
                     ),

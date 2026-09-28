@@ -1,4 +1,5 @@
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/config/app_config.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:razorpay_flutter/razorpay_flutter.dart';
@@ -21,16 +22,42 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   bool _isSubmitting = false;
   String? _pendingBookingId;
   Razorpay? _razorpay;
+  String? _customerAddressText;
+  String? _customerAddressId;
 
   @override
   void initState() {
     super.initState();
+    _loadCustomerAddress();
     if (!kIsWeb) {
       _razorpay = Razorpay();
       _razorpay!.on(Razorpay.EVENT_PAYMENT_SUCCESS, _handlePaymentSuccess);
       _razorpay!.on(Razorpay.EVENT_PAYMENT_ERROR, _handlePaymentError);
       _razorpay!.on(Razorpay.EVENT_EXTERNAL_WALLET, _handleExternalWallet);
     }
+  }
+
+  Future<void> _loadCustomerAddress() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      String? userId = user?.id;
+      if (userId == null && !AppConfig.useMockData) {
+        try {
+          userId = AppConfig.supabaseClient.auth.currentUser?.id;
+        } catch (_) {}
+      }
+      if (userId != null) {
+        final defAddr = await DI.userRepo.getDefaultAddress(userId);
+        if (defAddr != null && mounted) {
+          setState(() {
+            _customerAddressId = defAddr.id;
+            _customerAddressText = '${defAddr.addressLine}, ${defAddr.area.isNotEmpty ? "${defAddr.area}, " : ""}${defAddr.city} - ${defAddr.postalCode}';
+            bookingFlowState.addressId = defAddr.id;
+            bookingFlowState.address = _customerAddressText;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -390,6 +417,24 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _customerAddressText ?? 'No saved address set',
+                    style: AppTypography.bodySm.copyWith(fontSize: 11, color: _customerAddressText != null ? AppColors.onSurface : AppColors.outline),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -552,7 +597,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                             scheduledDate: date,
                             scheduledTime: time,
                             amount: total.toDouble(),
-                            addressId: bookingFlowState.addressId,
+                            addressId: _customerAddressId ?? bookingFlowState.addressId,
                           );
 
                           if (newBookingId == null) {

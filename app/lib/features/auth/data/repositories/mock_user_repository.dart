@@ -275,4 +275,29 @@ class MockUserRepository implements IUserRepository {
     final addrs = _mockAddresses[userId] ?? [];
     _mockAddresses[userId] = addrs.where((a) => a['id'] != addressId).toList();
   }
+
+  @override
+  Future<void> updateAddress({
+    required String userId,
+    required String addressId,
+    required String addressLine,
+    required String area,
+    required String city,
+    required String state,
+    required String postalCode,
+  }) async {
+    final addrs = _mockAddresses[userId] ?? [];
+    _mockAddresses[userId] = addrs.map((a) {
+      if (a['id'] == addressId) {
+        final copy = Map<String, dynamic>.from(a);
+        copy['address_line'] = addressLine;
+        copy['area'] = area;
+        copy['city'] = city;
+        copy['state'] = state;
+        copy['postal_code'] = postalCode;
+        return copy;
+      }
+      return a;
+    }).toList();
+  }
 }

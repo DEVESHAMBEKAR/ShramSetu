@@ -45,7 +45,7 @@ class BookingFlowState {
     this.selectedWorker,
     this.selectedDate,
     this.selectedTime,
-    this.address = 'Flat 402, Sai Shraddha Apts, Ideal Colony, Kothrud, Pune - 411038',
+    this.address,
     this.addressId,
     this.latitude,
     this.longitude,
