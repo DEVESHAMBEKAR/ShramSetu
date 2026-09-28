@@ -118,25 +118,87 @@ class SupabaseAdminRepository implements IAdminRepository {
     } catch (_) {}
 
     // 2. Direct database update fallback
-    final current = await _client.from('workers').select('worker_status').eq('id', workerId).maybeSingle();
-    final prevStatus = current?['worker_status'] ?? 'PENDING_VERIFICATION';
+    String prevStatus = 'PENDING_VERIFICATION';
+    try {
+      final current = await _client.from('workers').select('worker_status').eq('id', workerId).maybeSingle();
+      if (current != null && current['worker_status'] != null) {
+        prevStatus = current['worker_status'].toString();
+      }
+    } catch (_) {}
 
-    final updatePayload = <String, dynamic>{
+    final corePayload = <String, dynamic>{
       'worker_status': newWorkerStatus,
+      'is_available': newWorkerStatus == 'ACTIVE',
       'updated_at': DateTime.now().toIso8601String(),
     };
-    if (remarks != null) updatePayload['verification_remarks'] = remarks;
-    if (adminId != null) updatePayload['reviewed_by'] = adminId;
-    if (newWorkerStatus == 'ACTIVE') {
-      updatePayload['verified_at'] = DateTime.now().toIso8601String();
-      updatePayload['is_available'] = true;
-    } else if (newWorkerStatus == 'SUSPENDED' || newWorkerStatus == 'REJECTED') {
-      updatePayload['is_available'] = false;
+
+    // Try updating workers table (try rich payload with remarks/verified_at if columns exist, fallback to core)
+    try {
+      final richPayload = Map<String, dynamic>.from(corePayload);
+      if (remarks != null && remarks.isNotEmpty) {
+        richPayload['verification_remarks'] = remarks;
+      }
+      if (newWorkerStatus == 'ACTIVE') {
+        richPayload['verified_at'] = DateTime.now().toIso8601String();
+      }
+      await _client.from('workers').update(richPayload).eq('id', workerId);
+    } catch (_) {
+      try {
+        await _client.from('workers').update(corePayload).eq('id', workerId);
+      } catch (err) {
+        // If check constraint on remote workers table only allows base statuses
+        if (newWorkerStatus == 'UNDER_REVIEW' || newWorkerStatus == 'CHANGES_REQUIRED') {
+          await _client.from('workers').update({
+            'worker_status': 'PENDING_VERIFICATION',
+            'is_available': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', workerId);
+        } else if (newWorkerStatus == 'REJECTED') {
+          await _client.from('workers').update({
+            'worker_status': 'INACTIVE',
+            'is_available': false,
+            'updated_at': DateTime.now().toIso8601String(),
+          }).eq('id', workerId);
+        } else {
+          rethrow;
+        }
+      }
     }
 
-    await _client.from('workers').update(updatePayload).eq('id', workerId);
+    // 3. Update or insert into worker_verification table (reviewed_by and rejection_reason belong here)
+    try {
+      final verExisting = await _client
+          .from('worker_verification')
+          .select('id')
+          .eq('worker_id', workerId)
+          .maybeSingle();
 
-    // 3. Log history entry
+      String verStatus = 'PENDING';
+      if (newWorkerStatus == 'ACTIVE') {
+        verStatus = 'APPROVED';
+      } else if (newWorkerStatus == 'REJECTED') {
+        verStatus = 'REJECTED';
+      }
+
+      final verData = <String, dynamic>{
+        'worker_id': workerId,
+        'status': verStatus,
+        'reviewed_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (adminId != null) verData['reviewed_by'] = adminId;
+      if (remarks != null && remarks.isNotEmpty) {
+        verData['rejection_reason'] = remarks;
+      }
+
+      if (verExisting != null && verExisting['id'] != null) {
+        await _client.from('worker_verification').update(verData).eq('id', verExisting['id']);
+      } else {
+        await _client.from('worker_verification').insert(verData);
+      }
+    } catch (_) {}
+
+    // 4. Log history entry
     try {
       await _client.from('worker_verification_history').insert({
         'worker_id': workerId,

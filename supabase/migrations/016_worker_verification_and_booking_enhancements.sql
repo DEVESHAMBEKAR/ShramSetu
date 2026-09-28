@@ -127,30 +127,41 @@ BEGIN
     WHERE id = p_worker_id;
 
     -- Update or insert worker_verification table
-    INSERT INTO public.worker_verification (worker_id, status, reviewed_at, reviewed_by, rejection_reason, remarks, updated_at)
-    VALUES (
-        p_worker_id,
-        CASE
-            WHEN v_new_status = 'ACTIVE' THEN 'APPROVED'
-            WHEN v_new_status = 'CHANGES_REQUIRED' THEN 'CHANGES_REQUIRED'
-            WHEN v_new_status = 'UNDER_REVIEW' THEN 'UNDER_REVIEW'
-            WHEN v_new_status = 'SUSPENDED' THEN 'SUSPENDED'
-            WHEN v_new_status = 'REJECTED' THEN 'REJECTED'
-            ELSE 'PENDING'
-        END,
-        NOW(),
-        v_admin_id,
-        CASE WHEN v_new_status = 'REJECTED' THEN p_remarks ELSE NULL END,
-        p_remarks,
-        NOW()
-    )
-    ON CONFLICT (id) DO UPDATE
-    SET status = EXCLUDED.status,
-        reviewed_at = EXCLUDED.reviewed_at,
-        reviewed_by = EXCLUDED.reviewed_by,
-        rejection_reason = EXCLUDED.rejection_reason,
-        remarks = EXCLUDED.remarks,
-        updated_at = NOW();
+    IF EXISTS (SELECT 1 FROM public.worker_verification WHERE worker_id = p_worker_id) THEN
+        UPDATE public.worker_verification
+        SET status = CASE
+                WHEN v_new_status = 'ACTIVE' THEN 'APPROVED'
+                WHEN v_new_status = 'CHANGES_REQUIRED' THEN 'CHANGES_REQUIRED'
+                WHEN v_new_status = 'UNDER_REVIEW' THEN 'UNDER_REVIEW'
+                WHEN v_new_status = 'SUSPENDED' THEN 'SUSPENDED'
+                WHEN v_new_status = 'REJECTED' THEN 'REJECTED'
+                ELSE 'PENDING'
+            END,
+            reviewed_at = NOW(),
+            reviewed_by = v_admin_id,
+            rejection_reason = CASE WHEN v_new_status = 'REJECTED' THEN p_remarks ELSE NULL END,
+            remarks = p_remarks,
+            updated_at = NOW()
+        WHERE worker_id = p_worker_id;
+    ELSE
+        INSERT INTO public.worker_verification (worker_id, status, reviewed_at, reviewed_by, rejection_reason, remarks, updated_at)
+        VALUES (
+            p_worker_id,
+            CASE
+                WHEN v_new_status = 'ACTIVE' THEN 'APPROVED'
+                WHEN v_new_status = 'CHANGES_REQUIRED' THEN 'CHANGES_REQUIRED'
+                WHEN v_new_status = 'UNDER_REVIEW' THEN 'UNDER_REVIEW'
+                WHEN v_new_status = 'SUSPENDED' THEN 'SUSPENDED'
+                WHEN v_new_status = 'REJECTED' THEN 'REJECTED'
+                ELSE 'PENDING'
+            END,
+            NOW(),
+            v_admin_id,
+            CASE WHEN v_new_status = 'REJECTED' THEN p_remarks ELSE NULL END,
+            p_remarks,
+            NOW()
+        );
+    END IF;
 
     -- Log in immutable verification history
     INSERT INTO public.worker_verification_history (
@@ -181,3 +192,7 @@ BEGIN
     RETURN v_result;
 END;
 $$;
+
+-- Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
+
