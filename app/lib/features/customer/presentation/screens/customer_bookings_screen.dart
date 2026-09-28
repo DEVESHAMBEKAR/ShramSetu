@@ -6,6 +6,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import 'customer_live_tracking_screen.dart';
+import 'customer_booking_detail_screen.dart';
 import '../widgets/review_rating_modal.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
@@ -76,6 +77,16 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
         setState(() => _errorMessage = e.toString());
       }
     }
+  }
+
+  Future<void> _openBookingDetail(Map<String, dynamic> booking) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => CustomerBookingDetailScreen(booking: booking),
+      ),
+    );
+    _refreshBookings();
   }
 
   @override
@@ -266,8 +277,11 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
     final otp = booking['otp']?.toString() ?? '8492';
     final orderRef = bookingId.length >= 4 ? bookingId.substring(0, 4).toUpperCase() : '8942';
 
-    return Container(
-      decoration: BoxDecoration(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => _openBookingDetail(booking),
+      child: Container(
+        decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: AppRadius.radiusXl,
         border: Border.all(color: AppColors.outlineVariant),
@@ -443,33 +457,25 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                       ],
                     ),
                     if (!isPast)
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                          elevation: 0,
-                        ),
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => CustomerLiveTrackingScreen(bookingId: bookingId),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.navigation, size: 14, color: AppColors.tertiaryFixed),
-                        label: Text('Track Live', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-                      )
-                    else
                       Row(
                         children: [
                           OutlinedButton(
                             style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: AppColors.outlineVariant),
+                              side: const BorderSide(color: AppColors.outlineVariant),
                               shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                            ),
+                            onPressed: () => _openBookingDetail(booking),
+                            child: Text('Manage', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                              elevation: 0,
                             ),
                             onPressed: () {
                               Navigator.push(
@@ -479,6 +485,21 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                                 ),
                               );
                             },
+                            icon: const Icon(Icons.navigation, size: 14, color: AppColors.tertiaryFixed),
+                            label: Text('Track Live', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      )
+                    else
+                      Row(
+                        children: [
+                          OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.outlineVariant),
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            ),
+                            onPressed: () => _openBookingDetail(booking),
                             child: Text('Details', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                           ),
                           if (status == 'completed') ...[
@@ -512,6 +533,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 }

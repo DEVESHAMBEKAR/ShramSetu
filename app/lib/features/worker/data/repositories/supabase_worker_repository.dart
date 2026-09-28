@@ -91,22 +91,15 @@ class SupabaseWorkerRepository implements IWorkerRepository {
         'https://i.pravatar.cc/150?u=$effectiveId';
 
     // Attempt to parse VerificationStatus
-    VerificationStatus verificationStatus = VerificationStatus.pending;
-    if (workerRes != null) {
-      if (workerRes['worker_status'] == 'ACTIVE') {
-        verificationStatus = VerificationStatus.approved;
-      } else if (workerRes['worker_status'] == 'SUSPENDED' || workerRes['worker_status'] == 'REJECTED') {
-        verificationStatus = VerificationStatus.rejected;
-      }
-    }
+    VerificationStatus verificationStatus = VerificationStatus.fromDb(workerRes?['worker_status']);
 
     return WorkerProfile(
       id: effectiveId,
       name: resolvedName,
       profileImage: avatarUrl,
       phone: resolvedPhone,
-      skills: ['General Service'],
-      experience: '2 Years',
+      skills: [workerRes?['primary_skill'] as String? ?? 'General Service'],
+      experience: '${workerRes?['experience_years'] ?? 2} Years',
       rating: (workerRes?['rating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (workerRes?['review_count'] as num?)?.toInt() ?? 0,
       completedJobs: workerRes?['completed_jobs'] ?? 0,
@@ -115,12 +108,24 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       verificationStatus: verificationStatus,
       isAvailable: workerRes?['is_available'] ?? false,
       serviceLocation: workerRes?['location_tag'] ?? 'Pune, Maharashtra',
-      guildName: 'ShramSetu Cooperative',
-      guildId: '#',
+      guildName: workerRes?['federation_name'] as String? ?? 'Pune District Labour Cooperative Federation',
+      guildId: workerRes?['membership_id'] as String? ?? '#',
       latitude: (workerRes?['latitude'] as num?)?.toDouble(),
       longitude: (workerRes?['longitude'] as num?)?.toDouble(),
       locationUpdatedAt: workerRes?['location_updated_at'] != null 
           ? DateTime.tryParse(workerRes!['location_updated_at'].toString()) 
+          : null,
+      dob: workerRes?['dob']?.toString(),
+      gender: workerRes?['gender'] as String?,
+      district: workerRes?['district'] as String? ?? 'Pune',
+      pinCode: workerRes?['pincode'] as String?,
+      trade: workerRes?['trade'] as String?,
+      primarySkill: workerRes?['primary_skill'] as String?,
+      skillLevel: workerRes?['skill_level'] as String? ?? 'Intermediate',
+      membershipId: workerRes?['membership_id'] as String?,
+      verificationRemarks: workerRes?['verification_remarks'] as String?,
+      registeredAt: workerRes?['created_at'] != null 
+          ? DateTime.tryParse(workerRes!['created_at'].toString()) 
           : null,
     );
   }
@@ -378,6 +383,66 @@ class SupabaseWorkerRepository implements IWorkerRepository {
   @override
   Future<void> submitForVerification(String workerId) async {
     await _supabase.from('workers').update({'worker_status': 'PENDING_VERIFICATION'}).eq('id', workerId);
+    try {
+      await _supabase.from('worker_verification_history').insert({
+        'worker_id': workerId,
+        'previous_status': 'NOT_SUBMITTED',
+        'new_status': 'PENDING_VERIFICATION',
+        'action': 'SUBMIT_REGISTRATION',
+        'remarks': 'Worker submitted registration for verification',
+      });
+    } catch (_) {}
+  }
+
+  @override
+  Future<void> resubmitForVerification(String workerId) async {
+    await _supabase.from('workers').update({
+      'worker_status': 'UNDER_REVIEW',
+      'updated_at': DateTime.now().toIso8601String(),
+    }).eq('id', workerId);
+
+    try {
+      await _supabase.from('worker_verification_history').insert({
+        'worker_id': workerId,
+        'previous_status': 'CHANGES_REQUIRED',
+        'new_status': 'UNDER_REVIEW',
+        'action': 'RESUBMIT',
+        'remarks': 'Worker updated requested documents/details and resubmitted for review',
+      });
+    } catch (_) {}
+  }
+
+  @override
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId) async {
+    try {
+      final res = await _supabase
+          .from('worker_verification_history')
+          .select('''
+            id, worker_id, admin_id, previous_status, new_status, action, remarks, created_at,
+            admin:users!worker_verification_history_admin_id_fkey(full_name)
+          ''')
+          .eq('worker_id', workerId)
+          .order('created_at', ascending: false);
+
+      return (res as List).map((h) {
+        final adminData = h['admin'] as Map<String, dynamic>?;
+        final map = Map<String, dynamic>.from(h);
+        map['admin_name'] = adminData?['full_name'];
+        return WorkerVerificationHistoryItem.fromJson(map);
+      }).toList();
+    } catch (e) {
+      // Fallback query if foreign key alias varies
+      try {
+        final fallback = await _supabase
+            .from('worker_verification_history')
+            .select()
+            .eq('worker_id', workerId)
+            .order('created_at', ascending: false);
+        return (fallback as List).map((h) => WorkerVerificationHistoryItem.fromJson(h)).toList();
+      } catch (_) {
+        return [];
+      }
+    }
   }
 
   @override
@@ -388,7 +453,18 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    String? dob,
+    String? gender,
+    String? address,
+    String? city,
+    String? district,
+    String? pinCode,
+    String? trade,
+    String? skillLevel,
+    String? federationName,
+    String? membershipId,
     String? bio,
+    bool declarationAccepted = true,
   }) async {
     // 1. Update user record with full name & role
     try {
@@ -400,18 +476,41 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       debugPrint('[SupabaseWorkerRepo] update users full_name error: $e');
     }
 
-    // 2. Upsert workers table with pending verification status
+    // 2. Upsert workers table with pending verification status and 20 required fields
     try {
       final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
       if (isUuid) {
-        await _supabase.from('workers').upsert({
+        final payload = <String, dynamic>{
           'id': workerId,
           'bio': bio ?? 'Certified $skill artisan based in $serviceLocation.',
           'experience_years': experienceYears,
           'location_tag': serviceLocation,
+          'trade': trade ?? skill,
+          'primary_skill': skill,
+          'skill_level': skillLevel ?? 'Intermediate',
+          'district': district ?? 'Pune',
+          'pincode': pinCode,
+          'federation_name': federationName ?? 'Pune District Labour Cooperative Federation',
+          'membership_id': membershipId,
           'worker_status': 'PENDING_VERIFICATION',
           'is_available': false,
-        });
+        };
+        if (dob != null && dob.isNotEmpty) payload['dob'] = dob;
+        if (gender != null && gender.isNotEmpty) payload['gender'] = gender;
+
+        try {
+          await _supabase.from('workers').upsert(payload);
+        } catch (colErr) {
+          // Graceful fallback to core columns if migration is pending execution
+          await _supabase.from('workers').upsert({
+            'id': workerId,
+            'bio': bio ?? 'Certified $skill artisan based in $serviceLocation.',
+            'experience_years': experienceYears,
+            'location_tag': serviceLocation,
+            'worker_status': 'PENDING_VERIFICATION',
+            'is_available': false,
+          });
+        }
       }
     } catch (e) {
       debugPrint('[SupabaseWorkerRepo] upsert workers error: $e');

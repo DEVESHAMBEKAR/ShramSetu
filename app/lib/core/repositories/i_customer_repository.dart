@@ -27,6 +27,15 @@ abstract class ICustomerRepository {
   /// Cancel a booking if permitted by the state machine
   Future<bool> cancelBooking(String bookingId, {String? reason});
 
+  /// Reschedule an active booking (date, time, optional address/notes)
+  Future<bool> rescheduleBooking(
+    String bookingId, {
+    required String newDate,
+    required String newTime,
+    String? addressId,
+    String? notes,
+  });
+
   /// Realtime stream watching the authenticated customer's booking list
   Stream<List<Map<String, dynamic>>> watchCustomerBookings();
 

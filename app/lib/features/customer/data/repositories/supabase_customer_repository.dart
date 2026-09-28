@@ -469,7 +469,7 @@ class SupabaseCustomerRepository implements ICustomerRepository {
 
       final current = await _client
           .from('bookings')
-          .select('status')
+          .select('status, worker_id, services(name)')
           .eq('id', bookingId)
           .eq('customer_id', customerId)
           .maybeSingle();
@@ -480,18 +480,126 @@ class SupabaseCustomerRepository implements ICustomerRepository {
         throw Exception('Cannot cancel booking in $status state');
       }
 
-      await _client
-          .from('bookings')
-          .update({
-            'status': 'cancelled',
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', bookingId)
-          .eq('customer_id', customerId);
+      final updatePayload = <String, dynamic>{
+        'status': 'cancelled',
+        'updated_at': DateTime.now().toIso8601String(),
+        'cancellation_reason': reason ?? 'Cancelled by customer',
+        'cancelled_by': customerId,
+        'cancelled_at': DateTime.now().toIso8601String(),
+      };
+
+      try {
+        await _client
+            .from('bookings')
+            .update(updatePayload)
+            .eq('id', bookingId)
+            .eq('customer_id', customerId);
+      } catch (colErr) {
+        // Fallback gracefully if columns are pending migration execution
+        await _client
+            .from('bookings')
+            .update({
+              'status': 'cancelled',
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', bookingId)
+            .eq('customer_id', customerId);
+      }
+
+      // Notify the assigned worker
+      final workerId = current['worker_id'] as String?;
+      if (workerId != null) {
+        final sName = (current['services'] as Map<String, dynamic>?)?['name'] ?? 'service';
+        try {
+          DI.notificationRepo.sendPushNotification(
+            recipientUserId: workerId,
+            type: 'booking_status',
+            title: 'Booking Cancelled',
+            body: 'Customer cancelled the booking for $sName.',
+            data: {'bookingId': bookingId, 'status': 'cancelled'},
+          );
+        } catch (_) {}
+      }
 
       return true;
     } catch (e) {
       throw Exception('Failed to cancel booking: $e');
+    }
+  }
+
+  @override
+  Future<bool> rescheduleBooking(
+    String bookingId, {
+    required String newDate,
+    required String newTime,
+    String? addressId,
+    String? notes,
+  }) async {
+    try {
+      final customerId = _client.auth.currentUser?.id;
+      if (customerId == null) throw Exception('Customer not authenticated');
+
+      final current = await _client
+          .from('bookings')
+          .select('status, worker_id, scheduled_date, scheduled_time, services(name)')
+          .eq('id', bookingId)
+          .eq('customer_id', customerId)
+          .maybeSingle();
+
+      if (current == null) throw Exception('Booking not found');
+      final status = current['status'] as String? ?? '';
+      if (status != 'pending' && status != 'accepted') {
+        throw Exception('Cannot reschedule booking in $status state');
+      }
+
+      final payload = <String, dynamic>{
+        'scheduled_date': newDate,
+        'scheduled_time': newTime,
+        'rescheduled_at': DateTime.now().toIso8601String(),
+        'previous_scheduled_date': current['scheduled_date'],
+        'previous_scheduled_time': current['scheduled_time'],
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+      if (addressId != null) payload['address_id'] = addressId;
+      if (notes != null && notes.isNotEmpty) payload['notes'] = notes;
+
+      try {
+        await _client
+            .from('bookings')
+            .update(payload)
+            .eq('id', bookingId)
+            .eq('customer_id', customerId);
+      } catch (colErr) {
+        // Fallback if extra migration columns not yet in DB
+        await _client
+            .from('bookings')
+            .update({
+              'scheduled_date': newDate,
+              'scheduled_time': newTime,
+              'updated_at': DateTime.now().toIso8601String(),
+            })
+            .eq('id', bookingId)
+            .eq('customer_id', customerId);
+      }
+
+      // Notify the assigned worker
+      final workerId = current['worker_id'] as String?;
+      if (workerId != null) {
+        final sName = (current['services'] as Map<String, dynamic>?)?['name'] ?? 'service';
+        try {
+          DI.notificationRepo.sendPushNotification(
+            recipientUserId: workerId,
+            type: 'booking_rescheduled',
+            title: 'Booking Rescheduled',
+            body: 'Customer rescheduled $sName to $newDate at $newTime.',
+            data: {'bookingId': bookingId, 'status': status},
+          );
+        } catch (_) {}
+      }
+
+      return true;
+    } catch (e) {
+      throw Exception('Failed to reschedule booking: $e');
     }
   }
 

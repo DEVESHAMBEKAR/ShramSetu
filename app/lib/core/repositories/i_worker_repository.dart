@@ -10,7 +10,7 @@ abstract class IWorkerRepository {
   Future<void> submitVerificationDocument(String workerId, String documentType, String storagePath, String fileName, String mimeType, int fileSize);
   Future<void> submitForVerification(String workerId);
 
-  /// Register or update worker profile details during initial onboarding
+  /// Register or update worker profile details during initial onboarding with 20-field structure
   Future<void> registerWorker({
     required String workerId,
     required String fullName,
@@ -18,8 +18,25 @@ abstract class IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    String? dob,
+    String? gender,
+    String? address,
+    String? city,
+    String? district,
+    String? pinCode,
+    String? trade,
+    String? skillLevel,
+    String? federationName,
+    String? membershipId,
     String? bio,
+    bool declarationAccepted = true,
   });
+
+  /// Resubmit worker application after changes requested (transitions CHANGES_REQUIRED -> UNDER_REVIEW)
+  Future<void> resubmitForVerification(String workerId);
+
+  /// Fetch verification history audit trail
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId);
 
 
   /// Fetch all active, pending, or completed jobs for the worker

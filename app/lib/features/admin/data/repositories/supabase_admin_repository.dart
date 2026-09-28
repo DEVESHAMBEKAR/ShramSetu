@@ -31,45 +31,142 @@ class SupabaseAdminRepository implements IAdminRepository {
   }
 
   @override
-  Future<List<WorkerProfile>> getWorkers() async {
-    final response = await _client.from('workers').select('''
-      id, bio, experience_years, rating, completed_jobs, is_available, worker_status, location_tag,
-      users!inner(full_name, phone)
-    ''').order('created_at', ascending: false).limit(100);
-
-    return (response as List).map((json) {
-      final uData = json['users'] ?? {};
-      return WorkerProfile(
-        id: json['id'],
-        name: uData['full_name'] ?? 'Unknown',
-        phone: uData['phone'] ?? 'Unknown',
-        skills: ['General Services'],
-        experience: '${json['experience_years'] ?? 0} Years',
-        rating: (json['rating'] ?? 0).toDouble(),
-        completedJobs: json['completed_jobs'] ?? 0,
-        isVerified: json['worker_status'] == 'ACTIVE',
-        isAvailable: json['is_available'] ?? false,
-        verificationStatus: _mapVerificationStatus(json['worker_status']),
-        earnings: 0.0,
-        profileImage: 'assets/images/workers/default.jpg',
-        guildId: 'None',
-        guildName: 'None',
-        serviceLocation: json['location_tag'] ?? 'Local',
-      );
-    }).toList();
-  }
-
   @override
-  Future<void> approveWorker(String workerId) async {
-    final current = await _client.from('workers').select('worker_status').eq('id', workerId).single();
-    if (current['worker_status'] == 'PENDING_VERIFICATION') {
-      await _client.from('workers').update({'worker_status': 'ACTIVE'}).eq('id', workerId);
+  Future<List<WorkerProfile>> getWorkers() async {
+    try {
+      final response = await _client.from('workers').select('''
+        id, bio, experience_years, rating, completed_jobs, is_available, worker_status, location_tag,
+        dob, gender, trade, primary_skill, skill_level, district, pincode, federation_name, membership_id, verification_remarks, created_at,
+        users!inner(full_name, phone, avatar_url)
+      ''').order('created_at', ascending: false).limit(100);
+
+      return (response as List).map((json) {
+        final uData = json['users'] ?? {};
+        final status = VerificationStatus.fromDb(json['worker_status']);
+        final pSkill = json['primary_skill'] as String? ?? (json['trade'] as String? ?? 'General Services');
+
+        return WorkerProfile(
+          id: json['id'],
+          name: uData['full_name'] ?? 'Unknown',
+          phone: uData['phone'] ?? 'Unknown',
+          profileImage: uData['avatar_url'] ?? 'assets/images/workers/default.jpg',
+          skills: [pSkill],
+          experience: '${json['experience_years'] ?? 0} Years',
+          rating: (json['rating'] ?? 0).toDouble(),
+          completedJobs: json['completed_jobs'] ?? 0,
+          isVerified: status == VerificationStatus.approved,
+          isAvailable: json['is_available'] ?? false,
+          verificationStatus: status,
+          earnings: 0.0,
+          guildId: json['membership_id'] ?? 'None',
+          guildName: json['federation_name'] ?? 'Pune District Labour Cooperative Federation',
+          serviceLocation: json['location_tag'] ?? 'Pune',
+          dob: json['dob']?.toString(),
+          gender: json['gender'] as String?,
+          district: json['district'] as String? ?? 'Pune',
+          pinCode: json['pincode'] as String?,
+          trade: json['trade'] as String?,
+          primarySkill: pSkill,
+          skillLevel: json['skill_level'] as String? ?? 'Intermediate',
+          membershipId: json['membership_id'] as String?,
+          verificationRemarks: json['verification_remarks'] as String?,
+          registeredAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
+        );
+      }).toList();
+    } catch (e) {
+      // Fallback query without newer optional columns if needed
+      final response = await _client.from('workers').select('''
+        id, bio, experience_years, rating, completed_jobs, is_available, worker_status, location_tag,
+        users!inner(full_name, phone)
+      ''').order('created_at', ascending: false).limit(100);
+
+      return (response as List).map((json) {
+        final uData = json['users'] ?? {};
+        final status = VerificationStatus.fromDb(json['worker_status']);
+
+        return WorkerProfile(
+          id: json['id'],
+          name: uData['full_name'] ?? 'Unknown',
+          phone: uData['phone'] ?? 'Unknown',
+          skills: ['General Services'],
+          experience: '${json['experience_years'] ?? 0} Years',
+          rating: (json['rating'] ?? 0).toDouble(),
+          completedJobs: json['completed_jobs'] ?? 0,
+          isVerified: status == VerificationStatus.approved,
+          isAvailable: json['is_available'] ?? false,
+          verificationStatus: status,
+          earnings: 0.0,
+          profileImage: 'assets/images/workers/default.jpg',
+          guildId: 'None',
+          guildName: 'Pune District Labour Cooperative Federation',
+          serviceLocation: json['location_tag'] ?? 'Local',
+        );
+      }).toList();
     }
   }
 
+  Future<void> _executeVerificationAction(String workerId, String action, String? remarks, String newWorkerStatus) async {
+    final adminId = _client.auth.currentUser?.id;
+    // 1. Try secure RPC
+    try {
+      await _client.rpc('admin_verify_worker', params: {
+        'p_worker_id': workerId,
+        'p_action': action,
+        'p_remarks': remarks,
+      });
+      return;
+    } catch (_) {}
+
+    // 2. Direct database update fallback
+    final current = await _client.from('workers').select('worker_status').eq('id', workerId).maybeSingle();
+    final prevStatus = current?['worker_status'] ?? 'PENDING_VERIFICATION';
+
+    final updatePayload = <String, dynamic>{
+      'worker_status': newWorkerStatus,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (remarks != null) updatePayload['verification_remarks'] = remarks;
+    if (adminId != null) updatePayload['reviewed_by'] = adminId;
+    if (newWorkerStatus == 'ACTIVE') {
+      updatePayload['verified_at'] = DateTime.now().toIso8601String();
+      updatePayload['is_available'] = true;
+    } else if (newWorkerStatus == 'SUSPENDED' || newWorkerStatus == 'REJECTED') {
+      updatePayload['is_available'] = false;
+    }
+
+    await _client.from('workers').update(updatePayload).eq('id', workerId);
+
+    // 3. Log history entry
+    try {
+      await _client.from('worker_verification_history').insert({
+        'worker_id': workerId,
+        'admin_id': adminId,
+        'previous_status': prevStatus,
+        'new_status': newWorkerStatus,
+        'action': action,
+        'remarks': remarks,
+      });
+    } catch (_) {}
+  }
+
   @override
-  Future<void> rejectWorker(String workerId) async {
-    await _client.from('workers').update({'worker_status': 'REJECTED'}).eq('id', workerId);
+  Future<void> startReview(String workerId, {String? remarks}) async {
+    await _executeVerificationAction(workerId, 'START_REVIEW', remarks ?? 'Review initiated by administrator', 'UNDER_REVIEW');
+  }
+
+  @override
+  Future<void> approveWorker(String workerId, {String? remarks}) async {
+    await _executeVerificationAction(workerId, 'APPROVE', remarks ?? 'Verified and approved for marketplace', 'ACTIVE');
+  }
+
+  @override
+  Future<void> requestChanges(String workerId, {required String remarks}) async {
+    await _executeVerificationAction(workerId, 'REQUEST_CHANGES', remarks, 'CHANGES_REQUIRED');
+  }
+
+  @override
+  Future<void> rejectWorker(String workerId, {String? remarks}) async {
+    await _executeVerificationAction(workerId, 'REJECT', remarks ?? 'Application does not meet federation criteria', 'REJECTED');
   }
 
   @override
@@ -234,20 +331,41 @@ class SupabaseAdminRepository implements IAdminRepository {
     await _client.from('services').update({'is_active': !(current['is_active'] ?? true)}).eq('id', serviceId);
   }
 
-  VerificationStatus _mapVerificationStatus(String? status) {
-    switch (status) {
-      case 'ACTIVE': return VerificationStatus.approved;
-      case 'REJECTED': return VerificationStatus.rejected;
-      default: return VerificationStatus.pending;
-    }
+  @override
+  Future<void> suspendWorker(String workerId, {String? remarks}) async {
+    await _executeVerificationAction(workerId, 'SUSPEND', remarks ?? 'Worker suspended by administrator', 'SUSPENDED');
   }
 
   @override
-  Future<void> suspendWorker(String workerId) async {
-    await _client
-        .from('workers')
-        .update({'worker_status': 'SUSPENDED'})
-        .eq('id', workerId);
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId) async {
+    try {
+      final res = await _client
+          .from('worker_verification_history')
+          .select('''
+            id, worker_id, admin_id, previous_status, new_status, action, remarks, created_at,
+            admin:users!worker_verification_history_admin_id_fkey(full_name)
+          ''')
+          .eq('worker_id', workerId)
+          .order('created_at', ascending: false);
+
+      return (res as List).map((h) {
+        final adminData = h['admin'] as Map<String, dynamic>?;
+        final map = Map<String, dynamic>.from(h);
+        map['admin_name'] = adminData?['full_name'];
+        return WorkerVerificationHistoryItem.fromJson(map);
+      }).toList();
+    } catch (e) {
+      try {
+        final fallback = await _client
+            .from('worker_verification_history')
+            .select()
+            .eq('worker_id', workerId)
+            .order('created_at', ascending: false);
+        return (fallback as List).map((h) => WorkerVerificationHistoryItem.fromJson(h)).toList();
+      } catch (_) {
+        return [];
+      }
+    }
   }
 
   @override

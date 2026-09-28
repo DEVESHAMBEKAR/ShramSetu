@@ -46,30 +46,85 @@ class MockAdminRepository implements IAdminRepository {
 
 
 
+  final List<WorkerVerificationHistoryItem> _history = [];
+
   @override
-  Future<void> approveWorker(String workerId) async {
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId) async {
+    return _history.where((h) => h.workerId == workerId).toList();
+  }
+
+  void _recordHistory(String workerId, String prevStatus, String newStatus, String action, String? remarks) {
+    _history.insert(0, WorkerVerificationHistoryItem(
+      id: 'vh_${DateTime.now().millisecondsSinceEpoch}',
+      workerId: workerId,
+      adminId: 'admin_officer_01',
+      adminName: 'Federation Officer Desk',
+      previousStatus: prevStatus,
+      newStatus: newStatus,
+      action: action,
+      remarks: remarks,
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  @override
+  Future<void> startReview(String workerId, {String? remarks}) async {
     final index = _workers.indexWhere((w) => w.id == workerId);
     if (index != -1) {
+      final prev = _workers[index].verificationStatus.name.toUpperCase();
       _workers[index] = _workers[index].copyWith(
-        verificationStatus: VerificationStatus.approved,
-        isVerified: true,
+        verificationStatus: VerificationStatus.underReview,
+        verificationRemarks: remarks ?? 'Federation Officer has initiated document review',
       );
+      _recordHistory(workerId, prev, 'UNDER_REVIEW', 'START_REVIEW', remarks);
       _recalculateStats();
-      
     }
   }
 
   @override
-  Future<void> rejectWorker(String workerId) async {
+  Future<void> approveWorker(String workerId, {String? remarks}) async {
     final index = _workers.indexWhere((w) => w.id == workerId);
     if (index != -1) {
+      final prev = _workers[index].verificationStatus.name.toUpperCase();
+      _workers[index] = _workers[index].copyWith(
+        verificationStatus: VerificationStatus.approved,
+        isVerified: true,
+        isAvailable: true,
+        verificationRemarks: remarks ?? 'Verified by Federation Officer',
+      );
+      _recordHistory(workerId, prev, 'APPROVED', 'APPROVE', remarks);
+      _recalculateStats();
+    }
+  }
+
+  @override
+  Future<void> requestChanges(String workerId, {required String remarks}) async {
+    final index = _workers.indexWhere((w) => w.id == workerId);
+    if (index != -1) {
+      final prev = _workers[index].verificationStatus.name.toUpperCase();
+      _workers[index] = _workers[index].copyWith(
+        verificationStatus: VerificationStatus.changesRequired,
+        isVerified: false,
+        verificationRemarks: remarks,
+      );
+      _recordHistory(workerId, prev, 'CHANGES_REQUIRED', 'REQUEST_CHANGES', remarks);
+      _recalculateStats();
+    }
+  }
+
+  @override
+  Future<void> rejectWorker(String workerId, {String? remarks}) async {
+    final index = _workers.indexWhere((w) => w.id == workerId);
+    if (index != -1) {
+      final prev = _workers[index].verificationStatus.name.toUpperCase();
       _workers[index] = _workers[index].copyWith(
         verificationStatus: VerificationStatus.rejected,
         isVerified: false,
         isAvailable: false,
+        verificationRemarks: remarks ?? 'Application rejected',
       );
+      _recordHistory(workerId, prev, 'REJECTED', 'REJECT', remarks);
       _recalculateStats();
-      
     }
   }
 
@@ -214,7 +269,20 @@ class MockAdminRepository implements IAdminRepository {
   }
 
   @override
-  Future<void> suspendWorker(String workerId) async {}
+  Future<void> suspendWorker(String workerId, {String? remarks}) async {
+    final index = _workers.indexWhere((w) => w.id == workerId);
+    if (index != -1) {
+      final prev = _workers[index].verificationStatus.name.toUpperCase();
+      _workers[index] = _workers[index].copyWith(
+        verificationStatus: VerificationStatus.suspended,
+        isVerified: false,
+        isAvailable: false,
+        verificationRemarks: remarks ?? 'Account suspended by administrator',
+      );
+      _recordHistory(workerId, prev, 'SUSPENDED', 'SUSPEND', remarks);
+      _recalculateStats();
+    }
+  }
 
   @override
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId) async {

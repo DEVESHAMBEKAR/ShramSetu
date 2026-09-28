@@ -113,12 +113,50 @@ class MockWorkerRepository implements IWorkerRepository {
     });
   }
 
+  final List<WorkerVerificationHistoryItem> _mockHistory = [];
+
+  @override
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId) async {
+    return _mockHistory.where((h) => h.workerId == workerId).toList();
+  }
+
+  void addHistoryItem(WorkerVerificationHistoryItem item) {
+    _mockHistory.insert(0, item);
+  }
+
   @override
   Future<void> submitForVerification(String workerId) async {
     currentWorker = currentWorker.copyWith(
       verificationStatus: VerificationStatus.pending,
       isVerified: false,
     );
+    addHistoryItem(WorkerVerificationHistoryItem(
+      id: 'h_${DateTime.now().millisecondsSinceEpoch}',
+      workerId: workerId,
+      previousStatus: 'NOT_SUBMITTED',
+      newStatus: 'PENDING',
+      action: 'SUBMIT_REGISTRATION',
+      remarks: 'Worker submitted registration for verification',
+      createdAt: DateTime.now(),
+    ));
+  }
+
+  @override
+  Future<void> resubmitForVerification(String workerId) async {
+    final prev = currentWorker.verificationStatus.label;
+    currentWorker = currentWorker.copyWith(
+      verificationStatus: VerificationStatus.underReview,
+      isVerified: false,
+    );
+    addHistoryItem(WorkerVerificationHistoryItem(
+      id: 'h_${DateTime.now().millisecondsSinceEpoch}',
+      workerId: workerId,
+      previousStatus: prev,
+      newStatus: 'UNDER_REVIEW',
+      action: 'RESUBMIT',
+      remarks: 'Worker corrected and resubmitted required information',
+      createdAt: DateTime.now(),
+    ));
   }
 
   @override
@@ -129,7 +167,18 @@ class MockWorkerRepository implements IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    String? dob,
+    String? gender,
+    String? address,
+    String? city,
+    String? district,
+    String? pinCode,
+    String? trade,
+    String? skillLevel,
+    String? federationName,
+    String? membershipId,
     String? bio,
+    bool declarationAccepted = true,
   }) async {
     currentWorker = currentWorker.copyWith(
       id: workerId,
@@ -138,6 +187,19 @@ class MockWorkerRepository implements IWorkerRepository {
       skills: [skill],
       experience: '$experienceYears Years',
       serviceLocation: serviceLocation,
+      dob: dob,
+      gender: gender,
+      address: address,
+      city: city,
+      district: district ?? 'Pune',
+      pinCode: pinCode,
+      trade: trade ?? skill,
+      primarySkill: skill,
+      skillLevel: skillLevel ?? 'Intermediate',
+      guildName: federationName ?? 'Pune District Labour Cooperative Federation',
+      membershipId: membershipId,
+      bio: bio,
+      declarationAccepted: declarationAccepted,
       isVerified: false,
       verificationStatus: VerificationStatus.pending,
       isAvailable: false,

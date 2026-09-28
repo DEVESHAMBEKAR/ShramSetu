@@ -8,7 +8,14 @@ import '../../../../core/repositories/i_storage_repository.dart';
 import 'worker_under_verification_screen.dart';
 
 class WorkerRegistrationScreen extends StatefulWidget {
-  const WorkerRegistrationScreen({super.key});
+  final bool isResubmission;
+  final String? changeRequestReason;
+
+  const WorkerRegistrationScreen({
+    super.key,
+    this.isResubmission = false,
+    this.changeRequestReason,
+  });
 
   @override
   State<WorkerRegistrationScreen> createState() =>
@@ -18,14 +25,34 @@ class WorkerRegistrationScreen extends StatefulWidget {
 class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // 1. Full Name & 2. Mobile Number
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
 
+  // 4. DOB & 5. Gender
+  final TextEditingController _dobController = TextEditingController();
+  String _selectedGender = 'Male';
+
+  // 6. Current Address, 7. City, 8. District, 9. PIN Code
+  final TextEditingController _addressController = TextEditingController();
+  final TextEditingController _cityController = TextEditingController(text: 'Pune');
+  final TextEditingController _districtController = TextEditingController(text: 'Pune');
+  final TextEditingController _pinCodeController = TextEditingController();
+
+  // 10. Trade, 11. Primary Skill, 12. Skill Level, 13. Experience, 14. Service Area, 15. Availability
+  String _selectedTrade = 'Plumbing';
   String _selectedSkill = 'Plumbing & Pipe Fitting';
+  String _selectedSkillLevel = 'Intermediate';
   int _selectedExperienceYears = 3;
   String _selectedArea = 'Kothrud, Pune';
+  bool _isAvailable = true;
 
+  // 18. Cooperative/Federation, 19. Membership ID
+  final String _federationName = 'Pune District Labour Cooperative Federation';
+  final TextEditingController _membershipIdController = TextEditingController();
+
+  // 20. Worker Declaration
   bool _agreedToCharter = true;
   bool _isSubmitting = false;
   String? _errorMessage;
@@ -33,6 +60,21 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   // Uploaded documents state: docType -> PlatformFile
   final Map<String, PlatformFile> _uploadedFiles = {};
   final Set<String> _uploadingDocTypes = {};
+
+  final List<String> _genderOptions = ['Male', 'Female', 'Other'];
+  final List<String> _skillLevels = ['Beginner (1-2 yrs)', 'Intermediate (3-5 yrs)', 'Expert / Master Artisan (6+ yrs)'];
+
+  final List<String> _tradeCategories = [
+    'Plumbing',
+    'Electrical',
+    'Carpentry',
+    'Masonry & Construction',
+    'Cleaning & Sanitation',
+    'Appliance Repair',
+    'Painting & Waterproofing',
+    'Welding & Fabrication',
+    'General Maintenance',
+  ];
 
   final List<String> _availableSkills = [
     'Plumbing & Pipe Fitting',
@@ -72,6 +114,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
     _nameController.dispose();
     _phoneController.dispose();
     _bioController.dispose();
+    _dobController.dispose();
+    _addressController.dispose();
+    _cityController.dispose();
+    _districtController.dispose();
+    _pinCodeController.dispose();
+    _membershipIdController.dispose();
     super.dispose();
   }
 
@@ -97,8 +145,53 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             });
           }
         }
+
+        // Check if existing worker record exists to prefill during edit/resubmission
+        try {
+          final worker = await DI.workerRepo.getWorkerProfile(user.id);
+          if (worker.id.isNotEmpty && worker.name.isNotEmpty && !worker.name.startsWith('User ')) {
+            setState(() {
+              if (_nameController.text.isEmpty) _nameController.text = worker.name;
+              if (worker.dob != null && worker.dob!.isNotEmpty) _dobController.text = worker.dob!;
+              if (worker.gender != null && _genderOptions.contains(worker.gender)) _selectedGender = worker.gender!;
+              if (worker.address != null && worker.address!.isNotEmpty) _addressController.text = worker.address!;
+              if (worker.city != null && worker.city!.isNotEmpty) _cityController.text = worker.city!;
+              if (worker.district != null && worker.district!.isNotEmpty) _districtController.text = worker.district!;
+              if (worker.pinCode != null && worker.pinCode!.isNotEmpty) _pinCodeController.text = worker.pinCode!;
+              if (worker.trade != null && _tradeCategories.contains(worker.trade)) _selectedTrade = worker.trade!;
+              if (worker.primarySkill != null && _availableSkills.contains(worker.primarySkill)) {
+                _selectedSkill = worker.primarySkill!;
+              }
+              if (worker.skillLevel != null && _skillLevels.contains(worker.skillLevel)) {
+                _selectedSkillLevel = worker.skillLevel!;
+              }
+              if (worker.membershipId != null && worker.membershipId!.isNotEmpty) {
+                _membershipIdController.text = worker.membershipId!;
+              }
+              _isAvailable = worker.isAvailable;
+            });
+          }
+        } catch (_) {}
       }
     } catch (_) {}
+  }
+
+  Future<void> _selectDob() async {
+    final now = DateTime.now();
+    final initialDate = DateTime(now.year - 25, 1, 1);
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(now.year - 70),
+      lastDate: DateTime(now.year - 18),
+      helpText: 'Select Date of Birth (Must be 18+)',
+    );
+    if (picked != null) {
+      setState(() {
+        _dobController.text =
+            "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      });
+    }
   }
 
   Future<void> _pickAndUploadDocument(String docType) async {
@@ -152,12 +245,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
       return;
     }
 
-    if (!_uploadedFiles.containsKey('IDENTITY')) {
+    if (!widget.isResubmission && !_uploadedFiles.containsKey('IDENTITY')) {
       setState(() => _errorMessage = 'Please attach your Identity Proof (Aadhaar / Voter ID / PAN).');
       return;
     }
 
-    if (!_uploadedFiles.containsKey('ADDRESS')) {
+    if (!widget.isResubmission && !_uploadedFiles.containsKey('ADDRESS')) {
       setState(() => _errorMessage = 'Please attach your Address Proof (Electricity Bill / Rent Agreement).');
       return;
     }
@@ -178,7 +271,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
       final cleanName = _nameController.text.trim();
       final phone = _phoneController.text.trim();
 
-      // 1. Register worker profile in users and workers tables
+      // 1. Register worker profile in users and workers tables with 20 fields
       await DI.workerRepo.registerWorker(
         workerId: userId,
         fullName: cleanName,
@@ -186,9 +279,20 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
         skill: _selectedSkill,
         experienceYears: _selectedExperienceYears,
         serviceLocation: _selectedArea,
+        dob: _dobController.text.trim().isNotEmpty ? _dobController.text.trim() : null,
+        gender: _selectedGender,
+        address: _addressController.text.trim(),
+        city: _cityController.text.trim(),
+        district: _districtController.text.trim(),
+        pinCode: _pinCodeController.text.trim(),
+        trade: _selectedTrade,
+        skillLevel: _selectedSkillLevel,
+        federationName: _federationName,
+        membershipId: _membershipIdController.text.trim().isNotEmpty ? _membershipIdController.text.trim() : null,
         bio: _bioController.text.trim().isNotEmpty
             ? _bioController.text.trim()
             : 'Certified $_selectedSkill artisan serving $_selectedArea with $_selectedExperienceYears years of experience.',
+        declarationAccepted: _agreedToCharter,
       );
 
       // 2. Upload attached documents
@@ -220,14 +324,20 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
         );
       }
 
-      // 3. Mark for verification
-      await DI.workerRepo.submitForVerification(userId);
+      // 3. Mark for verification (submit initial or resubmit)
+      if (widget.isResubmission) {
+        await DI.workerRepo.resubmitForVerification(userId);
+      } else {
+        await DI.workerRepo.submitForVerification(userId);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             backgroundColor: AppColors.onTertiaryContainer,
-            content: Text('Registration and documents submitted for Federation Verification!'),
+            content: Text(widget.isResubmission
+                ? 'Application updated and resubmitted for Federation Review!'
+                : 'Registration and documents submitted for Federation Verification!'),
           ),
         );
 
@@ -315,10 +425,16 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                 children: [
                   _buildHeaderBanner(),
                   const SizedBox(height: 16),
+                  if (widget.changeRequestReason != null && widget.changeRequestReason!.isNotEmpty)
+                    _buildChangesRequiredBanner(),
                   if (_errorMessage != null) _buildErrorBanner(),
                   _buildPersonalInfoSection(),
                   const SizedBox(height: 16),
+                  _buildAddressSection(),
+                  const SizedBox(height: 16),
                   _buildTradeDetailsSection(),
+                  const SizedBox(height: 16),
+                  _buildCooperativeSection(),
                   const SizedBox(height: 16),
                   _buildDocumentUploadSection(),
                   const SizedBox(height: 16),
@@ -331,6 +447,43 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildChangesRequiredBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFFF9800), width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.edit_note, color: Color(0xFFE65100), size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Changes Requested by Federation Officer',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFE65100)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            widget.changeRequestReason!,
+            style: const TextStyle(fontSize: 12, color: AppColors.primary, height: 1.4),
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Please update the indicated information or upload corrected documents below and resubmit.',
+            style: TextStyle(fontSize: 11, color: AppColors.outline),
+          ),
+        ],
       ),
     );
   }
@@ -361,13 +514,13 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Artisan Cooperative Registration',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
+                Text(
+                  widget.isResubmission ? 'Update & Resubmit Application' : 'Artisan Cooperative Registration',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.primary),
                 ),
                 const SizedBox(height: 4),
                 const Text(
-                  'Complete your trade registration and submit verification documents. Access to receiving customer jobs is activated after administrator verification.',
+                  'Complete your 20-point trade registration and submit verification documents. Access to receiving customer jobs is activated after federation review.',
                   style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant, height: 1.4),
                 ),
               ],
@@ -418,7 +571,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const Icon(Icons.person_outline, color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Personal & Contact Details',
+                '1. Basic Information',
                 style: AppTypography.titleMd.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -430,7 +583,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           TextFormField(
             controller: _nameController,
             decoration: InputDecoration(
-              labelText: 'Full Legal Name *',
+              labelText: '1. Full Legal Name *',
               hintText: 'e.g. Rahul Ananda Patil',
               prefixIcon: const Icon(Icons.badge_outlined, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
@@ -452,13 +605,159 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             controller: _phoneController,
             readOnly: true,
             decoration: InputDecoration(
-              labelText: 'Registered Mobile Number',
+              labelText: '2. Registered Mobile Number',
               prefixIcon: const Icon(Icons.phone_outlined, size: 20),
               suffixIcon: const Icon(Icons.check_circle, color: AppColors.onTertiaryContainer, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: AppColors.surfaceContainerHigh.withValues(alpha: 0.4),
             ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _dobController,
+                  readOnly: true,
+                  onTap: _selectDob,
+                  decoration: InputDecoration(
+                    labelText: '4. Date of Birth *',
+                    hintText: 'YYYY-MM-DD',
+                    prefixIcon: const Icon(Icons.cake_outlined, size: 20),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.calendar_month, size: 20),
+                      onPressed: _selectDob,
+                    ),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) {
+                      return 'Select date of birth.';
+                    }
+                    return null;
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedGender,
+                  decoration: InputDecoration(
+                    labelText: '5. Gender *',
+                    prefixIcon: const Icon(Icons.wc, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  items: _genderOptions.map((g) => DropdownMenuItem(value: g, child: Text(g))).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedGender = val);
+                  },
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAddressSection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.home_outlined, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '2. Current Address & Location',
+                style: AppTypography.titleMd.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _addressController,
+            decoration: InputDecoration(
+              labelText: '6. Current Residential Address *',
+              hintText: 'e.g. Flat 301, Shanti Niwas, Paud Road',
+              prefixIcon: const Icon(Icons.location_city_outlined, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerLowest,
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Please enter current residential address.';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _cityController,
+                  decoration: InputDecoration(
+                    labelText: '7. City *',
+                    prefixIcon: const Icon(Icons.map_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Enter city.' : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _districtController,
+                  decoration: InputDecoration(
+                    labelText: '8. District *',
+                    prefixIcon: const Icon(Icons.apartment_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  validator: (val) => val == null || val.trim().isEmpty ? 'Enter district.' : null,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextFormField(
+                  controller: _pinCodeController,
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    labelText: '9. PIN Code *',
+                    hintText: '411038',
+                    prefixIcon: const Icon(Icons.pin_drop_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Enter PIN.';
+                    if (val.trim().length != 6) return '6 digits.';
+                    return null;
+                  },
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -481,7 +780,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const Icon(Icons.handyman_outlined, color: AppColors.primary, size: 20),
               const SizedBox(width: 8),
               Text(
-                'Trade & Service Area',
+                '3. Work & Skill Information',
                 style: AppTypography.titleMd.copyWith(
                   fontWeight: FontWeight.bold,
                   color: AppColors.primary,
@@ -491,9 +790,26 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
+            value: _selectedTrade,
+            decoration: InputDecoration(
+              labelText: '10. Worker Category / Trade *',
+              prefixIcon: const Icon(Icons.category_outlined, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerLowest,
+            ),
+            items: _tradeCategories.map((trade) {
+              return DropdownMenuItem(value: trade, child: Text(trade));
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) setState(() => _selectedTrade = val);
+            },
+          ),
+          const SizedBox(height: 14),
+          DropdownButtonFormField<String>(
             value: _selectedSkill,
             decoration: InputDecoration(
-              labelText: 'Primary Trade Specialization *',
+              labelText: '11. Primary Skill *',
               prefixIcon: const Icon(Icons.construction, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
@@ -507,32 +823,57 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             },
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<int>(
-            value: _selectedExperienceYears,
-            decoration: InputDecoration(
-              labelText: 'Years of Experience *',
-              prefixIcon: const Icon(Icons.history_toggle_off, size: 20),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: AppColors.surfaceContainerLowest,
-            ),
-            items: const [
-              DropdownMenuItem(value: 1, child: Text('1 Year (Beginner)')),
-              DropdownMenuItem(value: 2, child: Text('2 Years')),
-              DropdownMenuItem(value: 3, child: Text('3 Years (Experienced)')),
-              DropdownMenuItem(value: 5, child: Text('5 Years (Senior Artisan)')),
-              DropdownMenuItem(value: 8, child: Text('8 Years')),
-              DropdownMenuItem(value: 10, child: Text('10+ Years (Master Artisan)')),
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  value: _selectedSkillLevel,
+                  decoration: InputDecoration(
+                    labelText: '12. Skill Level *',
+                    prefixIcon: const Icon(Icons.grade_outlined, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  items: _skillLevels.map((lvl) {
+                    return DropdownMenuItem(value: lvl, child: Text(lvl, style: const TextStyle(fontSize: 12)));
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedSkillLevel = val);
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: _selectedExperienceYears,
+                  decoration: InputDecoration(
+                    labelText: '13. Years of Experience *',
+                    prefixIcon: const Icon(Icons.history_toggle_off, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 1, child: Text('1 Year')),
+                    DropdownMenuItem(value: 2, child: Text('2 Years')),
+                    DropdownMenuItem(value: 3, child: Text('3 Years')),
+                    DropdownMenuItem(value: 5, child: Text('5 Years')),
+                    DropdownMenuItem(value: 8, child: Text('8 Years')),
+                    DropdownMenuItem(value: 10, child: Text('10+ Years')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setState(() => _selectedExperienceYears = val);
+                  },
+                ),
+              ),
             ],
-            onChanged: (val) {
-              if (val != null) setState(() => _selectedExperienceYears = val);
-            },
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
             value: _selectedArea,
             decoration: InputDecoration(
-              labelText: 'Primary Service Locality in Pune *',
+              labelText: '14. Service Area / Preferred Working Locality *',
               prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
@@ -546,12 +887,80 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             },
           ),
           const SizedBox(height: 14),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text(
+              '15. Availability to Receive Jobs',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary),
+            ),
+            subtitle: Text(
+              _isAvailable ? 'Currently Available (accepting jobs once verified)' : 'Busy / Not accepting new jobs right now',
+              style: const TextStyle(fontSize: 12, color: AppColors.outline),
+            ),
+            value: _isAvailable,
+            activeColor: AppColors.primary,
+            onChanged: (val) => setState(() => _isAvailable = val),
+          ),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _bioController,
             maxLines: 2,
             decoration: InputDecoration(
               labelText: 'Brief Profile Bio (Optional)',
               hintText: 'e.g. Licensed residential plumbing, pipe leak detection, pump servicing.',
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerLowest,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCooperativeSection() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.diversity_3_outlined, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                '4. Cooperative / Federation Info',
+                style: AppTypography.titleMd.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            readOnly: true,
+            initialValue: _federationName,
+            decoration: InputDecoration(
+              labelText: '18. Registered Federation / Cooperative',
+              prefixIcon: const Icon(Icons.account_balance_outlined, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerHigh.withValues(alpha: 0.3),
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _membershipIdController,
+            decoration: InputDecoration(
+              labelText: '19. Cooperative Membership ID (Optional)',
+              hintText: 'e.g. FED-PUN-2024-9128',
+              prefixIcon: const Icon(Icons.card_membership_outlined, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
               fillColor: AppColors.surfaceContainerLowest,
@@ -763,12 +1172,17 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                   ),
                   SizedBox(width: 12),
-                  Text('Submitting for Federation Verification...', style: TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    'Submitting for Federation Review...',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               )
-            : const Text(
-                'Submit Registration for Admin Verification',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            : Text(
+                widget.isResubmission
+                    ? 'Resubmit Application for Federation Review'
+                    : 'Submit Registration for Admin Verification',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
               ),
       ),
     );

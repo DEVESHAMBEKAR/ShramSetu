@@ -5,12 +5,17 @@ abstract class IAdminRepository {
   Future<AdminDashboardStats> getDashboardStats();
 
   Future<List<WorkerProfile>> getWorkers();
-  Future<void> approveWorker(String workerId);
-  Future<void> rejectWorker(String workerId);
-  Future<void> suspendWorker(String workerId);
+  Future<void> startReview(String workerId, {String? remarks});
+  Future<void> approveWorker(String workerId, {String? remarks});
+  Future<void> requestChanges(String workerId, {required String remarks});
+  Future<void> rejectWorker(String workerId, {String? remarks});
+  Future<void> suspendWorker(String workerId, {String? remarks});
 
   /// Fetch KYC documents uploaded by a specific worker.
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId);
+
+  /// Fetch verification history audit trail for a worker.
+  Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId);
 
   Future<List<JobRequest>> getBookings();
   Stream<List<JobRequest>> watchBookings();

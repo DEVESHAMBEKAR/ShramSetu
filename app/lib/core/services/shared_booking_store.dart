@@ -221,9 +221,63 @@ class SharedBookingStore {
     final index = _bookings.indexWhere((b) => b['id'] == bookingId);
     if (index != -1) {
       _bookings[index]['status'] = BookingStatus.cancelled.toDbString();
+      _bookings[index]['cancellation_reason'] = reason ?? 'Cancelled by user';
+      _bookings[index]['cancelled_by'] = 'CUSTOMER';
+      _bookings[index]['cancelled_at'] = DateTime.now().toIso8601String();
       _changeController.add(null);
+
+      // Notify Worker
+      final workerId = _bookings[index]['worker_id'] as String?;
+      if (workerId != null) {
+        try {
+          DI.notificationRepo.sendPushNotification(
+            recipientUserId: workerId,
+            type: 'booking_status',
+            title: 'Booking Cancelled',
+            body: 'Customer cancelled the booking: ${reason ?? "No reason specified"}',
+            data: {'bookingId': bookingId, 'status': 'cancelled'},
+          );
+        } catch (_) {}
+      }
     }
     return true;
+  }
+
+  Future<bool> rescheduleBooking(
+    String bookingId, {
+    required String newDate,
+    required String newTime,
+    String? addressId,
+    String? notes,
+  }) async {
+    final index = _bookings.indexWhere((b) => b['id'] == bookingId);
+    if (index != -1) {
+      _bookings[index]['previous_scheduled_date'] = _bookings[index]['scheduled_date'];
+      _bookings[index]['previous_scheduled_time'] = _bookings[index]['scheduled_time'];
+      _bookings[index]['scheduled_date'] = newDate;
+      _bookings[index]['scheduled_time'] = newTime;
+      _bookings[index]['rescheduled_at'] = DateTime.now().toIso8601String();
+      if (notes != null && notes.isNotEmpty) {
+        _bookings[index]['notes'] = notes;
+      }
+      _changeController.add(null);
+
+      // Notify Worker
+      final workerId = _bookings[index]['worker_id'] as String?;
+      if (workerId != null) {
+        try {
+          DI.notificationRepo.sendPushNotification(
+            recipientUserId: workerId,
+            type: 'booking_rescheduled',
+            title: 'Booking Rescheduled',
+            body: 'Customer has rescheduled booking to $newDate at $newTime.',
+            data: {'bookingId': bookingId, 'status': _bookings[index]['status']},
+          );
+        } catch (_) {}
+      }
+      return true;
+    }
+    return false;
   }
 
   // ─────────────────────── Worker Methods ───────────────────────

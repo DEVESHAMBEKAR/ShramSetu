@@ -153,6 +153,24 @@ class MockCustomerRepository implements ICustomerRepository {
   }
 
   @override
+  Future<bool> rescheduleBooking(
+    String bookingId, {
+    required String newDate,
+    required String newTime,
+    String? addressId,
+    String? notes,
+  }) async {
+    await Future.delayed(const Duration(milliseconds: 100));
+    return SharedBookingStore.instance.rescheduleBooking(
+      bookingId,
+      newDate: newDate,
+      newTime: newTime,
+      addressId: addressId,
+      notes: notes,
+    );
+  }
+
+  @override
   Stream<List<Map<String, dynamic>>> watchCustomerBookings() {
     return SharedBookingStore.instance.watchCustomerBookings();
   }
