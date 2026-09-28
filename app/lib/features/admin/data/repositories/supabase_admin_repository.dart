@@ -146,20 +146,21 @@ class SupabaseAdminRepository implements IAdminRepository {
       try {
         await _client.from('workers').update(corePayload).eq('id', workerId);
       } catch (err) {
-        // If check constraint on remote workers table only allows base statuses
-        if (newWorkerStatus == 'UNDER_REVIEW' || newWorkerStatus == 'CHANGES_REQUIRED') {
+        // Last resort: write a baseline status that is always allowed
+        final safeStatus = (newWorkerStatus == 'ACTIVE')
+            ? 'ACTIVE'
+            : (newWorkerStatus == 'REJECTED' || newWorkerStatus == 'INACTIVE')
+                ? 'REJECTED'
+                : (newWorkerStatus == 'SUSPENDED')
+                    ? 'SUSPENDED'
+                    : 'PENDING_VERIFICATION';
+        try {
           await _client.from('workers').update({
-            'worker_status': 'PENDING_VERIFICATION',
-            'is_available': false,
+            'worker_status': safeStatus,
+            'is_available': safeStatus == 'ACTIVE',
             'updated_at': DateTime.now().toIso8601String(),
           }).eq('id', workerId);
-        } else if (newWorkerStatus == 'REJECTED') {
-          await _client.from('workers').update({
-            'worker_status': 'INACTIVE',
-            'is_available': false,
-            'updated_at': DateTime.now().toIso8601String(),
-          }).eq('id', workerId);
-        } else {
+        } catch (_) {
           rethrow;
         }
       }

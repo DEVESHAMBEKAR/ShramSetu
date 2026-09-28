@@ -41,6 +41,7 @@ enum VerificationStatus {
       case 'CHANGES_REQUIRED':
         return VerificationStatus.changesRequired;
       case 'REJECTED':
+      case 'INACTIVE': // fallback written when DB check constraint blocks 'REJECTED'
         return VerificationStatus.rejected;
       case 'SUSPENDED':
         return VerificationStatus.suspended;

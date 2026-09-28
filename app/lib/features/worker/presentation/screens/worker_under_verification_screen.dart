@@ -58,6 +58,12 @@ class _WorkerUnderVerificationScreenState
       try {
         _history = await DI.workerRepo.getVerificationHistory(_worker?.id ?? userId);
       } catch (_) {}
+
+      // Stop polling if already in a terminal state (rejected / suspended)
+      final vs = _worker?.verificationStatus;
+      if (vs == VerificationStatus.rejected || vs == VerificationStatus.suspended) {
+        _autoCheckTimer?.cancel();
+      }
     } catch (_) {}
     if (mounted) setState(() => _isLoading = false);
   }
@@ -72,33 +78,67 @@ class _WorkerUnderVerificationScreenState
       final userId = user?.id ?? 'mock-worker-id';
       final updatedWorker = await DI.workerRepo.getWorkerProfile(userId);
 
+      // Also refresh documents so flagged docs become visible
+      List<Map<String, dynamic>> freshDocs = _documents;
+      try {
+        freshDocs = await DI.workerRepo.getVerificationDocuments(updatedWorker.id);
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _worker = updatedWorker;
+          _documents = freshDocs;
         });
 
-        if (updatedWorker.verificationStatus == VerificationStatus.approved) {
+        final vs = updatedWorker.verificationStatus;
+
+        if (vs == VerificationStatus.approved) {
           _autoCheckTimer?.cancel();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
                 backgroundColor: AppColors.onTertiaryContainer,
                 content: Text('🎉 Congratulations! Your documents have been verified by the Federation Administrator. Access granted!'),
+                duration: Duration(seconds: 5),
               ),
             );
-
             if (widget.onVerified != null) {
               widget.onVerified!();
             } else {
               Navigator.of(context).pushReplacementNamed('/worker/dashboard');
             }
           }
+        } else if (vs == VerificationStatus.rejected) {
+          // Stop polling — rejection is a terminal state
+          _autoCheckTimer?.cancel();
+          if (!isAuto && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: AppColors.error,
+                content: Text('Application Declined — your registration has been rejected by the Federation Administrator. Check the remarks below.'),
+                duration: Duration(seconds: 6),
+              ),
+            );
+          }
+        } else if (vs == VerificationStatus.suspended) {
+          _autoCheckTimer?.cancel();
+          if (!isAuto && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                backgroundColor: AppColors.error,
+                content: Text('Account Suspended — your artisan account has been suspended. Please contact your district federation desk.'),
+                duration: Duration(seconds: 6),
+              ),
+            );
+          }
         } else if (!isAuto) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(updatedWorker.verificationStatus == VerificationStatus.rejected
-                  ? 'Your application requires attention. Please check rejected documents below.'
-                  : 'Status: Under Verification. Federation Admin is currently reviewing your documents.'),
+              content: Text(vs == VerificationStatus.changesRequired
+                  ? '⚠ Changes Required — check the remarks and resubmit corrected documents.'
+                  : vs == VerificationStatus.underReview
+                      ? 'Status: Under Review — a Federation Officer is actively examining your documents.'
+                      : 'Status: In Queue — Federation Admin is reviewing your documents.'),
             ),
           );
         }
