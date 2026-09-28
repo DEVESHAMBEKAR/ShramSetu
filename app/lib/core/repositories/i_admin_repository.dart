@@ -14,6 +14,9 @@ abstract class IAdminRepository {
   /// Fetch KYC documents uploaded by a specific worker.
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId);
 
+  /// Update inspection status for a specific uploaded document.
+  Future<void> updateDocumentStatus(String documentId, String status, {String? remarks});
+
   /// Fetch verification history audit trail for a worker.
   Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId);
 

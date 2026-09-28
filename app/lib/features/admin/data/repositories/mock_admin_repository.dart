@@ -294,6 +294,7 @@ class MockAdminRepository implements IAdminRepository {
         'file_name': 'aadhaar_card_${workerId.toLowerCase()}.pdf',
         'mime_type': 'application/pdf',
         'file_size': 1024 * 450,
+        'storage_path': '$workerId/IDENTITY-sample.pdf',
         'status': 'PENDING',
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
@@ -304,6 +305,7 @@ class MockAdminRepository implements IAdminRepository {
         'file_name': 'electricity_bill_pune.jpg',
         'mime_type': 'image/jpeg',
         'file_size': 1024 * 780,
+        'storage_path': '$workerId/ADDRESS-sample.jpg',
         'status': 'PENDING',
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
@@ -314,9 +316,16 @@ class MockAdminRepository implements IAdminRepository {
         'file_name': 'iti_trade_certificate.pdf',
         'mime_type': 'application/pdf',
         'file_size': 1024 * 920,
+        'storage_path': '$workerId/SKILL_CERTIFICATE-sample.pdf',
         'status': 'PENDING',
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
     ];
+  }
+
+  @override
+  Future<void> updateDocumentStatus(String documentId, String status, {String? remarks}) async {
+    // Mock: no persistent state — documents regenerated fresh per getWorkerDocuments() call.
+    await Future.delayed(const Duration(milliseconds: 200));
   }
 }

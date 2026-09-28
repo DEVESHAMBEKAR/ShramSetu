@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../worker/data/models/worker_models.dart';
 
 class AdminWorkerVerificationDetailScreen extends StatefulWidget {
@@ -54,6 +56,223 @@ class _AdminWorkerVerificationDetailScreenState
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  /// Opens the document — generates a signed URL for private bucket and copies/shows it.
+  Future<void> _viewDocument(Map<String, dynamic> doc) async {
+    final storagePath = doc['storage_path']?.toString() ?? '';
+    final fileName = doc['file_name']?.toString() ?? 'Document';
+    final mimeType = doc['mime_type']?.toString() ?? '';
+
+    if (storagePath.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No storage path available for this document.')),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Generate a 1-hour signed URL for the private worker-documents bucket
+      final signedUrl = await DI.storageRepo.getSignedUrl(
+        bucket: StorageBucket.workerDocuments,
+        path: storagePath,
+        expiresIn: 3600,
+      );
+
+      if (mounted) {
+        final isPdf = mimeType.contains('pdf') || fileName.toLowerCase().endsWith('.pdf');
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(
+                  isPdf ? Icons.picture_as_pdf_outlined : Icons.image_outlined,
+                  color: isPdf ? AppColors.error : AppColors.primary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    fileName,
+                    style: const TextStyle(fontSize: 14),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Document signed URL generated (valid 1 hour). Copy and open in browser to inspect:',
+                  style: TextStyle(fontSize: 12, color: AppColors.outline),
+                ),
+                const SizedBox(height: 10),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Text(
+                    signedUrl,
+                    style: const TextStyle(fontSize: 10, color: AppColors.primary, fontFamily: 'monospace'),
+                    maxLines: 4,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Type: ${(doc['document_type'] ?? 'DOCUMENT').toString().replaceAll('_', ' ')} • '
+                  'Size: ${_formatBytes((doc['file_size'] as int?) ?? 0)}',
+                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton.icon(
+                icon: const Icon(Icons.copy, size: 16),
+                label: const Text('Copy URL'),
+                onPressed: () {
+                  Clipboard.setData(ClipboardData(text: signedUrl));
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      backgroundColor: Colors.teal,
+                      content: Text('✓ Signed URL copied to clipboard — paste in browser to view document.'),
+                      duration: Duration(seconds: 4),
+                    ),
+                  );
+                },
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        // Fallback: show storage path for manual lookup
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Document Info'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('File: $fileName', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                const Text('Storage path (paste in Supabase Storage Explorer):', style: TextStyle(fontSize: 11, color: AppColors.outline)),
+                const SizedBox(height: 6),
+                SelectableText(
+                  storagePath,
+                  style: const TextStyle(fontSize: 11, color: AppColors.primary, fontFamily: 'monospace'),
+                ),
+              ],
+            ),
+            actions: [
+              ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+            ],
+          ),
+        );
+      }
+    }
+  }
+
+  /// Lets admin mark a single document as APPROVED or FLAGGED with optional remarks.
+  Future<void> _updateDocumentStatus(Map<String, dynamic> doc, String newStatus) async {
+    final docId = doc['id']?.toString() ?? '';
+    final docType = (doc['document_type'] ?? 'DOCUMENT').toString().replaceAll('_', ' ');
+    final remarksController = TextEditingController();
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(
+              newStatus == 'APPROVED' ? Icons.check_circle_outline : Icons.flag_outlined,
+              color: newStatus == 'APPROVED' ? const Color(0xFF2E7D32) : AppColors.error,
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(newStatus == 'APPROVED' ? 'Approve Document' : 'Flag Document', style: const TextStyle(fontSize: 15))),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Document: $docType', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksController,
+              decoration: InputDecoration(
+                labelText: newStatus == 'APPROVED' ? 'Remarks (optional)' : 'Reason for flagging *',
+                border: const OutlineInputBorder(),
+                hintText: newStatus == 'APPROVED'
+                    ? 'e.g. Identity verified against MSDE register'
+                    : 'e.g. Photo blurry — re-upload required',
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: newStatus == 'APPROVED' ? const Color(0xFF2E7D32) : AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (newStatus == 'FLAGGED' && remarksController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Please enter a reason for flagging.')));
+                return;
+              }
+              Navigator.pop(ctx, true);
+            },
+            child: Text(newStatus == 'APPROVED' ? 'Approve' : 'Flag'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && docId.isNotEmpty) {
+      try {
+        await DI.adminRepo.updateDocumentStatus(docId, newStatus, remarks: remarksController.text.trim());
+        setState(() {
+          final idx = _documents.indexWhere((d) => d['id'] == docId);
+          if (idx != -1) _documents[idx] = Map<String, dynamic>.from(_documents[idx])..['status'] = newStatus;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: newStatus == 'APPROVED' ? AppColors.onTertiaryContainer : AppColors.error,
+              content: Text(newStatus == 'APPROVED' ? '✓ Document approved.' : '⚑ Document flagged for re-upload.'),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        }
+      }
+    }
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
   Future<void> _handleStartReview() async {
@@ -791,48 +1010,178 @@ class _AdminWorkerVerificationDetailScreenState
             ..._documents.map((d) {
               final docType = d['document_type']?.toString() ?? 'DOCUMENT';
               final fileName = d['file_name']?.toString() ?? 'Document';
-              final status = d['status']?.toString().toUpperCase() ?? 'SUBMITTED';
+              final mimeType = d['mime_type']?.toString() ?? '';
+              final status = d['status']?.toString().toUpperCase() ?? 'PENDING';
+              final fileSize = (d['file_size'] as int?) ?? 0;
+              final isPdf = mimeType.contains('pdf') || fileName.toLowerCase().endsWith('.pdf');
+              final isImage = mimeType.startsWith('image/');
+              final isApproved = status == 'APPROVED';
+              final isFlagged = status == 'FLAGGED';
+
+              Color statusColor;
+              Color statusTextColor;
+              IconData statusIcon;
+              if (isApproved) {
+                statusColor = AppColors.tertiaryContainer;
+                statusTextColor = AppColors.onTertiaryContainer;
+                statusIcon = Icons.check_circle;
+              } else if (isFlagged) {
+                statusColor = AppColors.errorContainer;
+                statusTextColor = AppColors.error;
+                statusIcon = Icons.flag;
+              } else {
+                statusColor = AppColors.warningContainer;
+                statusTextColor = AppColors.onWarningContainer;
+                statusIcon = Icons.hourglass_top_rounded;
+              }
 
               return Container(
-                margin: const EdgeInsets.only(bottom: 10),
-                padding: const EdgeInsets.all(12),
+                margin: const EdgeInsets.only(bottom: 12),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceContainerLowest,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.outlineVariant),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isApproved
+                        ? const Color(0xFF81C784)
+                        : isFlagged
+                            ? AppColors.error.withValues(alpha: 0.5)
+                            : AppColors.outlineVariant,
+                    width: isApproved || isFlagged ? 1.5 : 1,
+                  ),
                 ),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.file_present_outlined, color: AppColors.primary),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Header row
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 12, 6),
+                      child: Row(
                         children: [
-                          Text(
-                            docType.replaceAll('_', ' '),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                          Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isPdf
+                                  ? AppColors.error.withValues(alpha: 0.1)
+                                  : isImage
+                                      ? AppColors.primaryContainer
+                                      : AppColors.surfaceContainerLow,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isPdf
+                                  ? Icons.picture_as_pdf_outlined
+                                  : isImage
+                                      ? Icons.image_outlined
+                                      : Icons.insert_drive_file_outlined,
+                              color: isPdf ? AppColors.error : AppColors.primary,
+                              size: 18,
+                            ),
                           ),
-                          Text(
-                            fileName,
-                            style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  docType.replaceAll('_', ' '),
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                                Text(
+                                  fileName,
+                                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (fileSize > 0)
+                                  Text(
+                                    _formatBytes(fileSize),
+                                    style: const TextStyle(fontSize: 10, color: AppColors.outline),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusColor,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(statusIcon, size: 10, color: statusTextColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  status,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusTextColor,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),
                     ),
+                    // Action row
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: status == 'APPROVED' ? AppColors.tertiaryContainer : AppColors.warningContainer,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: status == 'APPROVED' ? AppColors.onTertiaryContainer : AppColors.onWarningContainer,
-                        ),
+                      padding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                      child: Row(
+                        children: [
+                          // VIEW button
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => _viewDocument(d),
+                              icon: const Icon(Icons.open_in_new, size: 14),
+                              label: const Text('View', style: TextStyle(fontSize: 12)),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          // APPROVE button
+                          if (!isApproved)
+                            Expanded(
+                              child: ElevatedButton.icon(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2E7D32),
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _updateDocumentStatus(d, 'APPROVED'),
+                                icon: const Icon(Icons.check, size: 14),
+                                label: const Text('Approve', style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                          const SizedBox(width: 6),
+                          // FLAG button
+                          if (!isFlagged)
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 8),
+                                  foregroundColor: AppColors.error,
+                                  side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                onPressed: () => _updateDocumentStatus(d, 'FLAGGED'),
+                                icon: const Icon(Icons.flag_outlined, size: 14),
+                                label: const Text('Flag', style: TextStyle(fontSize: 12)),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ],

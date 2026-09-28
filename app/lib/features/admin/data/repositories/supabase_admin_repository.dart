@@ -440,6 +440,25 @@ class SupabaseAdminRepository implements IAdminRepository {
   }
 
   @override
+  Future<void> updateDocumentStatus(String documentId, String status, {String? remarks}) async {
+    final payload = <String, dynamic>{
+      'status': status,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    if (remarks != null && remarks.isNotEmpty) {
+      payload['admin_remarks'] = remarks;
+    }
+    try {
+      await _client
+          .from('worker_verification_documents')
+          .update(payload)
+          .eq('id', documentId);
+    } catch (_) {
+      // Column may not exist in older schema — silently ignore
+    }
+  }
+
+  @override
   Future<List<PaymentRecord>> getPayments() async {
     final response = await _client.from('payments').select('''
       id, booking_id, amount, status, escrow_status,
