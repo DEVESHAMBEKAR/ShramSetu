@@ -218,6 +218,37 @@ class MockAdminRepository implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId) async {
-    return [];
+    return [
+      {
+        'id': 'doc_01',
+        'worker_id': workerId,
+        'document_type': 'IDENTITY',
+        'file_name': 'aadhaar_card_${workerId.toLowerCase()}.pdf',
+        'mime_type': 'application/pdf',
+        'file_size': 1024 * 450,
+        'status': 'PENDING',
+        'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
+      },
+      {
+        'id': 'doc_02',
+        'worker_id': workerId,
+        'document_type': 'ADDRESS',
+        'file_name': 'electricity_bill_pune.jpg',
+        'mime_type': 'image/jpeg',
+        'file_size': 1024 * 780,
+        'status': 'PENDING',
+        'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
+      },
+      {
+        'id': 'doc_03',
+        'worker_id': workerId,
+        'document_type': 'SKILL_CERTIFICATE',
+        'file_name': 'iti_trade_certificate.pdf',
+        'mime_type': 'application/pdf',
+        'file_size': 1024 * 920,
+        'status': 'PENDING',
+        'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
+      },
+    ];
   }
 }

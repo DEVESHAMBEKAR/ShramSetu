@@ -10,6 +10,17 @@ abstract class IWorkerRepository {
   Future<void> submitVerificationDocument(String workerId, String documentType, String storagePath, String fileName, String mimeType, int fileSize);
   Future<void> submitForVerification(String workerId);
 
+  /// Register or update worker profile details during initial onboarding
+  Future<void> registerWorker({
+    required String workerId,
+    required String fullName,
+    required String phone,
+    required String skill,
+    required int experienceYears,
+    required String serviceLocation,
+    String? bio,
+  });
+
 
   /// Fetch all active, pending, or completed jobs for the worker
   Future<List<JobRequest>> getWorkerBookings();

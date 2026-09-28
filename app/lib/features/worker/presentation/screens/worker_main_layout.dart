@@ -6,6 +6,8 @@ import 'worker_dashboard_screen.dart';
 import 'worker_job_requests_screen.dart';
 import 'worker_earnings_screen.dart';
 import 'worker_profile_settings_screen.dart';
+import 'worker_under_verification_screen.dart';
+import '../../data/models/worker_models.dart';
 
 class WorkerMainLayout extends StatefulWidget {
   const WorkerMainLayout({super.key});
@@ -16,6 +18,8 @@ class WorkerMainLayout extends StatefulWidget {
 
 class _WorkerMainLayoutState extends State<WorkerMainLayout> {
   int _currentIndex = 0;
+  WorkerProfile? _profile;
+  bool _isLoadingProfile = true;
   String _workerName = 'Artisan Partner';
   String _workerPhone = '';
   String? _workerAvatar;
@@ -36,12 +40,18 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
       final profile = await DI.workerRepo.getWorkerProfile(userId);
       if (mounted) {
         setState(() {
+          _profile = profile;
           _workerName = profile.name;
           _workerPhone = profile.phone;
           _workerAvatar = profile.profileImage;
+          _isLoadingProfile = false;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingProfile = false);
+      }
+    }
   }
 
   final List<Widget> _screens = [
@@ -53,6 +63,24 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoadingProfile) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    // Strict verification barrier:
+    // Only approved workers get access to dashboard, bookings, jobs, and earnings.
+    // Unverified/pending workers see WorkerUnderVerificationScreen!
+    if (_profile?.verificationStatus != VerificationStatus.approved) {
+      return WorkerUnderVerificationScreen(
+        onVerified: () => _loadWorkerInfo(),
+      );
+    }
+
     final isWide = MediaQuery.of(context).size.width >= 800;
 
     if (isWide) {

@@ -83,12 +83,64 @@ class MockWorkerRepository implements IWorkerRepository {
     await SharedBookingStore.instance.updateBookingStatus(bookingId, newStatus);
   }
 
-  @override
-  Future<List<Map<String, dynamic>>> getVerificationDocuments(String workerId) async { return []; }
+  final List<Map<String, dynamic>> _mockDocuments = [];
 
   @override
-  Future<void> submitVerificationDocument(String workerId, String documentType, String storagePath, String fileName, String mimeType, int fileSize) async {}
+  Future<List<Map<String, dynamic>>> getVerificationDocuments(String workerId) async {
+    return _mockDocuments.where((d) => d['worker_id'] == workerId).toList();
+  }
 
   @override
-  Future<void> submitForVerification(String workerId) async {}
+  Future<void> submitVerificationDocument(
+    String workerId,
+    String documentType,
+    String storagePath,
+    String fileName,
+    String mimeType,
+    int fileSize,
+  ) async {
+    _mockDocuments.removeWhere((d) => d['worker_id'] == workerId && d['document_type'] == documentType);
+    _mockDocuments.add({
+      'id': 'doc_${DateTime.now().millisecondsSinceEpoch}',
+      'worker_id': workerId,
+      'document_type': documentType,
+      'storage_path': storagePath,
+      'file_name': fileName,
+      'mime_type': mimeType,
+      'file_size': fileSize,
+      'status': 'PENDING',
+      'created_at': DateTime.now().toIso8601String(),
+    });
+  }
+
+  @override
+  Future<void> submitForVerification(String workerId) async {
+    currentWorker = currentWorker.copyWith(
+      verificationStatus: VerificationStatus.pending,
+      isVerified: false,
+    );
+  }
+
+  @override
+  Future<void> registerWorker({
+    required String workerId,
+    required String fullName,
+    required String phone,
+    required String skill,
+    required int experienceYears,
+    required String serviceLocation,
+    String? bio,
+  }) async {
+    currentWorker = currentWorker.copyWith(
+      id: workerId,
+      name: fullName,
+      phone: phone,
+      skills: [skill],
+      experience: '$experienceYears Years',
+      serviceLocation: serviceLocation,
+      isVerified: false,
+      verificationStatus: VerificationStatus.pending,
+      isAvailable: false,
+    );
+  }
 }

@@ -4,6 +4,7 @@ import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../worker/data/models/worker_models.dart';
 
 class WorkerLoginScreen extends StatefulWidget {
   const WorkerLoginScreen({super.key});
@@ -96,8 +97,21 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
             debugPrint('[WorkerLogin] Upsert non-critical: $e');
           }
 
+          // Check worker profile registration and document verification status
+          final WorkerProfile profile = await DI.workerRepo.getWorkerProfile(userId);
+          final docs = await DI.workerRepo.getVerificationDocuments(profile.id);
+
+          final hasCompletedRegistration = profile.name.isNotEmpty &&
+              !profile.name.startsWith('Artisan (') &&
+              !profile.name.startsWith('User ') &&
+              docs.isNotEmpty;
+
           if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/worker/dashboard');
+            if (!hasCompletedRegistration) {
+              Navigator.of(context).pushReplacementNamed('/worker/registration');
+            } else {
+              Navigator.of(context).pushReplacementNamed('/worker/dashboard');
+            }
           }
         } else {
           throw Exception('Invalid OTP. Please check the code sent to your number.');

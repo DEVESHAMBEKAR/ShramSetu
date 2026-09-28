@@ -95,7 +95,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     if (workerRes != null) {
       if (workerRes['worker_status'] == 'ACTIVE') {
         verificationStatus = VerificationStatus.approved;
-      } else if (workerRes['worker_status'] == 'SUSPENDED') {
+      } else if (workerRes['worker_status'] == 'SUSPENDED' || workerRes['worker_status'] == 'REJECTED') {
         verificationStatus = VerificationStatus.rejected;
       }
     }
@@ -378,5 +378,43 @@ class SupabaseWorkerRepository implements IWorkerRepository {
   @override
   Future<void> submitForVerification(String workerId) async {
     await _supabase.from('workers').update({'worker_status': 'PENDING_VERIFICATION'}).eq('id', workerId);
+  }
+
+  @override
+  Future<void> registerWorker({
+    required String workerId,
+    required String fullName,
+    required String phone,
+    required String skill,
+    required int experienceYears,
+    required String serviceLocation,
+    String? bio,
+  }) async {
+    // 1. Update user record with full name & role
+    try {
+      await _supabase.from('users').update({
+        'full_name': fullName,
+        'role': 'WORKER',
+      }).eq('id', workerId);
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] update users full_name error: $e');
+    }
+
+    // 2. Upsert workers table with pending verification status
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      if (isUuid) {
+        await _supabase.from('workers').upsert({
+          'id': workerId,
+          'bio': bio ?? 'Certified $skill artisan based in $serviceLocation.',
+          'experience_years': experienceYears,
+          'location_tag': serviceLocation,
+          'worker_status': 'PENDING_VERIFICATION',
+          'is_available': false,
+        });
+      }
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] upsert workers error: $e');
+    }
   }
 }
