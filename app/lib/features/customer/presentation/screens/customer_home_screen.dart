@@ -53,7 +53,16 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
     if (userId != null) {
       try {
-        final profile = await DI.userRepo.getCustomerProfile(userId);
+        var profile = await DI.userRepo.getCustomerProfile(userId);
+        if (profile == null || profile.fullName.trim().isEmpty || profile.fullName.startsWith('User ')) {
+          final userData = await DI.userRepo.getUserProfile(userId);
+          final dbName = userData?['full_name'] as String?;
+          if (dbName != null && dbName.isNotEmpty && !dbName.startsWith('User ')) {
+            profile = profile != null
+                ? profile.copyWith(fullName: dbName)
+                : CustomerProfile(id: userId, fullName: dbName, phone: (userData?['phone'] as String?) ?? user?.phone ?? '');
+          }
+        }
         if (mounted) _profile = profile;
       } catch (_) {}
     }
@@ -319,7 +328,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _profile?.fullName.isNotEmpty == true ? _profile!.fullName : 'ShramSetu Customer',
+                        (_profile?.fullName.isNotEmpty == true && !_profile!.fullName.startsWith('User '))
+                            ? _profile!.fullName
+                            : (_profile?.phone.isNotEmpty == true ? 'Customer (${_profile!.phone})' : 'Customer'),
                         style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
                       ),
                       Text(

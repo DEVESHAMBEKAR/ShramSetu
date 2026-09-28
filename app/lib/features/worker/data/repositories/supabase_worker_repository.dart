@@ -15,42 +15,81 @@ class SupabaseWorkerRepository implements IWorkerRepository {
 
   @override
   Future<WorkerProfile> getWorkerProfile(String userId) async {
-    // If not a valid UUID (e.g. test or unauthenticated placeholder), return a safe default
-    final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(userId);
-    if (!isUuid) {
-      return WorkerProfile(
-        id: userId,
-        name: 'Worker Partner',
-        profileImage: 'https://i.pravatar.cc/150?u=$userId',
-        phone: '',
-        skills: ['Electrician', 'Plumber'],
-        experience: '2 Years',
-        rating: 4.8,
-        reviewCount: 15,
-        completedJobs: 24,
-        earnings: 14200.0,
-        isVerified: true,
-        verificationStatus: VerificationStatus.approved,
-        isAvailable: true,
-        serviceLocation: 'Pune, Maharashtra',
-        guildName: 'ShramSetu Cooperative',
-        guildId: '#GUILD-101',
-      );
+    final authUser = _supabase.auth.currentUser;
+    final effectiveId = (userId.isNotEmpty && userId != 'mock-worker-id')
+        ? userId
+        : (authUser?.id ?? userId);
+
+    final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(effectiveId);
+
+    Map<String, dynamic>? userRes;
+    Map<String, dynamic>? workerRes;
+
+    if (isUuid) {
+      try {
+        userRes = await _supabase.from('users').select().eq('id', effectiveId).maybeSingle();
+      } catch (e) {
+        debugPrint('[WorkerRepo] users select note: $e');
+      }
+
+      try {
+        workerRes = await _supabase.from('workers').select().eq('id', effectiveId).maybeSingle();
+        if (workerRes == null) {
+          try {
+            await _supabase.from('workers').insert({
+              'id': effectiveId,
+              'worker_status': 'PENDING_VERIFICATION',
+            });
+            workerRes = await _supabase.from('workers').select().eq('id', effectiveId).maybeSingle();
+          } catch (_) {}
+        }
+      } catch (e) {
+        debugPrint('[WorkerRepo] workers select note: $e');
+      }
     }
 
-    final userRes = await _supabase.from('users').select().eq('id', userId).maybeSingle();
-    var workerRes = await _supabase.from('workers').select().eq('id', userId).maybeSingle();
-    
-    if (workerRes == null) {
+    // Attempt to resolve real name from database users table
+    String resolvedName = (userRes?['full_name'] as String?)?.trim() ?? '';
+    String resolvedPhone = (userRes?['phone'] as String?)?.trim() ?? '';
+
+    // If missing or generic placeholder, inspect auth metadata or DI.userRepo
+    if (resolvedName.isEmpty || resolvedName.startsWith('User ')) {
+      if (authUser != null) {
+        final metaName = (authUser.userMetadata?['full_name'] ?? authUser.userMetadata?['name']) as String?;
+        if (metaName != null && metaName.trim().isNotEmpty && !metaName.startsWith('User ')) {
+          resolvedName = metaName.trim();
+        }
+        if (resolvedPhone.isEmpty && authUser.phone != null) {
+          resolvedPhone = authUser.phone!;
+        }
+      }
+    }
+
+    if (resolvedName.isEmpty || resolvedName.startsWith('User ')) {
       try {
-        await _supabase.from('workers').insert({
-          'id': userId,
-          'worker_status': 'PENDING_VERIFICATION',
-        });
-        workerRes = await _supabase.from('workers').select().eq('id', userId).maybeSingle();
+        final dbUser = await DI.userRepo.getUserProfile(effectiveId);
+        final dbName = (dbUser?['full_name'] as String?)?.trim() ?? '';
+        if (dbName.isNotEmpty && !dbName.startsWith('User ')) {
+          resolvedName = dbName;
+        }
+        if (resolvedPhone.isEmpty) {
+          resolvedPhone = (dbUser?['phone'] as String?)?.trim() ?? '';
+        }
       } catch (_) {}
     }
-    
+
+    if (resolvedName.isEmpty) {
+      if (resolvedPhone.isNotEmpty) {
+        resolvedName = 'Artisan ($resolvedPhone)';
+      } else {
+        resolvedName = 'Rahul Patil';
+      }
+    }
+
+    final avatarUrl = (userRes?['avatar_url'] as String?) ??
+        (authUser?.userMetadata?['avatar_url'] as String?) ??
+        'https://i.pravatar.cc/150?u=$effectiveId';
+
     // Attempt to parse VerificationStatus
     VerificationStatus verificationStatus = VerificationStatus.pending;
     if (workerRes != null) {
@@ -60,12 +99,12 @@ class SupabaseWorkerRepository implements IWorkerRepository {
         verificationStatus = VerificationStatus.rejected;
       }
     }
-    
+
     return WorkerProfile(
-      id: userId,
-      name: userRes?['full_name'] ?? 'Worker Partner',
-      profileImage: 'https://i.pravatar.cc/150?u=$userId',
-      phone: userRes?['phone'] ?? '',
+      id: effectiveId,
+      name: resolvedName,
+      profileImage: avatarUrl,
+      phone: resolvedPhone,
       skills: ['General Service'],
       experience: '2 Years',
       rating: (workerRes?['rating'] as num?)?.toDouble() ?? 0.0,

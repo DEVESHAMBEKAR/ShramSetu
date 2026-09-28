@@ -24,10 +24,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   StreamSubscription<List<JobRequest>>? _bookingsSub;
   int _currentNavIndex = 0;
   bool _disputeResolved = false;
+  String _adminInitials = 'AD';
 
   @override
   void initState() {
     super.initState();
+    _loadAdminInitials();
     _refreshData();
     _bookingsSub = DI.adminRepo.watchBookings().listen(
       (_) {
@@ -51,6 +53,25 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         DI.adminRepo.getComplaints(),
       ]);
     });
+  }
+
+  Future<void> _loadAdminInitials() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      if (user != null) {
+        final dbUser = await DI.userRepo.getUserProfile(user.id);
+        final name = (dbUser?['full_name'] as String?)?.trim() ??
+            (user.userMetadata?['full_name'] as String?)?.trim() ??
+            (user.email != null ? user.email!.split('@').first : '');
+        if (mounted && name.isNotEmpty) {
+          final parts = name.split(' ').where((s) => s.isNotEmpty).toList();
+          final initials = parts.map((s) => s[0]).take(2).join().toUpperCase();
+          if (initials.isNotEmpty) {
+            setState(() => _adminInitials = initials);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   void _showToast(String message) {
@@ -215,9 +236,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             shape: BoxShape.circle,
           ),
           alignment: Alignment.center,
-          child: const Text(
-            'OP',
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.onPrimary),
+          child: Text(
+            _adminInitials,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.onPrimary),
           ),
         ),
       ],

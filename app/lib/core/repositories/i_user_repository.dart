@@ -13,6 +13,9 @@ abstract class IUserRepository {
   /// Get the role of the current user.
   Future<String?> getUserRole(String userId);
 
+  /// Get the user profile record from the users table.
+  Future<Map<String, dynamic>?> getUserProfile(String userId);
+
   // ───────────── Customer Profile Methods ─────────────
 
   /// Load the customer's full profile (including their default address if any).

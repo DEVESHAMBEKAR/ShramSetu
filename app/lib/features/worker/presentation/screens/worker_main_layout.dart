@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
 import 'worker_dashboard_screen.dart';
 import 'worker_job_requests_screen.dart';
@@ -15,13 +16,32 @@ class WorkerMainLayout extends StatefulWidget {
 
 class _WorkerMainLayoutState extends State<WorkerMainLayout> {
   int _currentIndex = 0;
+  String _workerName = 'Artisan Partner';
+  String _workerPhone = '';
+  String? _workerAvatar;
 
   @override
   void initState() {
     super.initState();
+    _loadWorkerInfo();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DI.notificationService.requestPermissions();
     });
+  }
+
+  Future<void> _loadWorkerInfo() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      final userId = user?.id ?? 'mock-worker-id';
+      final profile = await DI.workerRepo.getWorkerProfile(userId);
+      if (mounted) {
+        setState(() {
+          _workerName = profile.name;
+          _workerPhone = profile.phone;
+          _workerAvatar = profile.profileImage;
+        });
+      }
+    } catch (_) {}
   }
 
   final List<Widget> _screens = [
@@ -135,7 +155,53 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
           _buildDesktopNavItem(3, Icons.person_outline, Icons.person, 'Profile & Guild'),
           const Spacer(),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppRadius.radiusLg,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 20,
+                    backgroundColor: AppColors.primaryContainer,
+                    backgroundImage: (_workerAvatar != null && _workerAvatar!.isNotEmpty)
+                        ? NetworkImage(_workerAvatar!)
+                        : null,
+                    child: (_workerAvatar == null || _workerAvatar!.isEmpty)
+                        ? Text(
+                            _workerName.isNotEmpty ? _workerName[0].toUpperCase() : 'W',
+                            style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _workerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                        ),
+                        Text(
+                          _workerPhone.isNotEmpty ? _workerPhone : 'Verified Partner',
+                          style: const TextStyle(fontSize: 11, color: AppColors.outline),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

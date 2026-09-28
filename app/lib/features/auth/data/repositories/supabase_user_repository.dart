@@ -41,6 +41,34 @@ class SupabaseUserRepository implements IUserRepository {
   }
 
   @override
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    try {
+      final response = await _client
+          .from('users')
+          .select('id, full_name, phone, email, role, avatar_url')
+          .eq('id', userId)
+          .maybeSingle();
+      if (response != null) {
+        return response;
+      }
+    } catch (_) {}
+
+    // Fallback to active auth session metadata
+    final currentUser = _client.auth.currentUser;
+    if (currentUser != null && (currentUser.id == userId || userId.isEmpty)) {
+      return {
+        'id': currentUser.id,
+        'full_name': currentUser.userMetadata?['full_name'] ?? currentUser.userMetadata?['name'],
+        'phone': currentUser.phone,
+        'email': currentUser.email,
+        'role': (currentUser.appMetadata['role'] ?? currentUser.userMetadata?['role'])?.toString().toUpperCase(),
+        'avatar_url': currentUser.userMetadata?['avatar_url'],
+      };
+    }
+    return null;
+  }
+
+  @override
   Future<void> upsertUserProfile({
     required String userId,
     required String role,
@@ -118,14 +146,26 @@ class SupabaseUserRepository implements IUserRepository {
           .eq('id', userId)
           .maybeSingle();
 
-      if (userRow == null) return null;
-
-      final defaultAddr = await getDefaultAddress(userId);
-
-      return CustomerProfile.fromMap(userRow, defaultAddress: defaultAddr);
+      if (userRow != null) {
+        final defaultAddr = await getDefaultAddress(userId);
+        return CustomerProfile.fromMap(userRow, defaultAddress: defaultAddr);
+      }
     } catch (e) {
-      return null;
+      // Fall through to auth session check
     }
+
+    final currentUser = _client.auth.currentUser;
+    if (currentUser != null && (currentUser.id == userId || userId.isEmpty)) {
+      final defaultAddr = await getDefaultAddress(currentUser.id);
+      return CustomerProfile(
+        id: currentUser.id,
+        fullName: (currentUser.userMetadata?['full_name'] ?? currentUser.userMetadata?['name'] ?? '').toString(),
+        phone: currentUser.phone ?? '',
+        avatarUrl: currentUser.userMetadata?['avatar_url']?.toString(),
+        defaultAddress: defaultAddr,
+      );
+    }
+    return null;
   }
 
   @override

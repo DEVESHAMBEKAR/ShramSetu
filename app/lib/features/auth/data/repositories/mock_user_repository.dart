@@ -57,11 +57,45 @@ class MockUserRepository implements IUserRepository {
         'longitude': 73.8077,
       }
     ];
+
+    // 3. Worker: Rahul Patil
+    _mockUsers['mock_worker_01'] = {
+      'id': 'mock_worker_01',
+      'role': 'WORKER',
+      'phone': '9800012345',
+      'full_name': 'Rahul Patil',
+      'avatar_url': null,
+    };
+    _mockUsers['mock-worker-id'] = _mockUsers['mock_worker_01']!;
+
+    // 4. Admin: Federation Administrator
+    _mockUsers['mock_admin_01'] = {
+      'id': 'mock_admin_01',
+      'role': 'ADMIN',
+      'phone': '9811122233',
+      'email': 'admin@shramsetu.in',
+      'full_name': 'Devendra Ambdekar (Federation Admin)',
+      'avatar_url': null,
+    };
+    _mockUsers['mock-admin-id'] = _mockUsers['mock_admin_01']!;
   }
 
   @override
   Future<String?> getUserRole(String userId) async {
     return _mockUsers[userId]?['role'] as String?;
+  }
+
+  @override
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    if (_mockUsers.containsKey(userId)) {
+      return _mockUsers[userId];
+    }
+    for (final entry in _mockUsers.entries) {
+      if (entry.key == userId || entry.value['id'] == userId) {
+        return entry.value;
+      }
+    }
+    return null;
   }
 
   @override

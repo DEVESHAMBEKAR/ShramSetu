@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
+import '../../../../core/theme/app_radius.dart';
 import 'admin_dashboard_screen.dart';
 import 'admin_services_screen.dart';
 import 'admin_bookings_screen.dart';
@@ -17,6 +18,40 @@ class AdminMainLayout extends StatefulWidget {
 
 class _AdminMainLayoutState extends State<AdminMainLayout> {
   int _currentIndex = 2; // Default to Coop Hub (Dashboard)
+  String _adminName = 'Federation Admin';
+  String _adminEmail = 'admin@shramsetu.in';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminInfo();
+  }
+
+  Future<void> _loadAdminInfo() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      if (user != null) {
+        final dbUser = await DI.userRepo.getUserProfile(user.id);
+        if (mounted) {
+          setState(() {
+            final name = (dbUser?['full_name'] as String?)?.trim() ??
+                (user.userMetadata?['full_name'] as String?)?.trim() ??
+                (user.email != null ? user.email!.split('@').first : '');
+            if (name.isNotEmpty && !name.startsWith('User ')) {
+              _adminName = name;
+            } else if (user.email != null && user.email!.isNotEmpty) {
+              _adminName = 'Admin (${user.email!.split('@').first})';
+            }
+            _adminEmail = (dbUser?['email'] as String?) ??
+                user.email ??
+                (dbUser?['phone'] as String?) ??
+                user.phone ??
+                'admin@shramsetu.in';
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   final List<Widget> _screens = [
     const AdminServicesScreen(),
@@ -126,7 +161,50 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
           _buildDesktopNavItem(4, Icons.badge_outlined, Icons.badge, 'Member Directory'),
           const Spacer(),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppRadius.radiusLg,
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.primary,
+                    child: Text(
+                      _adminName.isNotEmpty ? _adminName[0].toUpperCase() : 'A',
+                      style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _adminName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.primary),
+                        ),
+                        Text(
+                          _adminEmail,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 11, color: AppColors.outline),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

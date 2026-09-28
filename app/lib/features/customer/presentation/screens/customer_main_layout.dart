@@ -3,6 +3,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/config/app_config.dart';
 import 'customer_home_screen.dart';
 import 'customer_bookings_screen.dart';
 import 'worker_discovery_screen.dart';
@@ -16,16 +17,66 @@ class CustomerMainLayout extends StatefulWidget {
 
 class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   int _currentIndex = 0;
+  String _customerName = 'ShramSetu Member';
+  String _customerSubtitle = 'Pune District Cooperative Federation';
+  String? _customerAvatar;
 
   @override
   void initState() {
     super.initState();
+    _loadCustomerProfile();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       DI.notificationService.requestPermissions();
     });
   }
 
-  late final List<Widget> _screens = [
+  Future<void> _loadCustomerProfile() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      final userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      if (userId != null) {
+        final profile = await DI.userRepo.getCustomerProfile(userId);
+        final userData = await DI.userRepo.getUserProfile(userId);
+
+        if (mounted) {
+          setState(() {
+            String resolvedName = profile?.fullName.trim() ?? '';
+            if (resolvedName.isEmpty || resolvedName.startsWith('User ')) {
+              final dbName = (userData?['full_name'] as String?)?.trim() ?? '';
+              if (dbName.isNotEmpty && !dbName.startsWith('User ')) {
+                resolvedName = dbName;
+              }
+            }
+            if (resolvedName.isEmpty) {
+              final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
+              if (metaName != null && metaName.trim().isNotEmpty) {
+                resolvedName = metaName.trim();
+              }
+            }
+            if (resolvedName.isEmpty) {
+              final p = profile?.phone.isNotEmpty == true ? profile!.phone : (user?.phone ?? '');
+              resolvedName = p.isNotEmpty ? p : 'Customer';
+            }
+
+            _customerName = resolvedName;
+            _customerAvatar = profile?.avatarUrl ?? userData?['avatar_url'] as String?;
+
+            final phoneNum = (profile?.phone.isNotEmpty == true) ? profile!.phone : (user?.phone ?? '');
+            if (profile?.defaultAddress != null) {
+              final addr = profile!.defaultAddress!;
+              _customerSubtitle = '${addr.area.isNotEmpty ? addr.area : addr.city}, Pune';
+            } else if (phoneNum.isNotEmpty && _customerName != phoneNum) {
+              _customerSubtitle = phoneNum;
+            } else {
+              _customerSubtitle = 'Pune District Cooperative Federation';
+            }
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  List<Widget> get _screens => [
     CustomerHomeScreen(onSelectTab: (index) => setState(() => _currentIndex = index)),
     const WorkerDiscoveryScreen(),
     CustomerBookingsScreen(onExploreServices: () => setState(() => _currentIndex = 1)),
@@ -239,18 +290,34 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                       CircleAvatar(
                         radius: 28,
                         backgroundColor: AppColors.surfaceContainerLow,
-                        child: const Icon(Icons.person, size: 30, color: AppColors.primary),
+                        backgroundImage: (_customerAvatar != null && _customerAvatar!.isNotEmpty)
+                            ? NetworkImage(_customerAvatar!)
+                            : null,
+                        child: (_customerAvatar == null || _customerAvatar!.isEmpty)
+                            ? Text(
+                                _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
+                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                              )
+                            : null,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text('ShramSetu Member', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            Text(_customerName, style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
                             const SizedBox(height: 2),
-                            Text('Pune District Cooperative Federation', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                            Text(_customerSubtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
                           ],
                         ),
+                      ),
+                      IconButton(
+                        tooltip: 'Edit Profile & Address',
+                        icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.outline),
+                        onPressed: () async {
+                          await Navigator.of(context).pushNamed('/customer/onboarding');
+                          _loadCustomerProfile();
+                        },
                       ),
                     ],
                   ),
@@ -416,6 +483,64 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
           _buildDesktopNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'My Bookings'),
           _buildDesktopNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile & Settings'),
           const Spacer(),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.outlineVariant),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: AppColors.primaryContainer,
+                    backgroundImage: (_customerAvatar != null && _customerAvatar!.isNotEmpty)
+                        ? NetworkImage(_customerAvatar!)
+                        : null,
+                    child: (_customerAvatar == null || _customerAvatar!.isEmpty)
+                        ? Text(
+                            _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _customerName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.labelMd.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Text(
+                          _customerSubtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.outline,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(

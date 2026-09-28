@@ -10,8 +10,61 @@ import 'admin_complaints_screen.dart';
 import 'admin_analytics_screen.dart';
 import 'admin_welfare_screen.dart';
 
-class AdminProfileScreen extends StatelessWidget {
+class AdminProfileScreen extends StatefulWidget {
   const AdminProfileScreen({super.key});
+
+  @override
+  State<AdminProfileScreen> createState() => _AdminProfileScreenState();
+}
+
+class _AdminProfileScreenState extends State<AdminProfileScreen> {
+  String _adminName = 'Federation Administrator';
+  String _adminEmail = 'admin@shramsetu.in';
+  String _adminRole = 'Level 3 Federation Admin';
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAdminData();
+  }
+
+  Future<void> _loadAdminData() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      if (user != null) {
+        final dbUser = await DI.userRepo.getUserProfile(user.id);
+        if (mounted) {
+          setState(() {
+            final name = (dbUser?['full_name'] as String?)?.trim() ??
+                (user.userMetadata?['full_name'] as String?)?.trim() ??
+                (user.email != null ? user.email!.split('@').first : '');
+            if (name.isNotEmpty && !name.startsWith('User ')) {
+              _adminName = name;
+            } else if (user.email != null && user.email!.isNotEmpty) {
+              _adminName = 'Admin (${user.email!.split('@').first})';
+            } else {
+              _adminName = 'Federation Administrator';
+            }
+
+            _adminEmail = (dbUser?['email'] as String?) ??
+                user.email ??
+                (dbUser?['phone'] as String?) ??
+                user.phone ??
+                'admin@shramsetu.in';
+
+            final roleStr = (dbUser?['role'] as String?) ?? 'ADMIN';
+            _adminRole = 'Verified $roleStr Administrator';
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoading = false);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,46 +75,65 @@ class AdminProfileScreen extends StatelessWidget {
         elevation: 1,
         title: Text('Admin Profile & Settings', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.marginMobile),
-        child: Column(
-          children: [
-            _buildProfileCard(),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildMenuCard(context),
-            const SizedBox(height: AppSpacing.spacingLg),
-            _buildLogoutButton(context),
-            const SizedBox(height: 80),
-          ],
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 800),
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppSpacing.marginMobile),
+            child: Column(
+              children: [
+                _buildProfileCard(),
+                const SizedBox(height: AppSpacing.spacingLg),
+                _buildMenuCard(context),
+                const SizedBox(height: AppSpacing.spacingLg),
+                _buildLogoutButton(context),
+                const SizedBox(height: 80),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
   Widget _buildProfileCard() {
+    final initials = _adminName.isNotEmpty
+        ? _adminName.trim().split(' ').map((s) => s.isNotEmpty ? s[0] : '').take(2).join().toUpperCase()
+        : 'AD';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppRadius.radiusXl,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+      ),
       child: Row(
         children: [
           Container(
             width: 72,
             height: 72,
             decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
-            child: const Icon(Icons.shield, color: AppColors.onPrimary, size: 36),
+            alignment: Alignment.center,
+            child: Text(
+              initials,
+              style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.onPrimary),
+            ),
           ),
           const SizedBox(width: AppSpacing.spacingMd),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Admin Superuser', style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                Text('admin@shramsetu.demo', style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                Text(_adminName, style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                Text(_adminEmail, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
                 const SizedBox(height: 4),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(color: AppColors.primaryContainer, borderRadius: AppRadius.radiusFull),
-                  child: Text('Level 3 Federation Admin', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
+                  child: Text(_adminRole, style: AppTypography.labelSm.copyWith(color: AppColors.onPrimaryContainer)),
                 ),
               ],
             ),
@@ -73,7 +145,11 @@ class AdminProfileScreen extends StatelessWidget {
 
   Widget _buildMenuCard(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppRadius.radiusXl,
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+      ),
       child: Column(
         children: [
           _buildMenuItem(context, Icons.engineering, 'Worker Management', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen()))),
@@ -119,4 +195,3 @@ class AdminProfileScreen extends StatelessWidget {
     );
   }
 }
-
