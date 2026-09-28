@@ -62,7 +62,13 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   final Set<String> _uploadingDocTypes = {};
 
   final List<String> _genderOptions = ['Male', 'Female', 'Other'];
-  final List<String> _skillLevels = ['Beginner (1-2 yrs)', 'Intermediate (3-5 yrs)', 'Expert / Master Artisan (6+ yrs)'];
+  final List<String> _skillLevels = ['Beginner', 'Intermediate', 'Expert'];
+  final Map<String, String> _skillLevelLabels = {
+    'Beginner': 'Beginner (1-2 yrs)',
+    'Intermediate': 'Intermediate (3-5 yrs)',
+    'Expert': 'Expert / Master Artisan (6+ yrs)',
+  };
+  final List<int> _experienceOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20];
 
   final List<String> _tradeCategories = [
     'Plumbing',
@@ -162,8 +168,28 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               if (worker.primarySkill != null && _availableSkills.contains(worker.primarySkill)) {
                 _selectedSkill = worker.primarySkill!;
               }
-              if (worker.skillLevel != null && _skillLevels.contains(worker.skillLevel)) {
-                _selectedSkillLevel = worker.skillLevel!;
+              if (worker.skillLevel != null) {
+                if (_skillLevels.contains(worker.skillLevel)) {
+                  _selectedSkillLevel = worker.skillLevel!;
+                } else if (worker.skillLevel!.toLowerCase().contains('begin')) {
+                  _selectedSkillLevel = 'Beginner';
+                } else if (worker.skillLevel!.toLowerCase().contains('expert')) {
+                  _selectedSkillLevel = 'Expert';
+                } else {
+                  _selectedSkillLevel = 'Intermediate';
+                }
+              }
+              if (worker.experience.isNotEmpty) {
+                final match = RegExp(r'\d+').firstMatch(worker.experience);
+                if (match != null) {
+                  final yrs = int.tryParse(match.group(0)!);
+                  if (yrs != null && _experienceOptions.contains(yrs)) {
+                    _selectedExperienceYears = yrs;
+                  }
+                }
+              }
+              if (worker.serviceLocation.isNotEmpty && _puneAreas.contains(worker.serviceLocation)) {
+                _selectedArea = worker.serviceLocation;
               }
               if (worker.membershipId != null && worker.membershipId!.isNotEmpty) {
                 _membershipIdController.text = worker.membershipId!;
@@ -644,7 +670,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedGender,
+                  value: _genderOptions.contains(_selectedGender) ? _selectedGender : _genderOptions.first,
                   decoration: InputDecoration(
                     labelText: '5. Gender *',
                     prefixIcon: const Icon(Icons.wc, size: 20),
@@ -790,7 +816,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _selectedTrade,
+            value: _tradeCategories.contains(_selectedTrade) ? _selectedTrade : _tradeCategories.first,
             decoration: InputDecoration(
               labelText: '10. Worker Category / Trade *',
               prefixIcon: const Icon(Icons.category_outlined, size: 20),
@@ -807,7 +833,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: _selectedSkill,
+            value: _availableSkills.contains(_selectedSkill) ? _selectedSkill : _availableSkills.first,
             decoration: InputDecoration(
               labelText: '11. Primary Skill *',
               prefixIcon: const Icon(Icons.construction, size: 20),
@@ -827,7 +853,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _selectedSkillLevel,
+                  value: _skillLevels.contains(_selectedSkillLevel) ? _selectedSkillLevel : 'Intermediate',
                   decoration: InputDecoration(
                     labelText: '12. Skill Level *',
                     prefixIcon: const Icon(Icons.grade_outlined, size: 20),
@@ -836,7 +862,10 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                     fillColor: AppColors.surfaceContainerLowest,
                   ),
                   items: _skillLevels.map((lvl) {
-                    return DropdownMenuItem(value: lvl, child: Text(lvl, style: const TextStyle(fontSize: 12)));
+                    return DropdownMenuItem(
+                      value: lvl,
+                      child: Text(_skillLevelLabels[lvl] ?? lvl, style: const TextStyle(fontSize: 12)),
+                    );
                   }).toList(),
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedSkillLevel = val);
@@ -846,7 +875,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _selectedExperienceYears,
+                  value: _experienceOptions.contains(_selectedExperienceYears) ? _selectedExperienceYears : 3,
                   decoration: InputDecoration(
                     labelText: '13. Years of Experience *',
                     prefixIcon: const Icon(Icons.history_toggle_off, size: 20),
@@ -854,14 +883,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                     filled: true,
                     fillColor: AppColors.surfaceContainerLowest,
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 1, child: Text('1 Year')),
-                    DropdownMenuItem(value: 2, child: Text('2 Years')),
-                    DropdownMenuItem(value: 3, child: Text('3 Years')),
-                    DropdownMenuItem(value: 5, child: Text('5 Years')),
-                    DropdownMenuItem(value: 8, child: Text('8 Years')),
-                    DropdownMenuItem(value: 10, child: Text('10+ Years')),
-                  ],
+                  items: _experienceOptions.map((yrs) {
+                    return DropdownMenuItem(
+                      value: yrs,
+                      child: Text(yrs >= 10 ? '$yrs+ Years' : (yrs == 1 ? '1 Year' : '$yrs Years')),
+                    );
+                  }).toList(),
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedExperienceYears = val);
                   },
@@ -871,7 +898,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: _selectedArea,
+            value: _puneAreas.contains(_selectedArea) ? _selectedArea : _puneAreas.first,
             decoration: InputDecoration(
               labelText: '14. Service Area / Preferred Working Locality *',
               prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
