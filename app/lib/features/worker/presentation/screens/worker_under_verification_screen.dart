@@ -218,16 +218,52 @@ class _WorkerUnderVerificationScreenState
           ],
         ),
         actions: [
-          IconButton(
-            tooltip: 'Sign Out',
-            icon: const Icon(Icons.logout, color: AppColors.outline, size: 20),
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.error,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
+            icon: const Icon(Icons.logout_rounded, size: 18),
+            label: const Text('Logout', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
             onPressed: () async {
-              await DI.authRepo.logout();
-              if (context.mounted) {
-                Navigator.of(context).pushReplacementNamed('/onboarding');
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Row(
+                    children: [
+                      Icon(Icons.logout_rounded, color: AppColors.error),
+                      SizedBox(width: 8),
+                      Text('Sign Out'),
+                    ],
+                  ),
+                  content: const Text(
+                    'You will be returned to the login screen. Your registration and documents are saved — you can log back in anytime to check your verification status.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Stay'),
+                    ),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error,
+                        foregroundColor: Colors.white,
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Sign Out & Change Account'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmed == true) {
+                await DI.authRepo.logout();
+                if (context.mounted) {
+                  Navigator.of(context).pushNamedAndRemoveUntil('/onboarding', (route) => false);
+                }
               }
             },
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: _isLoading
