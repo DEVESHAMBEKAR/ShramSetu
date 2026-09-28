@@ -93,6 +93,31 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     // Attempt to parse VerificationStatus
     VerificationStatus verificationStatus = VerificationStatus.fromDb(workerRes?['worker_status']);
 
+    // Also read rejection_reason / remarks from worker_verification table
+    // (admin writes reviewed_by, rejection_reason here — not on workers table)
+    String? rejectionReason = workerRes?['verification_remarks'] as String?;
+    if (isUuid) {
+      try {
+        final verRow = await _supabase
+            .from('worker_verification')
+            .select('rejection_reason, remarks, status')
+            .eq('worker_id', effectiveId)
+            .order('updated_at', ascending: false)
+            .limit(1)
+            .maybeSingle();
+        if (verRow != null) {
+          final verRejection = verRow['rejection_reason'] as String?;
+          final verRemarks = verRow['remarks'] as String?;
+          // Prefer rejection_reason for rejected status; otherwise use remarks
+          if (verRejection != null && verRejection.trim().isNotEmpty) {
+            rejectionReason = verRejection.trim();
+          } else if (verRemarks != null && verRemarks.trim().isNotEmpty && rejectionReason == null) {
+            rejectionReason = verRemarks.trim();
+          }
+        }
+      } catch (_) {}
+    }
+
     return WorkerProfile(
       id: effectiveId,
       name: resolvedName,
@@ -112,8 +137,8 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       guildId: workerRes?['membership_id'] as String? ?? '#',
       latitude: (workerRes?['latitude'] as num?)?.toDouble(),
       longitude: (workerRes?['longitude'] as num?)?.toDouble(),
-      locationUpdatedAt: workerRes?['location_updated_at'] != null 
-          ? DateTime.tryParse(workerRes!['location_updated_at'].toString()) 
+      locationUpdatedAt: workerRes?['location_updated_at'] != null
+          ? DateTime.tryParse(workerRes!['location_updated_at'].toString())
           : null,
       dob: workerRes?['dob']?.toString(),
       gender: workerRes?['gender'] as String?,
@@ -123,11 +148,12 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       primarySkill: workerRes?['primary_skill'] as String?,
       skillLevel: workerRes?['skill_level'] as String? ?? 'Intermediate',
       membershipId: workerRes?['membership_id'] as String?,
-      verificationRemarks: workerRes?['verification_remarks'] as String?,
-      registeredAt: workerRes?['created_at'] != null 
-          ? DateTime.tryParse(workerRes!['created_at'].toString()) 
+      verificationRemarks: rejectionReason,
+      registeredAt: workerRes?['created_at'] != null
+          ? DateTime.tryParse(workerRes!['created_at'].toString())
           : null,
     );
+
   }
 
   @override

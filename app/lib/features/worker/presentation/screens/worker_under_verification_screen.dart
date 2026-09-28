@@ -505,7 +505,8 @@ class _WorkerUnderVerificationScreenState
             description,
             style: const TextStyle(fontSize: 13, height: 1.5, color: AppColors.onSurfaceVariant),
           ),
-          if (hasRemarks) ...[
+          // Generic remarks (changes-required, under-review, etc.)
+          if (hasRemarks && status != VerificationStatus.rejected) ...[
             const SizedBox(height: 14),
             Container(
               width: double.infinity,
@@ -541,6 +542,115 @@ class _WorkerUnderVerificationScreenState
               ),
             ),
           ],
+          // ── REJECTED: show why + allow reapply ──────────────────────────
+          if (status == VerificationStatus.rejected) ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFEBEE),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.6), width: 1.5),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.info_outline, size: 16, color: AppColors.error),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'Reason for Rejection:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    (_worker?.verificationRemarks?.trim().isNotEmpty == true)
+                        ? _worker!.verificationRemarks!
+                        : 'The Federation Administrator did not provide a specific reason. Please contact your district federation desk for details.',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.primary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Divider(height: 1, color: Color(0xFFEF9A9A)),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'You may correct the issues mentioned above and reapply. Your registration details will be pre-filled.',
+                    style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant, height: 1.4),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                onPressed: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Row(
+                        children: [
+                          Icon(Icons.refresh_rounded, color: AppColors.primary),
+                          SizedBox(width: 8),
+                          Text('Reapply for Verification'),
+                        ],
+                      ),
+                      content: const Text(
+                        'Your previous registration details will be pre-filled. Review and correct the issues mentioned in the rejection reason, then resubmit your documents.\n\nYour application will re-enter the queue for Federation Administrator review.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Proceed to Reapply'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && mounted) {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => WorkerRegistrationScreen(
+                          isResubmission: true,
+                          changeRequestReason: _worker?.verificationRemarks ??
+                              'Your previous application was rejected. Please review and correct your details.',
+                        ),
+                      ),
+                    );
+                    _loadData();
+                  }
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text(
+                  'Correct & Reapply',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                ),
+              ),
+            ),
+          ],
+          // ── CHANGES REQUIRED: quick edit button ─────────────────────────
           if (status == VerificationStatus.changesRequired) ...[
             const SizedBox(height: 14),
             SizedBox(
@@ -1094,3 +1204,4 @@ class _WorkerUnderVerificationScreenState
     );
   }
 }
+
