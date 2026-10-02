@@ -5,6 +5,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import 'customer_live_tracking_screen.dart';
 import '../widgets/review_rating_modal.dart';
+import '../../../../core/models/invoice_models.dart';
+import '../dialogs/invoice_view_dialog.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
   final Map<String, dynamic> booking;
@@ -79,18 +81,25 @@ class _CustomerBookingDetailScreenState
                   style: TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant),
                 ),
                 const SizedBox(height: 14),
-                ...reasons.map((r) => RadioListTile<String>(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(r, style: const TextStyle(fontSize: 13)),
-                      value: r,
-                      groupValue: selectedReason,
-                      onChanged: (val) {
-                        if (val != null) {
-                          setModalState(() => selectedReason = val);
-                        }
-                      },
-                    )),
+                ...[
+                  RadioGroup<String>(
+                    groupValue: selectedReason,
+                    onChanged: (val) {
+                      if (val != null) {
+                        setModalState(() => selectedReason = val);
+                      }
+                    },
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: reasons.map((r) => RadioListTile<String>(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(r, style: const TextStyle(fontSize: 13)),
+                            value: r,
+                          )).toList(),
+                    ),
+                  ),
+                ],
                 if (selectedReason == 'Other reason') ...[
                   const SizedBox(height: 8),
                   TextField(
@@ -199,18 +208,25 @@ class _CustomerBookingDetailScreenState
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.primary),
               ),
               const SizedBox(height: 12),
-              ...slots.map((s) => RadioListTile<String>(
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(s, style: const TextStyle(fontSize: 13)),
-                    value: s,
-                    groupValue: selectedSlot,
-                    onChanged: (val) {
-                      if (val != null) {
-                        setModalState(() => selectedSlot = val);
-                      }
-                    },
-                  )),
+              ...[
+                RadioGroup<String>(
+                  groupValue: selectedSlot,
+                  onChanged: (val) {
+                    if (val != null) {
+                      setModalState(() => selectedSlot = val);
+                    }
+                  },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: slots.map((s) => RadioListTile<String>(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(s, style: const TextStyle(fontSize: 13)),
+                          value: s,
+                        )).toList(),
+                  ),
+                ),
+              ],
             ],
           ),
           actions: [
@@ -692,9 +708,15 @@ class _CustomerBookingDetailScreenState
                       padding: const EdgeInsets.symmetric(vertical: 12),
                     ),
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Invoice downloaded to device.')),
+                      final invoice = InvoiceModel.fromBooking(
+                        _booking,
+                        worker: (_booking['workers'] as Map<String, dynamic>?),
+                        customer: (_booking['customers'] as Map<String, dynamic>?),
+                        payment: (_booking['payments'] is List && (_booking['payments'] as List).isNotEmpty
+                            ? (_booking['payments'] as List).first as Map<String, dynamic>
+                            : (_booking['payments'] as Map<String, dynamic>?)),
                       );
+                      InvoiceViewDialog.show(context, invoice: invoice);
                     },
                     icon: const Icon(Icons.receipt_long, size: 18),
                     label: const Text('View Invoice'),

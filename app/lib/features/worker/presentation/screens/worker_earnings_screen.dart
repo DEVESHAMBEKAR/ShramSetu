@@ -1,9 +1,47 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/models/payment_models.dart';
+import '../../../../core/models/insurance_models.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../widgets/worker_top_app_bar_actions.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
+
+class _EarningsData {
+  final WorkerProfile worker;
+  final List<PaymentModel> releasedPayments;
+  final List<JobRequest> allBookings;
+  final WorkerInsuranceModel? insurance;
+
+  _EarningsData({
+    required this.worker,
+    required this.releasedPayments,
+    required this.allBookings,
+    this.insurance,
+  });
+}
+
+class _SettledPayoutItem {
+  final String id;
+  final String bookingId;
+  final String title;
+  final String subtitle;
+  final double amount;
+  final DateTime date;
+
+  const _SettledPayoutItem({
+    required this.id,
+    required this.bookingId,
+    required this.title,
+    required this.subtitle,
+    required this.amount,
+    required this.date,
+  });
+}
 
 class WorkerEarningsScreen extends StatefulWidget {
   const WorkerEarningsScreen({super.key});
@@ -14,80 +52,289 @@ class WorkerEarningsScreen extends StatefulWidget {
 
 class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
   int _selectedPeriod = 1; // 0: Today, 1: This Week, 2: This Month
-  late Future<WorkerProfile?> _workerFuture;
-  late Future<List<PaymentModel>> _paymentsFuture;
+  late Future<_EarningsData> _earningsDataFuture;
+  StreamSubscription<List<JobRequest>>? _jobsSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _refreshData();
+    _jobsSubscription = DI.workerRepo.watchWorkerBookings().listen(
+      (_) {
+        if (mounted) _refreshData();
+      },
+      onError: (_) {},
+    );
   }
 
-  void _loadData() {
-    _workerFuture = () async {
-      final user = await DI.authRepo.getCurrentUser();
-      final workerId = user?.id ?? 'worker-1';
-      return DI.workerRepo.getWorkerProfile(workerId);
-    }();
-    _paymentsFuture = () async {
-      final user = await DI.authRepo.getCurrentUser();
-      final workerId = user?.id ?? 'worker-1';
-      return DI.paymentRepo.getWorkerReleasedPayments(workerId);
-    }();
+  @override
+  void dispose() {
+    _jobsSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _refreshData() {
+    setState(() {
+      _earningsDataFuture = _loadData();
+    });
+  }
+
+  Future<_EarningsData> _loadData() async {
+    final user = await DI.authRepo.getCurrentUser();
+    final workerId = (user != null && user.id.isNotEmpty) ? user.id : 'mock-worker-id';
+
+    WorkerProfile worker;
+    try {
+      worker = await DI.workerRepo.getWorkerProfile(workerId);
+    } catch (e) {
+      debugPrint('[WorkerEarnings] getWorkerProfile fallback: $e');
+      worker = WorkerProfile(
+        id: workerId,
+        name: 'Artisan Partner',
+        profileImage: '',
+        phone: user?.phone ?? '',
+        skills: ['General Service'],
+        experience: '2 Years',
+        rating: 5.0,
+        completedJobs: 0,
+        earnings: 0.0,
+        isVerified: true,
+        verificationStatus: VerificationStatus.approved,
+        isAvailable: true,
+        serviceLocation: 'Pune',
+        guildName: 'Pune Labour Collective Guild',
+        guildId: '#101',
+      );
+    }
+
+    List<PaymentModel> releasedPayments;
+    try {
+      releasedPayments = await DI.paymentRepo.getWorkerReleasedPayments(workerId);
+    } catch (e) {
+      debugPrint('[WorkerEarnings] getWorkerReleasedPayments fallback: $e');
+      releasedPayments = [];
+    }
+
+    List<JobRequest> allBookings;
+    try {
+      allBookings = await DI.workerRepo.getWorkerBookings();
+    } catch (e) {
+      debugPrint('[WorkerEarnings] getWorkerBookings fallback: $e');
+      allBookings = [];
+    }
+
+    WorkerInsuranceModel? insurance;
+    try {
+      insurance = await DI.workerRepo.getWorkerInsurance(workerId);
+    } catch (e) {
+      debugPrint('[WorkerEarnings] getWorkerInsurance fallback: $e');
+    }
+
+    return _EarningsData(
+      worker: worker,
+      releasedPayments: releasedPayments,
+      allBookings: allBookings,
+      insurance: insurance,
+    );
+  }
+
+  String get _periodTitle {
+    switch (_selectedPeriod) {
+      case 0:
+        return 'TODAY\'S PAYOUT'.tr();
+      case 1:
+        return 'TOTAL WEEK PAYOUT'.tr();
+      case 2:
+        return 'TOTAL MONTH PAYOUT'.tr();
+      default:
+        return 'TOTAL PAYOUT'.tr();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<WorkerProfile?>(
-      future: _workerFuture,
-      builder: (context, workerSnapshot) {
-        return FutureBuilder<List<PaymentModel>>(
-          future: _paymentsFuture,
-          builder: (context, paymentsSnapshot) {
-            final worker = workerSnapshot.data;
-            final releasedPayments = paymentsSnapshot.data ?? [];
-            final workerName = worker?.name ?? 'Artisan';
-            final guildId = worker?.guildId ?? '101';
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        return FutureBuilder<_EarningsData>(
+      future: _earningsDataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: _buildAppBar('#101'),
+            body: const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          );
+        }
 
-            // Calculate actual released earnings from payments
-            final double releasedTotal = releasedPayments.fold(
-              0.0,
-              (sum, p) => sum + p.amount,
-            );
-            final earnings = releasedTotal > 0 ? releasedTotal : (worker?.earnings ?? 0.0);
-            final jobsCount = releasedPayments.isNotEmpty ? releasedPayments.length : (worker?.completedJobs ?? 0);
-
-            return Scaffold(
-              backgroundColor: AppColors.background,
-              appBar: _buildAppBar(guildId),
-              body: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.marginMobile,
-                  vertical: AppSpacing.spacingSm,
-                ),
+        if (snapshot.hasError) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            appBar: _buildAppBar('#101'),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.spacingLg),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _buildPeriodSelector(),
+                    const Icon(Icons.error_outline, size: 48, color: AppColors.error),
                     const SizedBox(height: 12),
-                    _buildFinancialHighlightCard(earnings, jobsCount),
-                    const SizedBox(height: 12),
-                    _buildRecentPayoutsSection(releasedPayments),
-                    const SizedBox(height: 12),
-                    _buildDailyIncomeChart(),
-                    const SizedBox(height: 12),
-                    _buildWelfareFundSection(workerName, guildId),
-                    const SizedBox(height: 80),
+                    Text(
+                      'Failed to load earnings: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 14, color: AppColors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _refreshData,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
+                      ),
+                      child: const Text('Retry'),
+                    ),
                   ],
                 ),
               ),
-            );
-          },
+            ),
+          );
+        }
+
+        final data = snapshot.data!;
+        final worker = data.worker;
+        final releasedPayments = data.releasedPayments;
+        final allBookings = data.allBookings;
+        final workerName = worker.name.isNotEmpty ? worker.name : 'Artisan';
+        final guildId = worker.guildId.isNotEmpty ? worker.guildId : '101';
+
+        // 1. Unify all completed / released items
+        final List<_SettledPayoutItem> allSettledItems = [];
+        final Set<String> processedBookingIds = {};
+
+        // Primary: Authoritative released payments from escrow
+        for (final p in releasedPayments) {
+          final bookingRef = p.bookingId.length >= 6
+              ? p.bookingId.substring(0, 6).toUpperCase()
+              : p.bookingId.toUpperCase();
+
+          final matchingBk = allBookings.where((b) => b.id == p.bookingId).firstOrNull;
+          final serviceName = matchingBk?.serviceName;
+          final subtitle = serviceName != null && serviceName.isNotEmpty
+              ? 'Escrow Released • ${p.paymentMethod ?? "UPI"} • $serviceName'
+              : 'Escrow Released • ${p.paymentMethod ?? "UPI"}';
+
+          allSettledItems.add(_SettledPayoutItem(
+            id: p.id,
+            bookingId: p.bookingId,
+            title: 'Job #$bookingRef',
+            subtitle: subtitle,
+            amount: p.amount,
+            date: p.updatedAt,
+          ));
+          processedBookingIds.add(p.bookingId);
+        }
+
+        // Secondary: Include completed bookings not already in payments table
+        for (final b in allBookings) {
+          if (b.status == BookingStatus.completed && !processedBookingIds.contains(b.id)) {
+            final bookingRef = b.id.length >= 6
+                ? b.id.substring(0, 6).toUpperCase()
+                : b.id.toUpperCase();
+            final amount = b.totalAmount > 0 ? b.totalAmount : b.baseAmount;
+
+            DateTime itemDate = DateTime.now();
+            if (b.createdAt.toLowerCase() != 'recently' && b.createdAt.toLowerCase() != 'just now') {
+              final parsed = DateTime.tryParse(b.createdAt);
+              if (parsed != null) itemDate = parsed;
+            }
+
+            allSettledItems.add(_SettledPayoutItem(
+              id: 'bk_${b.id}',
+              bookingId: b.id,
+              title: 'Job #$bookingRef',
+              subtitle: 'Completed • Direct Settlement • ${b.serviceName}',
+              amount: amount,
+              date: itemDate,
+            ));
+            processedBookingIds.add(b.id);
+          }
+        }
+
+        // Sort descending by date
+        allSettledItems.sort((a, b) => b.date.compareTo(a.date));
+
+        // 2. Filter by period (Today / This Week / This Month)
+        final now = DateTime.now();
+        final List<_SettledPayoutItem> periodItems = allSettledItems.where((item) {
+          switch (_selectedPeriod) {
+            case 0: // Today
+              return item.date.year == now.year &&
+                  item.date.month == now.month &&
+                  item.date.day == now.day;
+            case 1: // This Week (from Monday 00:00 to now)
+              final daysSinceMonday = (now.weekday - DateTime.monday) % 7;
+              final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysSinceMonday));
+              final endOfWeek = monday.add(const Duration(days: 7));
+              return (item.date.isAfter(monday) || item.date.isAtSameMomentAs(monday)) &&
+                  item.date.isBefore(endOfWeek);
+            case 2: // This Month
+              return item.date.year == now.year && item.date.month == now.month;
+            default:
+              return true;
+          }
+        }).toList();
+
+        final double periodEarnings = periodItems.fold(0.0, (sum, i) => sum + i.amount);
+        final int periodJobsCount = periodItems.length;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: _buildAppBar(guildId, worker: worker),
+          body: RefreshIndicator(
+            onRefresh: () async => _refreshData(),
+            color: AppColors.primary,
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.marginMobile,
+                vertical: AppSpacing.spacingSm,
+              ),
+              child: Column(
+                children: [
+                  _buildPeriodSelector(),
+                  const SizedBox(height: 12),
+                  _buildFinancialHighlightCard(
+                    earnings: periodEarnings,
+                    jobsCount: periodJobsCount,
+                    worker: worker,
+                  ),
+                  const SizedBox(height: 12),
+                  _buildRecentPayoutsSection(periodItems),
+                  const SizedBox(height: 12),
+                  _buildDailyIncomeChart(allSettledItems),
+                  const SizedBox(height: 12),
+                  _buildWelfareFundSection(
+                    workerName: workerName,
+                    guildId: guildId,
+                    periodEarnings: periodEarnings,
+                    insurance: data.insurance,
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
         );
       },
     );
   }
 
-  PreferredSizeWidget _buildAppBar(String guildId) {
+  PreferredSizeWidget _buildAppBar(String guildId, {WorkerProfile? worker}) {
+    final guildDistrict = (worker?.district?.isNotEmpty == true ? worker!.district : "COOPERATIVE")!.toUpperCase();
     return AppBar(
       backgroundColor: Colors.white.withValues(alpha: 0.95),
       elevation: 0,
@@ -113,7 +360,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   ),
                   const SizedBox(width: 5),
                   Text(
-                    'PUNE GUILD #$guildId',
+                    '$guildDistrict GUILD #$guildId',
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -123,9 +370,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   ),
                 ],
               ),
-              const Text(
-                'Worker Earnings',
-                style: TextStyle(
+              Text(
+                'Worker Earnings'.tr(),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
@@ -137,56 +384,16 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
         ],
       ),
       actions: [
-        Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'म',
-                  style: TextStyle(
-                    color: AppColors.onTertiaryContainer,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
-                ),
-                TextSpan(
-                  text: '/EN',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Container(
-          width: 34,
-          height: 34,
-          margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(Icons.support_agent, color: AppColors.primary, size: 18),
+        WorkerTopAppBarActions(
+          worker: worker,
+          showAvatar: false,
         ),
       ],
     );
   }
 
   Widget _buildPeriodSelector() {
-    final periods = ['Today', 'This Week', 'This Month'];
+    final periods = ['Today'.tr(), 'This Week'.tr(), 'This Month'.tr()];
     return Container(
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -234,7 +441,16 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     );
   }
 
-  Widget _buildFinancialHighlightCard(double earnings, int jobsCount) {
+  Widget _buildFinancialHighlightCard({
+    required double earnings,
+    required int jobsCount,
+    required WorkerProfile worker,
+  }) {
+    final phoneDigits = worker.phone.replaceAll(RegExp(r'\D'), '');
+    final lastDigits = phoneDigits.length >= 4
+        ? phoneDigits.substring(phoneDigits.length - 4)
+        : '4892';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
@@ -255,13 +471,13 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.account_balance_wallet, color: AppColors.secondary, size: 18),
-                  SizedBox(width: 6),
+                  const Icon(Icons.account_balance_wallet, color: AppColors.secondary, size: 18),
+                  const SizedBox(width: 6),
                   Text(
-                    'TOTAL WEEK PAYOUT',
-                    style: TextStyle(
+                    _periodTitle,
+                    style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
                       color: AppColors.onSurfaceVariant,
@@ -273,21 +489,27 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: earnings > 0 ? AppColors.tertiaryContainer : AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.tertiaryFixed),
+                  border: Border.all(
+                    color: earnings > 0 ? AppColors.tertiaryFixed : AppColors.outlineVariant,
+                  ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified, size: 13, color: AppColors.onTertiaryContainer),
-                    SizedBox(width: 4),
+                    Icon(
+                      earnings > 0 ? Icons.verified : Icons.schedule,
+                      size: 13,
+                      color: earnings > 0 ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
                     Text(
-                      'Instant Settled',
+                      earnings > 0 ? 'Instant Settled' : 'Ready to Earn',
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.onTertiaryContainer,
+                        color: earnings > 0 ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -301,7 +523,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                '₹${earnings.toInt() > 0 ? earnings.toInt() : 14280}',
+                '₹${earnings.toStringAsFixed(0)}',
                 style: const TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.w900,
@@ -313,29 +535,35 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: earnings > 0 ? AppColors.tertiaryContainer : AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Text(
-                  '100% Payout',
+                child: Text(
+                  earnings > 0 ? '100% Payout' : '0% Payout',
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.onTertiaryContainer,
+                    color: earnings > 0 ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 4),
-          const Row(
+          Row(
             children: [
-              Icon(Icons.check_circle, size: 14, color: AppColors.onTertiaryContainer),
-              SizedBox(width: 5),
+              Icon(
+                earnings > 0 ? Icons.check_circle : Icons.info_outline,
+                size: 14,
+                color: earnings > 0 ? AppColors.onTertiaryContainer : AppColors.outline,
+              ),
+              const SizedBox(width: 5),
               Expanded(
                 child: Text(
-                  'Disbursed to Bank of Maharashtra (A/C **4892) via UPI',
-                  style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                  earnings > 0
+                      ? 'Disbursed to Bank of Maharashtra (A/C **$lastDigits) via UPI'
+                      : 'No payouts settled for this period • Auto-settled via UPI on escrow release',
+                  style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -361,13 +589,13 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                   child: const Icon(Icons.verified_user, color: AppColors.secondary, size: 18),
                 ),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          Text(
+                          const Text(
                             '0% Commission Guarantee',
                             style: TextStyle(
                               fontSize: 12,
@@ -375,10 +603,10 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                               color: AppColors.primary,
                             ),
                           ),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text(
-                            '• Union Member',
-                            style: TextStyle(
+                            '• ${worker.trade != null && worker.trade!.isNotEmpty ? worker.trade! : "Union Member"}',
+                            style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w700,
                               color: AppColors.secondary,
@@ -386,10 +614,10 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                           ),
                         ],
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
-                        'Pune Plumbers Guild returns 100% of fair customer fees directly to you.',
-                        style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                        '${worker.guildName.isNotEmpty ? worker.guildName : "Pune Plumbers Guild"} returns 100% of fair customer fees directly to you.',
+                        style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                       ),
                     ],
                   ),
@@ -407,20 +635,20 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             crossAxisSpacing: 8,
             childAspectRatio: 2.1,
             children: [
-              _buildMetricCard('Completed Jobs', '$jobsCount', 'Jobs', null),
+              _buildMetricCard('Completed Jobs'.tr(), '$jobsCount', 'Jobs'.tr(), null),
               _buildMetricCard(
-                'Avg. per Job',
+                'Avg. per Job'.tr(),
                 jobsCount > 0 ? '₹${(earnings / jobsCount).toStringAsFixed(0)}' : '₹0',
                 jobsCount > 0 ? 'avg' : 'none',
                 AppColors.onTertiaryContainer,
               ),
               _buildMetricCard(
-                'Total Active Hours',
+                'Total Active Hours'.tr(),
                 jobsCount > 0 ? (jobsCount * 1.5).toStringAsFixed(1) : '0.0',
                 'hrs',
                 null,
               ),
-              _buildMetricCard('Platform Fee Deducted', '₹0', '0%', AppColors.onTertiaryContainer),
+              _buildMetricCard('Platform Fee'.tr(), '₹0', '0%', AppColors.onTertiaryContainer),
             ],
           ),
         ],
@@ -428,7 +656,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     );
   }
 
-  Widget _buildRecentPayoutsSection(List<PaymentModel> payments) {
+  Widget _buildRecentPayoutsSection(List<_SettledPayoutItem> items) {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
@@ -449,9 +677,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Recent Released Payouts',
-                style: TextStyle(
+              Text(
+                'Recent Settled Payouts'.tr(),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
@@ -461,32 +689,32 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: items.isNotEmpty ? AppColors.tertiaryContainer : AppColors.surfaceContainerHigh,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
-                  '${payments.length} Settled',
-                  style: const TextStyle(
+                  '${items.length} ${'Settled'.tr()}',
+                  style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.onTertiaryContainer,
+                    color: items.isNotEmpty ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
-          if (payments.isEmpty)
+          if (items.isEmpty)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 20),
-              child: const Column(
+              child: Column(
                 children: [
-                  Icon(Icons.account_balance_wallet_outlined, size: 36, color: AppColors.outline),
-                  SizedBox(height: 8),
+                  const Icon(Icons.account_balance_wallet_outlined, size: 36, color: AppColors.outline),
+                  const SizedBox(height: 8),
                   Text(
-                    'No released payouts yet',
-                    style: TextStyle(
+                    'No released payouts yet'.tr(),
+                    style: const TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.primary,
@@ -505,13 +733,10 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              itemCount: payments.length,
+              itemCount: items.length,
               separatorBuilder: (_, index) => const Divider(height: 16),
               itemBuilder: (context, index) {
-                final payment = payments[index];
-                final bookingRef = payment.bookingId.length >= 6
-                    ? payment.bookingId.substring(0, 6).toUpperCase()
-                    : payment.bookingId.toUpperCase();
+                final item = items[index];
                 return Row(
                   children: [
                     Container(
@@ -528,7 +753,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Job #$bookingRef',
+                            item.title,
                             style: const TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
@@ -536,14 +761,14 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                             ),
                           ),
                           Text(
-                            'Escrow Released • ${payment.paymentMethod}',
+                            item.subtitle,
                             style: const TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
                           ),
                         ],
                       ),
                     ),
                     Text(
-                      '₹${payment.amount.toStringAsFixed(0)}',
+                      '₹${item.amount.toStringAsFixed(0)}',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w800,
@@ -607,7 +832,29 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     );
   }
 
-  Widget _buildDailyIncomeChart() {
+  Widget _buildDailyIncomeChart(List<_SettledPayoutItem> allItems) {
+    final now = DateTime.now();
+    final daysSinceMonday = (now.weekday - DateTime.monday) % 7;
+    final monday = DateTime(now.year, now.month, now.day).subtract(Duration(days: daysSinceMonday));
+
+    final dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final List<double> dayTotals = List.filled(7, 0.0);
+
+    for (int i = 0; i < 7; i++) {
+      final targetDate = monday.add(Duration(days: i));
+      for (final item in allItems) {
+        if (item.date.year == targetDate.year &&
+            item.date.month == targetDate.month &&
+            item.date.day == targetDate.day) {
+          dayTotals[i] += item.amount;
+        }
+      }
+    }
+
+    final double maxDay = dayTotals.reduce((a, b) => a > b ? a : b);
+    const double benchmark = 1500.0;
+    final double scaleBasis = max(maxDay, benchmark);
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
@@ -625,22 +872,22 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Daily Income Breakdown',
-                    style: TextStyle(
+                    'Daily Income Breakdown'.tr(),
+                    style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w800,
                       color: AppColors.primary,
                       letterSpacing: -0.2,
                     ),
                   ),
-                  Text(
+                  const Text(
                     'Pune Fair Wage Index Benchmark: ₹1,500/day',
                     style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
@@ -693,15 +940,24 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildChartBar('1.8k', 0.53, 'Mon'),
-                    _buildChartBar('2.4k', 0.68, 'Tue'),
-                    _buildChartBar('1.6k', 0.47, 'Wed'),
-                    _buildChartBar('2.8k', 0.80, 'Thu'),
-                    _buildChartBar('2.1k', 0.60, 'Fri'),
-                    _buildChartBar('3.5k', 0.98, 'Sat', isPeak: true),
-                    _buildChartBar('-', 0.06, 'Sun', isOff: true),
-                  ],
+                  children: List.generate(7, (i) {
+                    final val = dayTotals[i];
+                    final isOff = val <= 0;
+                    final isPeak = val > 0 && val == maxDay;
+                    final heightPercent = isOff ? 0.06 : (val / scaleBasis).clamp(0.12, 1.0);
+                    final label = isOff
+                        ? '-'
+                        : (val >= 1000
+                            ? '${(val / 1000).toStringAsFixed(1)}k'
+                            : '₹${val.toInt()}');
+                    return _buildChartBar(
+                      label,
+                      heightPercent,
+                      dayNames[i],
+                      isPeak: isPeak,
+                      isOff: isOff,
+                    );
+                  }),
                 ),
               ],
             ),
@@ -736,7 +992,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          day,
+          day.tr(),
           style: TextStyle(
             fontSize: 11,
             fontWeight: isPeak ? FontWeight.w800 : FontWeight.w600,
@@ -747,7 +1003,19 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     );
   }
 
-  Widget _buildWelfareFundSection(String workerName, String guildId) {
+  Widget _buildWelfareFundSection({
+    required String workerName,
+    required String guildId,
+    required double periodEarnings,
+    WorkerInsuranceModel? insurance,
+  }) {
+    final int cessAccrued = (periodEarnings * 0.02).round();
+    final String cessBadge = cessAccrued > 0 ? '+₹$cessAccrued this mo' : '₹0 this mo';
+
+    final coverageAmountFormatted = '₹${(insurance?.coverageAmount ?? 500000.0).toStringAsFixed(0)}';
+    final policyMasked = insurance?.maskedPolicyNumber ?? 'FED-MH-4921';
+    final provider = insurance?.providerName ?? 'Maharashtra State Cooperative Labour Federation Welfare Pool';
+
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
@@ -770,13 +1038,13 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row(
+                  Row(
                     children: [
-                      Icon(Icons.verified, color: AppColors.onTertiaryContainer, size: 18),
-                      SizedBox(width: 5),
+                      const Icon(Icons.verified, color: AppColors.onTertiaryContainer, size: 18),
+                      const SizedBox(width: 5),
                       Text(
-                        'Partner Welfare & Protection',
-                        style: TextStyle(
+                        'Partner Welfare & Protection'.tr(),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
                           color: AppColors.primary,
@@ -810,19 +1078,47 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             ],
           ),
           const SizedBox(height: 12),
+
+          // External Provider Integration Pending Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.outlineVariant),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.info_outline, size: 14, color: AppColors.secondary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'External insurance provider integration pending'.tr(),
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
           _buildWelfareCard(
             icon: Icons.health_and_safety,
-            title: 'Accidental & Health Insurance',
-            badge: 'Active',
-            amount: '₹5,00,000',
-            desc: 'Full medical & life policy cover • Family included',
+            title: insurance?.coverageType ?? 'Accidental & Health Insurance',
+            badge: insurance?.status.displayLabel ?? 'Active',
+            amount: coverageAmountFormatted,
+            desc: '$provider\nPolicy: $policyMasked • Helpline: ${insurance?.claimSupportPhone ?? "1800-266-9090"}',
           ),
           const SizedBox(height: 8),
           _buildWelfareCard(
             icon: Icons.savings,
             title: 'Welfare Cess Accrued',
-            badge: '+₹428 this mo',
-            desc: 'Held securely in Pune Workers\' Collective Emergency Reserve.',
+            badge: cessBadge,
+            desc: 'Held securely in Cooperative Labour Federation Emergency Reserve.'.tr(),
           ),
           const SizedBox(height: 8),
           _buildWelfareCard(

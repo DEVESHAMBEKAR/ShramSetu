@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
+import '../../../../core/localization/locale_controller.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -13,7 +14,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   String _selectedRole = 'customer'; // 'customer', 'worker'
   String _selectedLanguage = 'en'; // 'en', 'hi', 'mr'
 
+  @override
+  void initState() {
+    super.initState();
+    _selectedLanguage = LocaleController.instance.languageCode;
+  }
+
   void _handleContinue() {
+    LocaleController.instance.setLanguage(_selectedLanguage);
     if (_selectedRole == 'customer') {
       Navigator.of(context).pushReplacementNamed('/login/customer');
     } else {
@@ -376,7 +384,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }) {
     final isSelected = _selectedLanguage == code;
     return GestureDetector(
-      onTap: () => setState(() => _selectedLanguage = code),
+      onTap: () {
+        setState(() => _selectedLanguage = code);
+        LocaleController.instance.setLanguage(code);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(12),

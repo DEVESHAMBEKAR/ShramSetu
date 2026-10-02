@@ -1,4 +1,4 @@
-﻿/// Payment models for ShramSetu Phase 19 — Razorpay + Escrow
+/// Payment models for ShramSetu Phase 19 — Razorpay + Escrow
 library;
 
 enum PaymentStatus {
@@ -110,6 +110,12 @@ class PaymentModel {
 
   factory PaymentModel.fromJson(Map<String, dynamic> json) {
     final amt = (json['amount'] as num).toDouble();
+    final status = PaymentStatus.fromDbString(json['status'] as String?);
+    final escrowStatusRaw = json['escrow_status'] as String?;
+    final escrowStatus = escrowStatusRaw != null
+        ? EscrowStatus.fromDbString(escrowStatusRaw)
+        : (status == PaymentStatus.paid ? EscrowStatus.released : EscrowStatus.notFunded);
+
     return PaymentModel(
       id: json['id'] as String,
       bookingId: json['booking_id'] as String,
@@ -117,8 +123,8 @@ class PaymentModel {
       workerId: json['worker_id'] as String?,
       amount: amt,
       amountPaise: (json['amount_paise'] as int?) ?? PaymentUtils.amountToPaise(amt),
-      status: PaymentStatus.fromDbString(json['status'] as String?),
-      escrowStatus: EscrowStatus.fromDbString(json['escrow_status'] as String?),
+      status: status,
+      escrowStatus: escrowStatus,
       razorpayOrderId: json['razorpay_order_id'] as String?,
       razorpayPaymentId: json['razorpay_payment_id'] as String?,
       razorpaySignature: json['razorpay_signature'] as String?,

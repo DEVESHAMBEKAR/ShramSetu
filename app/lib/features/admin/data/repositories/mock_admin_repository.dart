@@ -1,7 +1,10 @@
 import '../../../../core/repositories/i_admin_repository.dart';
 import '../../../../core/services/shared_booking_store.dart';
+import '../../../../core/models/insurance_models.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
+import '../../../customer/data/models/customer_models.dart';
+import '../../../customer/data/repositories/mock_customer_repository.dart';
 
 class MockAdminRepository implements IAdminRepository {
   static final MockAdminRepository _instance = MockAdminRepository._internal();
@@ -86,14 +89,52 @@ class MockAdminRepository implements IAdminRepository {
     final index = _workers.indexWhere((w) => w.id == workerId);
     if (index != -1) {
       final prev = _workers[index].verificationStatus.name.toUpperCase();
-      _workers[index] = _workers[index].copyWith(
+      final updatedProfile = _workers[index].copyWith(
         verificationStatus: VerificationStatus.approved,
         isVerified: true,
         isAvailable: true,
         verificationRemarks: remarks ?? 'Verified by Federation Officer',
       );
+      _workers[index] = updatedProfile;
       _recordHistory(workerId, prev, 'APPROVED', 'APPROVE', remarks);
       _recalculateStats();
+
+      // Ensure approved worker is immediately accessible in Customer console
+      final catId = updatedProfile.skills.any((s) => s.toLowerCase().contains('elect'))
+          ? 'c1'
+          : updatedProfile.skills.any((s) => s.toLowerCase().contains('clean'))
+              ? 'c4'
+              : 'c2';
+
+      MockCustomerRepository.registerOrUpdateWorker(Worker(
+        id: updatedProfile.id,
+        name: updatedProfile.name,
+        categoryId: catId,
+        rate: 349,
+        rating: updatedProfile.rating > 0 ? updatedProfile.rating : 4.85,
+        reviewCount: updatedProfile.reviewCount > 0 ? updatedProfile.reviewCount : 15,
+        jobsCompleted: updatedProfile.completedJobs,
+        distanceKm: 1.8,
+        experience: updatedProfile.experience,
+        availability: 'Available Today',
+        specializations: updatedProfile.skills,
+        locationTag: updatedProfile.serviceLocation.contains('Pune')
+            ? updatedProfile.serviceLocation
+            : '${updatedProfile.serviceLocation}, Pune',
+        imageUrl: updatedProfile.profileImage,
+        customTag: 'Union Approved Artisan',
+        bio: 'Certified union artisan registered with Pune Cooperative Federation.',
+        federationId: updatedProfile.guildId,
+        insuranceAmount: 'Up to ₹1,50,000',
+        languages: const ['मराठी', 'हिंदी'],
+        serviceAreas: [
+          updatedProfile.serviceLocation.replaceAll(', Pune', '').trim(),
+          'Pune',
+          'All Areas'
+        ],
+        isUnionGold: true,
+        isCoopMaster: true,
+      ));
     }
   }
 
@@ -327,5 +368,33 @@ class MockAdminRepository implements IAdminRepository {
   Future<void> updateDocumentStatus(String documentId, String status, {String? remarks}) async {
     // Mock: no persistent state — documents regenerated fresh per getWorkerDocuments() call.
     await Future.delayed(const Duration(milliseconds: 200));
+  }
+
+  final Map<String, WorkerInsuranceModel> _insuranceMap = {};
+
+  @override
+  Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId) async {
+    if (_insuranceMap.containsKey(workerId)) {
+      return _insuranceMap[workerId];
+    }
+    final model = WorkerInsuranceModel(
+      workerId: workerId,
+      policyNumber: 'FED-GRP-2024-${workerId.hashCode.abs() % 10000}',
+      coverageAmount: 500000.0,
+      status: InsuranceStatus.active,
+      verificationStatus: InsuranceVerificationStatus.verified,
+      providerName: 'Maharashtra State Cooperative Labour Federation Welfare Pool',
+      claimSupportPhone: '1800-266-9090',
+      claimInstructions: 'In case of workplace injury or hospitalization, notify your local federation secretary within 48 hours with hospital discharge summary.',
+      validUntil: DateTime.now().add(const Duration(days: 240)),
+      isExternalIntegrationPending: true,
+    );
+    _insuranceMap[workerId] = model;
+    return model;
+  }
+
+  @override
+  Future<void> updateWorkerInsurance(WorkerInsuranceModel insurance) async {
+    _insuranceMap[insurance.workerId] = insurance;
   }
 }

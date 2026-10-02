@@ -163,14 +163,32 @@ class SupabasePaymentRepository implements IPaymentRepository {
 
   @override
   Future<List<PaymentModel>> getWorkerReleasedPayments(String workerId) async {
-    final res = await _client
-        .from('payments')
-        .select()
-        .eq('worker_id', workerId)
-        .eq('escrow_status', 'released')
-        .order('updated_at', ascending: false);
-    return (res as List)
-        .map((r) => PaymentModel.fromJson(r as Map<String, dynamic>))
-        .toList();
+    try {
+      final res = await _client
+          .from('payments')
+          .select()
+          .eq('worker_id', workerId)
+          .eq('escrow_status', 'released')
+          .order('updated_at', ascending: false);
+      return (res as List)
+          .map((r) => PaymentModel.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (e) {
+      debugPrint('[PaymentRepo] escrow_status query note: $e. Falling back to status=PAID.');
+      try {
+        final res = await _client
+            .from('payments')
+            .select()
+            .eq('worker_id', workerId)
+            .eq('status', 'PAID')
+            .order('updated_at', ascending: false);
+        return (res as List)
+            .map((r) => PaymentModel.fromJson(r as Map<String, dynamic>))
+            .toList();
+      } catch (e2) {
+        debugPrint('[PaymentRepo] getWorkerReleasedPayments fallback error: $e2');
+        return [];
+      }
+    }
   }
 }

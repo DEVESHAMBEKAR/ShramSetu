@@ -5,6 +5,9 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 import 'worker_job_detail_screen.dart';
+import '../widgets/worker_top_app_bar_actions.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
   const WorkerDashboardScreen({super.key});
@@ -50,7 +53,10 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<dynamic>>(
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        return FutureBuilder<List<dynamic>>(
       future: _dataFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -127,6 +133,8 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           ),
         );
       },
+        );
+      },
     );
   }
 
@@ -171,9 +179,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   ),
                 ],
               ),
-              const Text(
-                'Partner Hub',
-                style: TextStyle(
+              Text(
+                'Partner Hub'.tr(),
+                style: const TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
@@ -185,73 +193,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         ],
       ),
       actions: [
-        Container(
-          height: 34,
-          padding: const EdgeInsets.symmetric(horizontal: 10),
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: RichText(
-            text: const TextSpan(
-              children: [
-                TextSpan(
-                  text: 'म',
-                  style: TextStyle(
-                    color: AppColors.onTertiaryContainer,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 12,
-                  ),
-                ),
-                TextSpan(
-                  text: '/EN',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        Container(
-          width: 34,
-          height: 34,
-          margin: const EdgeInsets.only(right: 8),
-          decoration: BoxDecoration(
-            color: AppColors.background,
-            border: Border.all(color: AppColors.outlineVariant),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: const Icon(
-            Icons.support_agent,
-            color: AppColors.primary,
-            size: 18,
-          ),
-        ),
-        Container(
-          width: 34,
-          height: 34,
-          margin: const EdgeInsets.only(right: AppSpacing.marginMobile),
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            worker.name.isNotEmpty
-                ? worker.name.trim().split(' ').map((e) => e.isNotEmpty ? e[0] : '').take(2).join().toUpperCase()
-                : 'PT',
-            style: const TextStyle(
-              color: AppColors.onPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-          ),
+        WorkerTopAppBarActions(
+          worker: worker,
+          showAvatar: true,
         ),
       ],
     );
@@ -458,7 +402,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         Row(
                           children: [
                             Text(
-                              isOnline ? 'ONLINE' : 'OFFLINE',
+                              (isOnline ? 'ONLINE' : 'OFFLINE').tr(),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w800,
@@ -770,14 +714,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
-              child: const Row(
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle, size: 18),
-                  SizedBox(width: 8),
+                  const Icon(Icons.check_circle, size: 18),
+                  const SizedBox(width: 8),
                   Text(
-                    'Accept Job',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
+                    'Accept Job'.tr(),
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
@@ -795,9 +739,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                       _refreshData();
                     },
                     icon: const Icon(Icons.redo, size: 15, color: AppColors.onSurfaceVariant),
-                    label: const Text(
-                      'Pass to Guild',
-                      style: TextStyle(
+                    label: Text(
+                      'Pass to Guild'.tr(),
+                      style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary,
@@ -877,7 +821,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           childAspectRatio: 1.25,
           children: [
             _buildMetricCard(
-              title: "Today's Earnings",
+              title: "Today's Earnings".tr(),
               icon: Icons.payments_outlined,
               iconColor: AppColors.onTertiaryContainer,
               mainValue: '₹${worker.earnings.toInt()}',
@@ -887,7 +831,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               footer: 'Direct Escrow Payout',
             ),
             _buildMetricCard(
-              title: 'Jobs Completed',
+              title: 'Jobs Completed'.tr(),
               icon: Icons.engineering_outlined,
               iconColor: AppColors.primary,
               mainValue: '${worker.completedJobs} / ${worker.completedJobs + 1}',
@@ -895,7 +839,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               footer: '1 in queue for today',
             ),
             _buildMetricCard(
-              title: 'Partner Rating',
+              title: 'Partner Rating'.tr(),
               icon: Icons.star,
               iconColor: AppColors.starRating,
               mainValue: worker.rating > 0 ? worker.rating.toStringAsFixed(1) : 'New',
@@ -905,7 +849,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               footer: worker.reviewCount > 0 ? '${worker.reviewCount} verified reviews' : 'No reviews yet',
             ),
             _buildMetricCard(
-              title: 'Guild Standing',
+              title: 'Guild Standing'.tr(),
               icon: Icons.military_tech_outlined,
               iconColor: AppColors.primary,
               mainValue: 'Top 5%',
@@ -1055,9 +999,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           children: [
             Row(
               children: [
-                const Text(
-                  'COMPLETED TODAY',
-                  style: TextStyle(
+                Text(
+                  'COMPLETED TODAY'.tr(),
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary,
@@ -1084,9 +1028,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 ),
               ],
             ),
-            const Text(
-              'Full History →',
-              style: TextStyle(
+            Text(
+              'Full History →'.tr(),
+              style: const TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primary,

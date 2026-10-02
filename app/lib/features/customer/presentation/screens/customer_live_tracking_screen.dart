@@ -8,6 +8,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../widgets/review_rating_modal.dart';
+import '../../../../core/localization/locale_controller.dart';
 
 class CustomerLiveTrackingScreen extends StatefulWidget {
   final String bookingId;
@@ -420,20 +421,36 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
         ],
       ),
       actions: [
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 12),
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceContainer,
-            borderRadius: AppRadius.radiusLg,
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.translate, size: 14, color: AppColors.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text('मराठी / EN', style: AppTypography.labelSm.copyWith(color: AppColors.onSurface)),
-            ],
-          ),
+        ListenableBuilder(
+          listenable: LocaleController.instance,
+          builder: (context, _) {
+            return InkWell(
+              borderRadius: AppRadius.radiusLg,
+              onTap: () {
+                LocaleController.instance.toggleNextLanguage();
+              },
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainer,
+                  borderRadius: AppRadius.radiusLg,
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.translate, size: 14, color: AppColors.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Text(
+                      LocaleController.instance.isMarathi
+                          ? 'मराठी'
+                          : (LocaleController.instance.isHindi ? 'हिंदी' : 'EN'),
+                      style: AppTypography.labelSm.copyWith(color: AppColors.onSurface),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
         IconButton(
           icon: const Icon(Icons.support_agent, color: AppColors.onSurfaceVariant),

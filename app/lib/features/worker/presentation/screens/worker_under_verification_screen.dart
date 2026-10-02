@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../shared/widgets/document_viewer/document_viewer_modal.dart';
 import '../../data/models/worker_models.dart';
 import 'worker_kyc_screen.dart';
 import 'worker_registration_screen.dart';
@@ -1070,6 +1071,17 @@ class _WorkerUnderVerificationScreenState
             ],
           ),
         ),
+        if (hasDoc)
+          TextButton.icon(
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: () => DocumentViewerModal.show(context, doc: doc),
+            icon: const Icon(Icons.visibility_outlined, size: 14),
+            label: const Text('View', style: TextStyle(fontSize: 12)),
+          ),
       ],
     );
   }

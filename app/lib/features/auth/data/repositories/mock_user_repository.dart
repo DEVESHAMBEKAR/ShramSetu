@@ -203,7 +203,7 @@ class MockUserRepository implements IUserRepository {
       ...user,
       'id': userId,
       'full_name': fullName.trim(),
-      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      'avatar_url': ?avatarUrl,
     };
   }
 
@@ -236,8 +236,8 @@ class MockUserRepository implements IUserRepository {
       'state': state,
       'postal_code': postalCode,
       'is_default': isFirst,
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
+      'latitude': ?latitude,
+      'longitude': ?longitude,
     };
     _mockAddresses[userId] = [...(_mockAddresses[userId] ?? []), addr];
     return CustomerAddress.fromMap(addr);

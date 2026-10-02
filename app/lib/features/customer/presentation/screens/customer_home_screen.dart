@@ -13,6 +13,8 @@ import '../../data/models/customer_profile.dart';
 import 'worker_discovery_screen.dart';
 import 'worker_profile_screen.dart';
 import 'customer_live_tracking_screen.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -30,6 +32,87 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   List<Worker> _featuredWorkers = [];
   bool _isLoading = true;
   String _searchQuery = '';
+  String _selectedArea = 'All Areas';
+
+  List<String> _serviceAreas = [
+    'All Areas',
+    'Kothrud',
+    'Baner & Balewadi',
+    'Hinjewadi',
+    'Shivajinagar',
+    'Hadapsar',
+    'Viman Nagar',
+    'Wakad',
+    'Aundh',
+    'Katraj',
+    'Swargate',
+    'Kharadi',
+    'Pimpri-Chinchwad',
+  ];
+
+  static const Map<String, (double, double)> _regionCoordinates = {
+    'Kothrud': (18.5074, 73.8077),
+    'Baner & Balewadi': (18.5590, 73.7868),
+    'Hinjewadi': (18.5913, 73.7389),
+    'Shivajinagar': (18.5314, 73.8446),
+    'Hadapsar': (18.5089, 73.9259),
+    'Viman Nagar': (18.5679, 73.9143),
+    'Wakad': (18.5987, 73.7656),
+    'Aundh': (18.5580, 73.8075),
+    'Katraj': (18.4575, 73.8677),
+    'Swargate': (18.5018, 73.8586),
+    'Kharadi': (18.5516, 73.9349),
+    'Pimpri-Chinchwad': (18.6298, 73.7997),
+    'CIDCO, Nashik': (19.9703, 73.7533),
+    'Panchavati, Nashik': (20.0110, 73.7925),
+    'College Road, Nashik': (19.9975, 73.7667),
+    'Satpur, Nashik': (19.9867, 73.7333),
+    'Nashik Road': (19.9547, 73.8344),
+    'Andheri, Mumbai': (19.1136, 72.8697),
+    'Bandra, Mumbai': (19.0596, 72.8295),
+    'Dadar, Mumbai': (19.0178, 72.8478),
+    'Thane, MMR': (19.2183, 72.9781),
+    'Navi Mumbai': (19.0330, 73.0297),
+    'CIDCO, Sambhajinagar': (19.8762, 75.3433),
+    'Dharampeth, Nagpur': (21.1458, 79.0667),
+    'Sitabuldi, Nagpur': (21.1466, 79.0831),
+  };
+
+  void _syncServiceAreas() {
+    final set = <String>{'All Areas'};
+    final custArea = _profile?.defaultAddress?.area;
+    if (custArea != null && custArea.trim().isNotEmpty) {
+      set.add(custArea.trim());
+    }
+    final custCity = _profile?.defaultAddress?.city;
+    if (custCity != null && custCity.trim().isNotEmpty) {
+      set.add(custCity.trim());
+    }
+    for (final w in _featuredWorkers) {
+      if (w.locationTag.isNotEmpty && w.locationTag != 'General Service Area') {
+        for (final p in w.locationTag.split(RegExp(r'[,•/|]'))) {
+          final clean = p.trim();
+          if (clean.isNotEmpty && clean.length > 2) {
+            set.add(clean);
+          }
+        }
+      }
+      for (final a in w.serviceAreas) {
+        final clean = a.trim();
+        if (clean.isNotEmpty && clean != 'All Areas') {
+          set.add(clean);
+        }
+      }
+    }
+    if (set.length <= 3) {
+      set.addAll([
+        'Kothrud', 'Baner & Balewadi', 'Hinjewadi', 'Shivajinagar',
+        'Hadapsar', 'Viman Nagar', 'Wakad', 'Aundh', 'Katraj', 'Swargate'
+      ]);
+    }
+    _serviceAreas = set.toList();
+  }
+
   final TextEditingController _searchController = TextEditingController();
   StreamSubscription<List<Map<String, dynamic>>>? _bookingsSub;
 
@@ -63,18 +146,43 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 : CustomerProfile(id: userId, fullName: dbName, phone: (userData?['phone'] as String?) ?? user?.phone ?? '');
           }
         }
-        if (mounted) _profile = profile;
-      } catch (_) {}
+        if (mounted) {
+          _profile = profile;
+          debugPrint('[CustomerHome] Profile loaded: ${profile?.fullName ?? "null"}');
+        }
+      } catch (e) {
+        debugPrint('[CustomerHome] ERROR loading profile: $e');
+      }
     }
 
     try {
       final cats = await DI.customerRepo.getActiveServices();
       if (mounted) _categories = cats;
-      if (cats.isNotEmpty) {
-        final workers = await DI.customerRepo.getEligibleWorkers(cats.first.id);
-        if (mounted) _featuredWorkers = workers;
+      debugPrint('[CustomerHome] Categories loaded: ${cats.length}');
+      // Load all available registered union artisans across federations
+      final allWorkers = await DI.customerRepo.getAllWorkers();
+      debugPrint('[CustomerHome] All workers loaded: ${allWorkers.length}');
+      if (mounted) {
+        if (allWorkers.isNotEmpty) {
+          _featuredWorkers = allWorkers;
+        } else if (cats.isNotEmpty) {
+          final workers = await DI.customerRepo.getEligibleWorkers(cats.first.id);
+          _featuredWorkers = workers;
+        }
+        _syncServiceAreas();
+        final defaultArea = _profile?.defaultAddress?.area;
+        if (defaultArea != null && defaultArea.isNotEmpty && _selectedArea == 'All Areas') {
+          for (final a in _serviceAreas) {
+            if (a != 'All Areas' && (a.toLowerCase().contains(defaultArea.toLowerCase()) || defaultArea.toLowerCase().contains(a.toLowerCase()))) {
+              _selectedArea = a;
+              break;
+            }
+          }
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[CustomerHome] ERROR loading services/workers: $e');
+    }
 
     _bookingsSub?.cancel();
     _bookingsSub = DI.customerRepo.watchCustomerBookings().listen(
@@ -111,7 +219,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   String get _locationDisplay {
     final addr = _profile?.defaultAddress;
-    if (addr == null) return 'Pune • Tap to set address';
+    if (_selectedArea != 'All Areas') {
+      final cityPart = (addr?.city.isNotEmpty == true) ? addr!.city : '';
+      return cityPart.isNotEmpty && !_selectedArea.contains(cityPart)
+          ? '$_selectedArea, $cityPart'
+          : _selectedArea;
+    }
+    if (addr == null) return 'Select Service Location';
     final areaPart = addr.area.isNotEmpty ? addr.area : addr.city;
     if (addr.postalCode.isNotEmpty) {
       return '$areaPart, ${addr.city} • ${addr.postalCode}';
@@ -158,6 +272,27 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         builder: (_) => WorkerDiscoveryScreen(
           initialCategory: category,
           initialSearchQuery: searchQuery,
+          initialServiceArea: _selectedArea != 'All Areas' ? _selectedArea : null,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToEmergencyDiscovery() {
+    final emergencyCategory = _categories.firstWhere(
+      (c) => c.name.toLowerCase().contains('plumb') || c.name.toLowerCase().contains('elect'),
+      orElse: () => _categories.isNotEmpty
+          ? _categories.first
+          : const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing'),
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => WorkerDiscoveryScreen(
+          initialCategory: emergencyCategory,
+          initialServiceArea: _selectedArea != 'All Areas' ? _selectedArea : null,
+          isEmergency: true,
         ),
       ),
     );
@@ -255,7 +390,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 child: const Icon(Icons.handyman, color: AppColors.primary, size: 20),
               ),
               title: const Text('Standard Rates Updated', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Pune District Labor Federation published Q3 standardized fair rate cards.'),
+              subtitle: const Text('District Labour Cooperative Federations published Q3 standardized fair rate cards.'),
             ),
             if (_activeBooking != null)
               ListTile(
@@ -407,7 +542,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'A non-profit union platform organized in partnership with Pune District Labour Cooperative Society.',
+              'A non-profit union platform organized in partnership with District Labour Cooperative Federations across Maharashtra.',
               style: TextStyle(fontSize: 13, height: 1.4),
             ),
             const SizedBox(height: 12),
@@ -489,19 +624,43 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Select Language / भाषा निवडा', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+            Text('Select Language / भाषा निवडा'.tr(), style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: AppSpacing.spacingMd),
             ListTile(
-              leading: const Icon(Icons.check_circle, color: AppColors.secondary),
+              leading: Icon(
+                LocaleController.instance.isEnglish ? Icons.check_circle : Icons.circle_outlined,
+                color: LocaleController.instance.isEnglish ? AppColors.secondary : AppColors.outline,
+              ),
               title: const Text('English', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('Default interface'),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                LocaleController.instance.setLanguage('en');
+                Navigator.pop(ctx);
+              },
             ),
             ListTile(
-              leading: const Icon(Icons.circle_outlined, color: AppColors.outline),
+              leading: Icon(
+                LocaleController.instance.isMarathi ? Icons.check_circle : Icons.circle_outlined,
+                color: LocaleController.instance.isMarathi ? AppColors.secondary : AppColors.outline,
+              ),
               title: const Text('मराठी (Marathi)', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('स्थानिक भाषा'),
-              onTap: () => Navigator.pop(ctx),
+              onTap: () {
+                LocaleController.instance.setLanguage('mr');
+                Navigator.pop(ctx);
+              },
+            ),
+            ListTile(
+              leading: Icon(
+                LocaleController.instance.isHindi ? Icons.check_circle : Icons.circle_outlined,
+                color: LocaleController.instance.isHindi ? AppColors.secondary : AppColors.outline,
+              ),
+              title: const Text('हिंदी (Hindi)', style: TextStyle(fontWeight: FontWeight.bold)),
+              subtitle: const Text('राष्ट्रभाषा इंटरफेस'),
+              onTap: () {
+                LocaleController.instance.setLanguage('hi');
+                Navigator.pop(ctx);
+              },
             ),
           ],
         ),
@@ -512,147 +671,234 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   void _showLocationPickerSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.surfaceContainerLowest,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
         final currentAddr = _profile?.defaultAddress;
-        return Padding(
-          padding: const EdgeInsets.all(AppSpacing.marginMobile),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        return DraggableScrollableSheet(
+          initialChildSize: 0.75,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (_, scrollController) {
+            return SingleChildScrollView(
+              controller: scrollController,
+              padding: const EdgeInsets.all(AppSpacing.marginMobile),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Service Location', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
-                  IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () => Navigator.pop(ctx),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceContainerLow,
-                  borderRadius: AppRadius.radiusLg,
-                  border: Border.all(color: AppColors.outlineVariant),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.location_on, color: AppColors.primary, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            currentAddr?.displayString.isNotEmpty == true
-                                ? currentAddr!.displayString
-                                : 'Pune, Maharashtra',
-                            style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
-                          ),
-                          if (currentAddr?.hasCoordinates == true)
-                            Text(
-                              'GPS Coordinates: ${currentAddr!.latitude!.toStringAsFixed(4)}, ${currentAddr.longitude!.toStringAsFixed(4)}',
-                              style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10),
-                            ),
-                        ],
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.outlineVariant,
+                        borderRadius: AppRadius.radiusFull,
                       ),
                     ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              ListTile(
-                leading: const Icon(Icons.my_location, color: AppColors.secondary),
-                title: const Text('Use Current GPS Location', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Detect coordinates and reverse geocode address'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final user = await DI.authRepo.getCurrentUser();
-                  final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
-                  if (userId == null) return;
-                  
-                  final result = await DI.locationService.getCurrentPosition().timeout(const Duration(seconds: 6));
-                  if (result.isSuccess && result.coordinates != null) {
-                    final coords = result.coordinates!;
-                    final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude).timeout(const Duration(seconds: 4));
-                    if (geo != null) {
-                      await DI.userRepo.createAddress(
-                        userId: userId,
-                        addressLine: geo.addressLine.isNotEmpty ? geo.addressLine : 'Current Location',
-                        area: geo.area,
-                        city: geo.city,
-                        state: geo.state,
-                        postalCode: geo.postalCode,
-                        latitude: coords.latitude,
-                        longitude: coords.longitude,
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Service Location'.tr(), style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppRadius.radiusLg,
+                      border: Border.all(color: AppColors.outlineVariant),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, color: AppColors.primary, size: 22),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                currentAddr?.displayString.isNotEmpty == true
+                                    ? currentAddr!.displayString
+                                    : _locationDisplay,
+                                style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                              ),
+                              Text(
+                                'Select your service ward below to discover union artisans near you',
+                                style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text('Select Service Area / Ward', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _serviceAreas.map((area) {
+                      final isSelected = _selectedArea == area;
+                      return ChoiceChip(
+                        label: Text(area),
+                        selected: isSelected,
+                        selectedColor: AppColors.primary,
+                        backgroundColor: Colors.white,
+                        labelStyle: TextStyle(
+                          color: isSelected ? Colors.white : AppColors.onSurface,
+                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                          fontSize: 12,
+                        ),
+                        avatar: Icon(
+                          isSelected ? Icons.check_circle : Icons.location_on_outlined,
+                          size: 14,
+                          color: isSelected ? Colors.white : AppColors.outline,
+                        ),
+                        onSelected: (selected) async {
+                          Navigator.pop(ctx);
+                          final user = await DI.authRepo.getCurrentUser();
+                          final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+
+                          setState(() {
+                            _selectedArea = area;
+                          });
+
+                          if (userId != null && area != 'All Areas') {
+                            final coords = _regionCoordinates[area] ??
+                                (currentAddr != null && currentAddr.latitude != null && currentAddr.longitude != null
+                                    ? (currentAddr.latitude!, currentAddr.longitude!)
+                                    : const (18.5204, 73.8567));
+                            final existingCity = currentAddr?.city.isNotEmpty == true ? currentAddr!.city : 'Customer City';
+                            final existingState = currentAddr?.state.isNotEmpty == true ? currentAddr!.state : 'Maharashtra';
+                            final existingZip = currentAddr?.postalCode.isNotEmpty == true ? currentAddr!.postalCode : '400001';
+                            await DI.userRepo.createAddress(
+                              userId: userId,
+                              addressLine: '$area, $existingCity',
+                              area: area,
+                              city: existingCity,
+                              state: existingState,
+                              postalCode: existingZip,
+                              latitude: coords.$1,
+                              longitude: coords.$2,
+                            );
+                          }
+                          await _loadAllData();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Location updated to $area. Showing available union artisans.')),
+                            );
+                          }
+                        },
                       );
-                      await _loadAllData();
-                      if (mounted) {
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.my_location, color: AppColors.secondary),
+                    title: const Text('Use Current GPS Location', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Detect coordinates and reverse geocode address'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final user = await DI.authRepo.getCurrentUser();
+                      final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+                      if (userId == null) return;
+                      
+                      final result = await DI.locationService.getCurrentPosition().timeout(const Duration(seconds: 6));
+                      if (result.isSuccess && result.coordinates != null) {
+                        final coords = result.coordinates!;
+                        final geo = await DI.locationService.reverseGeocode(coords.latitude, coords.longitude).timeout(const Duration(seconds: 4));
+                        if (geo != null) {
+                          await DI.userRepo.createAddress(
+                            userId: userId,
+                            addressLine: geo.addressLine.isNotEmpty ? geo.addressLine : 'Current Location',
+                            area: geo.area,
+                            city: geo.city,
+                            state: geo.state,
+                            postalCode: geo.postalCode,
+                            latitude: coords.latitude,
+                            longitude: coords.longitude,
+                          );
+                          if (geo.area.isNotEmpty) {
+                            setState(() => _selectedArea = geo.area);
+                          }
+                          await _loadAllData();
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Service location updated successfully.')),
+                            );
+                          }
+                        }
+                      } else if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Service location updated successfully.')),
+                          SnackBar(content: Text(result.errorMessage ?? 'Unable to detect GPS location.')),
                         );
                       }
-                    }
-                  } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(result.errorMessage ?? 'Unable to detect GPS location.')),
-                    );
-                  }
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.map_outlined, color: AppColors.primary),
-                title: const Text('Pick on Google Map', style: TextStyle(fontWeight: FontWeight.bold)),
-                subtitle: const Text('Pinpoint your exact location visually'),
-                onTap: () async {
-                  Navigator.pop(ctx);
-                  final user = await DI.authRepo.getCurrentUser();
-                  final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
-                  if (userId == null || !mounted) return;
+                    },
+                  ),
+                  ListTile(
+                    leading: const Icon(Icons.map_outlined, color: AppColors.primary),
+                    title: const Text('Pick on Google Map', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: const Text('Pinpoint your exact location visually'),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final user = await DI.authRepo.getCurrentUser();
+                      final userId = user?.id ?? _profile?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+                      if (userId == null || !mounted) return;
 
-                  final currentAddr = _profile?.defaultAddress;
-                  final mapRes = await Navigator.push<LocationPickerResult>(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => MapLocationPickerScreen(
-                        initialLatitude: currentAddr?.latitude,
-                        initialLongitude: currentAddr?.longitude,
-                        title: 'Select Delivery Location',
-                      ),
-                    ),
-                  );
-
-                  if (mapRes != null) {
-                    final geo = mapRes.address;
-                    await DI.userRepo.createAddress(
-                      userId: userId,
-                      addressLine: geo?.addressLine.isNotEmpty == true ? geo!.addressLine : 'Selected Location',
-                      area: geo?.area ?? '',
-                      city: geo?.city.isNotEmpty == true ? geo!.city : 'Pune',
-                      state: geo?.state.isNotEmpty == true ? geo!.state : 'Maharashtra',
-                      postalCode: geo?.postalCode ?? '',
-                      latitude: mapRes.latitude,
-                      longitude: mapRes.longitude,
-                    );
-                    await _loadAllData();
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Location updated on map.')),
+                      final currentAddr = _profile?.defaultAddress;
+                      final mapRes = await Navigator.push<LocationPickerResult>(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => MapLocationPickerScreen(
+                            initialLatitude: currentAddr?.latitude,
+                            initialLongitude: currentAddr?.longitude,
+                            title: 'Select Delivery Location',
+                          ),
+                        ),
                       );
-                    }
-                  }
-                },
+
+                      if (mapRes != null) {
+                        final geo = mapRes.address;
+                        await DI.userRepo.createAddress(
+                          userId: userId,
+                          addressLine: geo?.addressLine.isNotEmpty == true ? geo!.addressLine : 'Selected Location',
+                          area: geo?.area ?? '',
+                          city: geo?.city.isNotEmpty == true ? geo!.city : 'Pune',
+                          state: geo?.state.isNotEmpty == true ? geo!.state : 'Maharashtra',
+                          postalCode: geo?.postalCode ?? '',
+                          latitude: mapRes.latitude,
+                          longitude: mapRes.longitude,
+                        );
+                        if (geo?.area.isNotEmpty == true) {
+                          setState(() => _selectedArea = geo!.area);
+                        }
+                        await _loadAllData();
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Location updated on map.')),
+                          );
+                        }
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                ],
               ),
-              const SizedBox(height: 12),
-            ],
-          ),
+            );
+          },
         );
       },
     );
@@ -670,12 +916,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: RefreshIndicator(
-          onRefresh: _loadAllData,
-          color: AppColors.secondary,
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: SafeArea(
+            child: RefreshIndicator(
+              onRefresh: _loadAllData,
+              color: AppColors.secondary,
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1150),
@@ -709,6 +958,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         // 5. In-Progress Booking Live Tracker
                         _buildActiveJobCard(),
 
+                        // 5b. Emergency Urgent Service Dispatch
+                        _buildEmergencyDispatchBanner(),
+
                         // 6. Popular Categories (4-Column Squircle Grid)
                         _buildCategoriesSection(),
 
@@ -732,6 +984,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
         ),
       ),
     );
+  },
+);
   }
 
   Widget _buildSliverHeader() {
@@ -816,7 +1070,9 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       const Icon(Icons.translate, size: 14, color: AppColors.secondary),
                       const SizedBox(width: 4),
                       Text(
-                        'मराठी / EN',
+                        LocaleController.instance.isMarathi
+                            ? 'मराठी'
+                            : (LocaleController.instance.isHindi ? 'हिंदी' : 'EN'),
                         style: AppTypography.labelSm.copyWith(
                           color: AppColors.onSurface,
                           fontWeight: FontWeight.w600,
@@ -976,7 +1232,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ),
                     child: Row(
                       children: [
-                        Text('Change', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                        Text('Change'.tr(), style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                         const Icon(Icons.expand_more, size: 14),
                       ],
                     ),
@@ -995,7 +1251,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'CIVIC HOME SERVICES',
+                    'CIVIC HOME SERVICES'.tr(),
                     style: AppTypography.labelSm.copyWith(
                       color: AppColors.secondary,
                       fontWeight: FontWeight.bold,
@@ -1074,7 +1330,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       }
                     },
                     decoration: InputDecoration(
-                      hintText: 'Search electrician, plumber, cleaning...',
+                      hintText: 'Search electrician, plumber, cleaning...'.tr(),
                       hintStyle: AppTypography.bodySm.copyWith(color: AppColors.outline),
                       border: InputBorder.none,
                       isDense: true,
@@ -1258,6 +1514,81 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmergencyDispatchBanner() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF7ED),
+          borderRadius: AppRadius.radiusXl,
+          border: Border.all(color: const Color(0xFFFDBA74)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFEA580C),
+                borderRadius: AppRadius.radiusMd,
+              ),
+              child: const Icon(Icons.bolt, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'Urgent SOS Dispatch'.tr(),
+                        style: AppTypography.labelMd.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: const Color(0xFF9A3412),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEA580C),
+                          borderRadius: AppRadius.radiusSm,
+                        ),
+                        child: Text(
+                          'PRIORITY'.tr(),
+                          style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Pipe burst, electrical spark, or lockout? Fast artisan response.'.tr(),
+                    style: AppTypography.bodySm.copyWith(color: const Color(0xFF7C2D12), fontSize: 10),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEA580C),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusMd),
+                elevation: 0,
+              ),
+              onPressed: _navigateToEmergencyDiscovery,
+              child: Text('Dispatch'.tr(), style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
             ),
           ],
         ),
@@ -1475,7 +1806,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             children: [
               Row(
                 children: [
-                  Text('Popular Services', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                  Text('Popular Services'.tr(), style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -1484,7 +1815,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       borderRadius: AppRadius.radiusSm,
                     ),
                     child: Text(
-                      'STANDARD RATES',
+                      'STANDARD RATES'.tr(),
                       style: AppTypography.labelSm.copyWith(
                         fontSize: 8,
                         color: AppColors.onSecondaryFixedVariant,
@@ -1503,7 +1834,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     _navigateToCategory(displayCategories.first);
                   }
                 },
-                child: Text('View all', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                child: Text('View all'.tr(), style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -1560,7 +1891,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              cat.name,
+                              cat.name.tr(),
                               style: AppTypography.labelSm.copyWith(
                                 color: AppColors.primary,
                                 fontWeight: FontWeight.bold,
@@ -1593,12 +1924,62 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildArtisansNearYou() {
-    final workers = _featuredWorkers;
+    // 1. Filter workers according to selected area
+    final List<Worker> areaWorkers;
+    if (_selectedArea == 'All Areas') {
+      areaWorkers = _featuredWorkers;
+    } else {
+      final target = _selectedArea.toLowerCase();
+      final keywords = target
+          .split(RegExp(r'[\s,&]+'))
+          .where((s) => s.length > 2)
+          .toList();
+
+      final directMatches = _featuredWorkers.where((w) {
+        final loc = w.locationTag.toLowerCase();
+        final matchesTag = keywords.any((k) => loc.contains(k));
+        final matchesAreas = w.serviceAreas.any((sa) =>
+            keywords.any((k) => sa.toLowerCase().contains(k)));
+        return matchesTag || matchesAreas;
+      }).toList();
+
+      if (directMatches.isNotEmpty) {
+        areaWorkers = directMatches;
+      } else {
+        // Express dispatch: verified union artisans serving this ward from Cooperative Collective
+        areaWorkers = _featuredWorkers.map((w) => Worker(
+          id: w.id,
+          name: w.name,
+          categoryId: w.categoryId,
+          rate: w.rate,
+          rating: w.rating,
+          reviewCount: w.reviewCount,
+          jobsCompleted: w.jobsCompleted,
+          distanceKm: 2.8,
+          experience: w.experience,
+          availability: 'Available Today',
+          specializations: w.specializations,
+          locationTag: 'Serving $_selectedArea (${w.locationTag})',
+          imageUrl: w.imageUrl,
+          customTag: 'Cooperative Collective Dispatch',
+          bio: w.bio,
+          federationId: w.federationId,
+          insuranceAmount: w.insuranceAmount,
+          languages: w.languages,
+          serviceAreas: [...w.serviceAreas, _selectedArea],
+          isUnionGold: w.isUnionGold,
+          isCoopMaster: w.isCoopMaster,
+        )).toList();
+      }
+    }
+
+    // 2. Filter by search query if applicable
     final filteredWorkers = _searchQuery.trim().isEmpty
-        ? workers
-        : workers.where((w) =>
+        ? areaWorkers
+        : areaWorkers.where((w) =>
             w.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-            w.specializations.any((s) => s.toLowerCase().contains(_searchQuery.toLowerCase()))
+            w.specializations.any((s) => s.toLowerCase().contains(_searchQuery.toLowerCase())) ||
+            w.locationTag.toLowerCase().contains(_searchQuery.toLowerCase())
           ).toList();
 
     return Padding(
@@ -1606,47 +1987,124 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Section Title & Counter
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Services Near You', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                  Text('Govt-verified Union professionals in $_locationDisplay', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
-                ],
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Services Near You'.tr(),
+                      style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(Icons.verified, size: 13, color: AppColors.onTertiaryContainer),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _selectedArea == 'All Areas'
+                                ? 'Govt-verified Union professionals'
+                                : 'Govt-verified Union professionals in $_selectedArea',
+                            style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
-                  if (widget.onSelectTab != null) {
-                    widget.onSelectTab!(1);
-                  } else if (_categories.isNotEmpty) {
-                    _navigateToCategory(_categories.first);
-                  }
-                },
-                child: Container(
-                  height: 28,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: AppRadius.radiusSm,
-                    border: Border.all(color: AppColors.outlineVariant),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        workers.isNotEmpty ? 'See all (${workers.length})' : 'See all',
-                        style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                      ),
-                      const Icon(Icons.chevron_right, size: 14),
-                    ],
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: AppRadius.radiusFull,
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Text(
+                  '${filteredWorkers.length} Verified',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
                   ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 12),
+
+          // Area Filter Chips Horizontal Scroll
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _serviceAreas.length,
+              separatorBuilder: (context, index) => const SizedBox(width: 8),
+              itemBuilder: (context, index) {
+                final area = _serviceAreas[index];
+                final isSelected = _selectedArea == area;
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: AppRadius.radiusFull,
+                    onTap: () {
+                      setState(() {
+                        _selectedArea = area;
+                      });
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : Colors.white,
+                        borderRadius: AppRadius.radiusFull,
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                          width: 1,
+                        ),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ]
+                            : null,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected ? Icons.location_on : Icons.location_on_outlined,
+                            size: 13,
+                            color: isSelected ? AppColors.tertiaryFixed : AppColors.outline,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            area,
+                            style: AppTypography.labelSm.copyWith(
+                              color: isSelected ? Colors.white : AppColors.onSurface,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 12),
+
           if (filteredWorkers.isEmpty)
             Container(
               width: double.infinity,
@@ -1658,15 +2116,18 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.handyman_outlined, size: 36, color: AppColors.outline),
+                  const Icon(Icons.location_off_outlined, size: 36, color: AppColors.outline),
                   const SizedBox(height: 8),
                   Text(
-                    'No artisans currently available',
+                    _selectedArea == 'All Areas'
+                        ? 'No artisans currently available'
+                        : 'No registered union artisans in $_selectedArea yet',
                     style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Select a category above to find and book available specialists.',
+                    'Union onboarding is actively registering cooperatives in this area. You can explore all available artisans across other clusters.',
                     style: AppTypography.bodySm.copyWith(color: AppColors.outline),
                     textAlign: TextAlign.center,
                   ),
@@ -1681,17 +2142,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                     ),
                     onPressed: () {
                       setState(() {
+                        _selectedArea = 'All Areas';
                         _searchQuery = '';
                         _searchController.clear();
                       });
-                      if (widget.onSelectTab != null) {
-                        widget.onSelectTab!(1);
-                      } else if (_categories.isNotEmpty) {
-                        _navigateToCategory(_categories.first);
-                      }
                     },
                     icon: const Icon(Icons.explore_outlined, size: 14),
-                    label: const Text('Explore All Trades'),
+                    label: const Text('View All Available Artisans'),
                   ),
                 ],
               ),
@@ -1743,7 +2200,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         radius: 28,
                         backgroundColor: AppColors.surfaceContainerLow,
                         backgroundImage: worker.imageUrl.isNotEmpty ? NetworkImage(worker.imageUrl) : null,
-                        child: worker.imageUrl.isEmpty ? const Icon(Icons.person, size: 28, color: AppColors.primary) : null,
+                        child: worker.imageUrl.isEmpty
+                            ? Text(
+                                worker.name.isNotEmpty ? worker.name[0] : 'W',
+                                style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                              )
+                            : null,
                       ),
                       Positioned(
                         bottom: 0,
@@ -1779,25 +2241,53 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                             ),
                           ],
                         ),
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
                               decoration: BoxDecoration(
-                                color: AppColors.secondaryFixed,
+                                color: worker.isCoopMaster ? AppColors.secondaryFixed : AppColors.surfaceContainerLow,
                                 borderRadius: AppRadius.radiusSm,
                               ),
                               child: Text(
-                                'Union Master',
-                                style: AppTypography.labelSm.copyWith(color: AppColors.onSecondaryFixedVariant, fontWeight: FontWeight.bold, fontSize: 9),
+                                worker.isCoopMaster ? 'Coop Master' : (worker.isUnionGold ? 'Union Gold' : 'Union Artisan'),
+                                style: AppTypography.labelSm.copyWith(
+                                  color: worker.isCoopMaster ? AppColors.onSecondaryFixedVariant : AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 9,
+                                ),
                               ),
                             ),
-                            const SizedBox(width: 4),
-                            Text('• ${worker.specializations.isNotEmpty ? worker.specializations.first : "Certified Artisan"}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+                            const SizedBox(width: 5),
+                            Expanded(
+                              child: Text(
+                                worker.specializations.isNotEmpty ? worker.specializations.first : 'Certified Artisan',
+                                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(height: 2),
-                        Text('Pune Trades & Guild Certified', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
+                            const SizedBox(width: 3),
+                            Text(
+                              worker.locationTag.isNotEmpty ? worker.locationTag : 'Local Area',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                            if (worker.federationId != null && worker.federationId!.isNotEmpty) ...[
+                              const SizedBox(width: 4),
+                              Text('• ${worker.federationId}', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 9.5)),
+                            ],
+                          ],
+                        ),
                       ],
                     ),
                   ),
@@ -1836,7 +2326,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ],
                     ),
                     Text('• ${worker.experience}', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
-                    Text('• ${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
+                    Row(
+                      children: [
+                        const Icon(Icons.near_me, size: 10, color: AppColors.secondary),
+                        const SizedBox(width: 2),
+                        Text('${worker.distanceKm} km away', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 10)),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -1856,7 +2352,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       ),
                       onPressed: () => _navigateToWorkerProfile(worker),
                       icon: const Icon(Icons.lock_outline, size: 14, color: AppColors.tertiaryFixed),
-                      label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                      label: Text('Book Service'.tr(), style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                     ),
                   ),
                   const SizedBox(width: 8),

@@ -5,13 +5,23 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/customer_models.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/config/app_config.dart';
 import 'worker_profile_screen.dart';
+import '../../../../core/localization/locale_controller.dart';
 
 class WorkerDiscoveryScreen extends StatefulWidget {
   final ServiceCategory? initialCategory;
   final String? initialSearchQuery;
+  final String? initialServiceArea;
+  final bool isEmergency;
 
-  const WorkerDiscoveryScreen({super.key, this.initialCategory, this.initialSearchQuery});
+  const WorkerDiscoveryScreen({
+    super.key,
+    this.initialCategory,
+    this.initialSearchQuery,
+    this.initialServiceArea,
+    this.isEmergency = false,
+  });
 
   @override
   State<WorkerDiscoveryScreen> createState() => _WorkerDiscoveryScreenState();
@@ -20,10 +30,39 @@ class WorkerDiscoveryScreen extends StatefulWidget {
 class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   String _activeCategoryFilter = 'all';
   String _searchQuery = '';
+  String _customerArea = 'Selected Location';
+  String _customerCity = '';
+  double? _customerLat;
+  double? _customerLng;
+  String _selectedWard = 'All Areas';
   late final TextEditingController _searchController;
   late Future<List<Worker>> _workersFuture;
   late ServiceCategory _currentCategory;
   List<ServiceCategory> _availableCategories = [];
+
+  List<String> _discoveryAreas = [
+    'All Areas',
+    'Kothrud',
+    'Baner & Balewadi',
+    'Hinjewadi',
+    'Shivajinagar',
+    'Hadapsar',
+    'Viman Nagar',
+    'Wakad',
+    'Aundh',
+    'Katraj',
+    'Swargate',
+    'Kharadi',
+    'Pimpri-Chinchwad',
+    'CIDCO, Nashik',
+    'Panchavati, Nashik',
+    'College Road, Nashik',
+    'Andheri, Mumbai',
+    'Bandra, Mumbai',
+    'Dadar, Mumbai',
+    'CIDCO, Chhatrapati Sambhajinagar',
+    'Dharampeth, Nagpur',
+  ];
 
   @override
   void initState() {
@@ -34,6 +73,34 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
         const ServiceCategory(id: 'c2', name: 'Plumbing', iconData: 'plumbing');
     _loadWorkers();
     _loadCategories();
+    _loadCustomerArea();
+  }
+
+  Future<void> _loadCustomerArea() async {
+    try {
+      final user = await DI.authRepo.getCurrentUser();
+      final userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      if (userId != null) {
+        final profile = await DI.userRepo.getCustomerProfile(userId);
+        final addr = profile?.defaultAddress;
+        if (addr != null && mounted) {
+          setState(() {
+            _customerLat = addr.latitude;
+            _customerLng = addr.longitude;
+            _customerArea = addr.area.isNotEmpty ? addr.area : (addr.city.isNotEmpty ? addr.city : 'Selected Location');
+            _customerCity = addr.city;
+            if (_customerArea.isNotEmpty && !_discoveryAreas.contains(_customerArea)) {
+              _discoveryAreas.insert(1, _customerArea);
+            }
+            if (_customerCity.isNotEmpty && !_discoveryAreas.contains(_customerCity)) {
+              _discoveryAreas.insert(2, _customerCity);
+            }
+            _selectedWard = _customerArea;
+          });
+          _loadWorkers();
+        }
+      }
+    } catch (_) {}
   }
 
   @override
@@ -87,7 +154,27 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
 
   void _loadWorkers() {
     setState(() {
-      _workersFuture = DI.customerRepo.getEligibleWorkers(_currentCategory.id);
+      _workersFuture = DI.customerRepo
+          .getEligibleWorkers(
+            _currentCategory.id,
+            customerLat: _customerLat,
+            customerLng: _customerLng,
+            serviceArea: _selectedWard != 'All Areas' ? _selectedWard : null,
+          )
+          .then((workers) {
+        if (mounted) {
+          final set = Set<String>.from(_discoveryAreas);
+          for (final w in workers) {
+            for (final a in w.serviceAreas) {
+              if (a.isNotEmpty && a != 'All Areas') set.add(a);
+            }
+          }
+          setState(() {
+            _discoveryAreas = set.toList();
+          });
+        }
+        return workers;
+      });
     });
   }
 
@@ -126,9 +213,13 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       }
 
                       final allWorkers = snapshot.data ?? [];
-                      final filtered = allWorkers.where((w) {
-                        if (_searchQuery.isNotEmpty && !w.name.toLowerCase().contains(_searchQuery.toLowerCase())) {
-                          return false;
+                      List<Worker> filtered = allWorkers.where((w) {
+                        if (_searchQuery.isNotEmpty) {
+                          final q = _searchQuery.toLowerCase();
+                          final matches = w.name.toLowerCase().contains(q) ||
+                              w.specializations.any((s) => s.toLowerCase().contains(q)) ||
+                              w.locationTag.toLowerCase().contains(q);
+                          if (!matches) return false;
                         }
                         if (_activeCategoryFilter == 'top_rated' && w.rating < 4.8) {
                           return false;
@@ -136,15 +227,82 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                         return true;
                       }).toList();
 
+                      // If specific ward filter is active
+                      if (_selectedWard != 'All Areas') {
+                        final target = _selectedWard.toLowerCase();
+                        final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2 && s != 'pune').toList();
+                        final wardMatches = filtered.where((w) {
+                          final loc = w.locationTag.toLowerCase();
+                          final matchesTag = keywords.any((k) => loc.contains(k));
+                          final matchesAreas = w.serviceAreas.any((sa) => keywords.any((k) => sa.toLowerCase().contains(k)));
+                          return matchesTag || matchesAreas;
+                        }).toList();
+
+                        if (wardMatches.isNotEmpty) {
+                          filtered = wardMatches;
+                        } else if (AppConfig.useMockData) {
+                          // Express dispatch fallback in mock/demo mode
+                          filtered = filtered.map((w) => Worker(
+                            id: w.id,
+                            name: w.name,
+                            categoryId: w.categoryId,
+                            rate: w.rate,
+                            rating: w.rating,
+                            reviewCount: w.reviewCount,
+                            jobsCompleted: w.jobsCompleted,
+                            distanceKm: 3.0,
+                            experience: w.experience,
+                            availability: 'Available Today',
+                            specializations: w.specializations,
+                            locationTag: 'Serving $_selectedWard (${w.locationTag})',
+                            imageUrl: w.imageUrl,
+                            customTag: 'Cooperative Union Dispatch',
+                            bio: w.bio,
+                            federationId: w.federationId,
+                            insuranceAmount: w.insuranceAmount,
+                            languages: w.languages,
+                            serviceAreas: [...w.serviceAreas, _selectedWard],
+                            isUnionGold: w.isUnionGold,
+                            isCoopMaster: w.isCoopMaster,
+                          )).toList();
+                        } else {
+                          filtered = [];
+                        }
+                      }
+
                       if (filtered.isEmpty) {
                         return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.search_off, size: 48, color: AppColors.outline),
-                              const SizedBox(height: 8),
-                              Text('No union artisans found matching criteria', style: AppTypography.bodyMd.copyWith(color: AppColors.outline)),
-                            ],
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  widget.isEmergency ? Icons.warning_amber_rounded : Icons.search_off,
+                                  size: 48,
+                                  color: widget.isEmergency ? AppColors.error : AppColors.outline,
+                                ),
+                                const SizedBox(height: 12),
+                                Text(
+                                  widget.isEmergency
+                                      ? 'No emergency artisans available in your area right now'
+                                      : 'No union artisans found matching criteria',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.titleMd.copyWith(
+                                    color: widget.isEmergency ? AppColors.error : AppColors.onSurface,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  widget.isEmergency
+                                      ? 'All nearby emergency specialists are currently engaged. Try scheduling a standard service or contact our union helpline: 1800-266-9090.'
+                                      : 'Try expanding your service area or searching another trade.',
+                                  textAlign: TextAlign.center,
+                                  style: AppTypography.bodySm.copyWith(color: AppColors.outline),
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       }
@@ -223,12 +381,21 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       ),
                     ],
                   ),
-                  Row(
-                    children: [
-                      const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
-                      const SizedBox(width: 2),
-                      Text('Kothrud, Pune', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10)),
-                    ],
+                  InkWell(
+                    onTap: _showAreaPickerModal,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
+                        const SizedBox(width: 2),
+                        Text(
+                          _customerCity.isNotEmpty && _customerArea != _customerCity
+                              ? '$_customerArea, $_customerCity'
+                              : _customerArea,
+                          style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                        const Icon(Icons.arrow_drop_down, size: 14, color: AppColors.primary),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -236,20 +403,43 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
           ),
           Row(
             children: [
-              Container(
-                height: 30,
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.secondaryFixed,
-                  borderRadius: AppRadius.radiusFull,
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.translate, size: 13, color: AppColors.secondary),
-                    const SizedBox(width: 4),
-                    Text('मराठी / EN', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 11, fontWeight: FontWeight.bold)),
-                  ],
-                ),
+              ListenableBuilder(
+                listenable: LocaleController.instance,
+                builder: (context, _) {
+                  return Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      borderRadius: AppRadius.radiusFull,
+                      onTap: () {
+                        LocaleController.instance.toggleNextLanguage();
+                      },
+                      child: Container(
+                        height: 30,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.secondaryFixed,
+                          borderRadius: AppRadius.radiusFull,
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.translate, size: 13, color: AppColors.secondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              LocaleController.instance.isMarathi
+                                  ? 'मराठी'
+                                  : (LocaleController.instance.isHindi ? 'हिंदी' : 'EN'),
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.secondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -343,8 +533,101 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
               ],
             ),
           ),
+          const SizedBox(height: 8),
+
+          // Pune Ward Area Filter Chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: _discoveryAreas.map((area) {
+                final isSelected = _selectedWard == area;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 6),
+                  child: GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _selectedWard = area;
+                      });
+                    },
+                    child: Container(
+                      height: 28,
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.primary : Colors.white,
+                        borderRadius: AppRadius.radiusFull,
+                        border: Border.all(
+                          color: isSelected ? AppColors.primary : AppColors.outlineVariant,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            isSelected ? Icons.location_on : Icons.location_on_outlined,
+                            size: 11,
+                            color: isSelected ? Colors.white : AppColors.outline,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            area,
+                            style: TextStyle(
+                              color: isSelected ? Colors.white : AppColors.onSurface,
+                              fontSize: 11,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  void _showAreaPickerModal() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.all(AppSpacing.marginMobile),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Select Service Area', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _discoveryAreas.map((area) {
+                  final isSelected = _selectedWard == area;
+                  return ChoiceChip(
+                    label: Text(area),
+                    selected: isSelected,
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.onSurface),
+                    onSelected: (selected) {
+                      Navigator.pop(ctx);
+                      setState(() {
+                        _selectedWard = area;
+                        _customerArea = area;
+                      });
+                      _loadWorkers();
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -392,9 +675,9 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
       child: Container(
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: widget.isEmergency ? AppColors.errorContainer.withValues(alpha: 0.15) : Colors.white,
           borderRadius: AppRadius.radiusLg,
-          border: Border.all(color: AppColors.outlineVariant),
+          border: Border.all(color: widget.isEmergency ? AppColors.error.withValues(alpha: 0.4) : AppColors.outlineVariant),
         ),
         child: Row(
           children: [
@@ -402,10 +685,14 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.tertiaryContainer,
+                color: widget.isEmergency ? AppColors.errorContainer : AppColors.tertiaryContainer,
                 borderRadius: AppRadius.radiusSm,
               ),
-              child: const Icon(Icons.verified_user, size: 18, color: AppColors.onTertiaryContainer),
+              child: Icon(
+                widget.isEmergency ? Icons.flash_on : Icons.verified_user,
+                size: 18,
+                color: widget.isEmergency ? AppColors.error : AppColors.onTertiaryContainer,
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -414,16 +701,37 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                 children: [
                   Row(
                     children: [
-                      Text('Pune Certified Union Guild', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
+                      Text(
+                        widget.isEmergency ? 'Emergency Artisan Dispatch Active' : 'Certified Cooperative Union Guild',
+                        style: AppTypography.labelSm.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: widget.isEmergency ? AppColors.error : AppColors.onSurface,
+                        ),
+                      ),
                       const SizedBox(width: 4),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(color: AppColors.tertiaryContainer, borderRadius: AppRadius.radiusSm),
-                        child: Text('100% DIRECT', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 8, fontWeight: FontWeight.bold)),
+                        decoration: BoxDecoration(
+                          color: widget.isEmergency ? AppColors.error : AppColors.tertiaryContainer,
+                          borderRadius: AppRadius.radiusSm,
+                        ),
+                        child: Text(
+                          widget.isEmergency ? 'PRIORITY' : '100% DIRECT',
+                          style: AppTypography.labelSm.copyWith(
+                            color: widget.isEmergency ? Colors.white : AppColors.onTertiaryContainer,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                  Text('Fixed union diagnostic rates • 0% platform deductions', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                  Text(
+                    widget.isEmergency
+                        ? 'Rapid response artisan dispatch • Verified local union specialists'
+                        : 'Fixed union diagnostic rates • 0% platform deductions',
+                    style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10),
+                  ),
                 ],
               ),
             ),
@@ -442,8 +750,18 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('${_currentCategory.name} Specialists in Pune', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-              Text('Govt-verified Union professionals near Kothrud', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+              Text(
+                widget.isEmergency
+                    ? 'Emergency ${_currentCategory.name} Specialists'
+                    : '${_currentCategory.name} Specialists in $_customerArea',
+                style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary),
+              ),
+              Text(
+                widget.isEmergency
+                    ? 'Available for immediate dispatch to your location'
+                    : 'Govt-verified Union professionals in your service area',
+                style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+              ),
             ],
           ),
           Container(

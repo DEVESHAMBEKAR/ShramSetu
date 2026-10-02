@@ -1,4 +1,5 @@
 import '../../features/worker/data/models/worker_models.dart';
+import '../models/insurance_models.dart';
 
 abstract class IWorkerRepository {
   /// Fetch the worker's profile using their auth user ID
@@ -55,4 +56,7 @@ abstract class IWorkerRepository {
 
   /// Update the status of a specific booking (e.g. pending -> confirmed -> completed)
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);
+
+  /// Fetch the worker's cooperative group insurance & welfare fund record
+  Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId);
 }

@@ -8,6 +8,8 @@ import 'customer_home_screen.dart';
 import 'customer_bookings_screen.dart';
 import 'worker_discovery_screen.dart';
 import '../../data/models/customer_profile.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
 
 class CustomerMainLayout extends StatefulWidget {
   const CustomerMainLayout({super.key});
@@ -125,38 +127,62 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (ctx) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.translate, color: AppColors.primary, size: 24),
-                const SizedBox(width: 10),
-                Text('Language / भाषा / भाषा निवडा', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.radio_button_checked, color: AppColors.primary),
-              title: const Text('English (Default)', style: TextStyle(fontWeight: FontWeight.bold)),
-              onTap: () => Navigator.pop(ctx),
-            ),
-            ListTile(
-              leading: const Icon(Icons.radio_button_unchecked, color: AppColors.outline),
-              title: const Text('मराठी (Marathi)'),
-              onTap: () => Navigator.pop(ctx),
-            ),
-            ListTile(
-              leading: const Icon(Icons.radio_button_unchecked, color: AppColors.outline),
-              title: const Text('हिंदी (Hindi)'),
-              onTap: () => Navigator.pop(ctx),
-            ),
-          ],
-        ),
-      ),
+      builder: (ctx) {
+        final currentCode = LocaleController.instance.languageCode;
+        return Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.translate, color: AppColors.primary, size: 24),
+                  const SizedBox(width: 10),
+                  Text('Select Language / भाषा निवडा'.tr(), style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Icon(
+                  currentCode == 'en' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: currentCode == 'en' ? AppColors.primary : AppColors.outline,
+                ),
+                title: const Text('English (Default)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('Standard interface'),
+                onTap: () {
+                  LocaleController.instance.setLanguage('en');
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  currentCode == 'mr' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: currentCode == 'mr' ? AppColors.primary : AppColors.outline,
+                ),
+                title: const Text('मराठी (Marathi)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('स्थानिक युनियन भाषा'),
+                onTap: () {
+                  LocaleController.instance.setLanguage('mr');
+                  Navigator.pop(ctx);
+                },
+              ),
+              ListTile(
+                leading: Icon(
+                  currentCode == 'hi' ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+                  color: currentCode == 'hi' ? AppColors.primary : AppColors.outline,
+                ),
+                title: const Text('हिंदी (Hindi)', style: TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: const Text('राष्ट्रभाषा'),
+                onTap: () {
+                  LocaleController.instance.setLanguage('hi');
+                  Navigator.pop(ctx);
+                },
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -310,10 +336,10 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                _buildProfileTile(Icons.location_on_outlined, 'Saved Addresses', 'Manage home and work addresses', onTap: _showSavedAddressesDialog),
-                _buildProfileTile(Icons.translate, 'Language Settings', 'मराठी / English / हिंदी', onTap: _showLanguageDialog),
-                _buildProfileTile(Icons.shield_outlined, 'Cooperative Welfare Guarantee', 'Direct deposit & damage protection policy', onTap: _showWelfareGuaranteeDialog),
-                _buildProfileTile(Icons.headset_mic_outlined, 'Union Help & Support', '1800-266-9090 (Toll free)', onTap: _showHelpSupportDialog),
+                _buildProfileTile(Icons.location_on_outlined, 'Saved Addresses'.tr(), 'Manage home and work addresses'.tr(), onTap: _showSavedAddressesDialog),
+                _buildProfileTile(Icons.translate, 'Language Settings'.tr(), 'मराठी / English / हिंदी', onTap: _showLanguageDialog),
+                _buildProfileTile(Icons.shield_outlined, 'Cooperative Welfare Guarantee'.tr(), 'Direct deposit & damage protection policy'.tr(), onTap: _showWelfareGuaranteeDialog),
+                _buildProfileTile(Icons.headset_mic_outlined, 'Union Help & Support'.tr(), '1800-266-9090 (Toll free)', onTap: _showHelpSupportDialog),
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,
@@ -329,7 +355,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                       if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
                     },
                     icon: const Icon(Icons.logout, size: 18),
-                    label: const Text('Logout from ShramSetu'),
+                    label: Text('Logout from ShramSetu'.tr()),
                   ),
                 ),
               ],
@@ -380,42 +406,47 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
 
   @override
   Widget build(BuildContext context) {
-    final isWide = MediaQuery.of(context).size.width >= 800;
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        final isWide = MediaQuery.of(context).size.width >= 800;
 
-    if (isWide) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: Row(
-          children: [
-            _buildDesktopSidebar(),
-            Expanded(child: _screens[_currentIndex]),
-          ],
-        ),
-      );
-    }
-
-    return Scaffold(
-      body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.outlineVariant, width: 1)),
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 58,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: Row(
               children: [
-                _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
-                _buildNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'),
-                _buildNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'Bookings', hasBadge: true),
-                _buildNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile'),
+                _buildDesktopSidebar(),
+                Expanded(child: _screens[_currentIndex]),
               ],
             ),
+          );
+        }
+
+        return Scaffold(
+          body: _screens[_currentIndex],
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(top: BorderSide(color: AppColors.outlineVariant, width: 1)),
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                height: 58,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'.tr()),
+                    _buildNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'.tr()),
+                    _buildNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'Bookings'.tr(), hasBadge: true),
+                    _buildNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile'.tr()),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -465,10 +496,10 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
           ),
           const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 16),
-          _buildDesktopNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
-          _buildDesktopNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'),
-          _buildDesktopNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'My Bookings'),
-          _buildDesktopNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile & Settings'),
+          _buildDesktopNavItem(0, Icons.home_outlined, Icons.home, 'Home'.tr()),
+          _buildDesktopNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'.tr()),
+          _buildDesktopNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'My Bookings'.tr()),
+          _buildDesktopNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile & Settings'.tr()),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

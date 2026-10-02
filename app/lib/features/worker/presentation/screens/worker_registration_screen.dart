@@ -5,6 +5,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
+import '../../../../core/models/federation_models.dart';
 import 'worker_under_verification_screen.dart';
 
 class WorkerRegistrationScreen extends StatefulWidget {
@@ -36,8 +37,8 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
 
   // 6. Current Address, 7. City, 8. District, 9. PIN Code
   final TextEditingController _addressController = TextEditingController();
-  final TextEditingController _cityController = TextEditingController(text: 'Pune');
-  final TextEditingController _districtController = TextEditingController(text: 'Pune');
+  final TextEditingController _cityController = TextEditingController();
+  final TextEditingController _districtController = TextEditingController();
   final TextEditingController _pinCodeController = TextEditingController();
 
   // 10. Trade, 11. Primary Skill, 12. Skill Level, 13. Experience, 14. Service Area, 15. Availability
@@ -49,7 +50,8 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   bool _isAvailable = true;
 
   // 18. Cooperative/Federation, 19. Membership ID
-  final String _federationName = 'Pune District Labour Cooperative Federation';
+  String _selectedFederationId = 'fed_pune';
+  String _federationName = 'Pune District Labour Cooperative Federation';
   final TextEditingController _membershipIdController = TextEditingController();
 
   // 20. Worker Declaration
@@ -94,7 +96,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
     'General Maintenance & Handyman',
   ];
 
-  final List<String> _puneAreas = [
+  final List<String> _serviceAreasList = [
     'Kothrud, Pune',
     'Shivajinagar, Pune',
     'Hinjewadi, Pune',
@@ -107,6 +109,20 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
     'Katraj & Dhankawadi, Pune',
     'Aundh & Pashan, Pune',
     'Kharadi & Wagholi, Pune',
+    'CIDCO, Nashik',
+    'Panchavati, Nashik',
+    'College Road, Nashik',
+    'Satpur & Ambad MIDC, Nashik',
+    'Nashik Road, Nashik',
+    'Andheri & Juhu, Mumbai',
+    'Bandra & Khar, Mumbai',
+    'Dadar & Parel, Mumbai',
+    'Thane & Mulund, MMR',
+    'Navi Mumbai & Vashi',
+    'CIDCO, Chhatrapati Sambhajinagar',
+    'Waluj MIDC, Chhatrapati Sambhajinagar',
+    'Dharampeth & Sitabuldi, Nagpur',
+    'Sadar & Civil Lines, Nagpur',
   ];
 
   @override
@@ -188,7 +204,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                   }
                 }
               }
-              if (worker.serviceLocation.isNotEmpty && _puneAreas.contains(worker.serviceLocation)) {
+              if (worker.serviceLocation.isNotEmpty && _serviceAreasList.contains(worker.serviceLocation)) {
                 _selectedArea = worker.serviceLocation;
               }
               if (worker.membershipId != null && worker.membershipId!.isNotEmpty) {
@@ -670,7 +686,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _genderOptions.contains(_selectedGender) ? _selectedGender : _genderOptions.first,
+                  initialValue: _genderOptions.contains(_selectedGender) ? _selectedGender : _genderOptions.first,
                   decoration: InputDecoration(
                     labelText: '5. Gender *',
                     prefixIcon: const Icon(Icons.wc, size: 20),
@@ -816,7 +832,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            value: _tradeCategories.contains(_selectedTrade) ? _selectedTrade : _tradeCategories.first,
+            initialValue: _tradeCategories.contains(_selectedTrade) ? _selectedTrade : _tradeCategories.first,
             decoration: InputDecoration(
               labelText: '10. Worker Category / Trade *',
               prefixIcon: const Icon(Icons.category_outlined, size: 20),
@@ -833,7 +849,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: _availableSkills.contains(_selectedSkill) ? _selectedSkill : _availableSkills.first,
+            initialValue: _availableSkills.contains(_selectedSkill) ? _selectedSkill : _availableSkills.first,
             decoration: InputDecoration(
               labelText: '11. Primary Skill *',
               prefixIcon: const Icon(Icons.construction, size: 20),
@@ -853,7 +869,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: _skillLevels.contains(_selectedSkillLevel) ? _selectedSkillLevel : 'Intermediate',
+                  initialValue: _skillLevels.contains(_selectedSkillLevel) ? _selectedSkillLevel : 'Intermediate',
                   decoration: InputDecoration(
                     labelText: '12. Skill Level *',
                     prefixIcon: const Icon(Icons.grade_outlined, size: 20),
@@ -875,7 +891,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<int>(
-                  value: _experienceOptions.contains(_selectedExperienceYears) ? _selectedExperienceYears : 3,
+                  initialValue: _experienceOptions.contains(_selectedExperienceYears) ? _selectedExperienceYears : 3,
                   decoration: InputDecoration(
                     labelText: '13. Years of Experience *',
                     prefixIcon: const Icon(Icons.history_toggle_off, size: 20),
@@ -898,7 +914,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 14),
           DropdownButtonFormField<String>(
-            value: _puneAreas.contains(_selectedArea) ? _selectedArea : _puneAreas.first,
+            initialValue: _serviceAreasList.contains(_selectedArea) ? _selectedArea : _serviceAreasList.first,
             decoration: InputDecoration(
               labelText: '14. Service Area / Preferred Working Locality *',
               prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
@@ -906,7 +922,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               filled: true,
               fillColor: AppColors.surfaceContainerLowest,
             ),
-            items: _puneAreas.map((area) {
+            items: _serviceAreasList.map((area) {
               return DropdownMenuItem(value: area, child: Text(area));
             }).toList(),
             onChanged: (val) {
@@ -925,7 +941,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               style: const TextStyle(fontSize: 12, color: AppColors.outline),
             ),
             value: _isAvailable,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
             onChanged: (val) => setState(() => _isAvailable = val),
           ),
           const SizedBox(height: 8),
@@ -970,16 +986,41 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            readOnly: true,
-            initialValue: _federationName,
+          DropdownButtonFormField<String>(
+            initialValue: _selectedFederationId,
+            isExpanded: true,
             decoration: InputDecoration(
-              labelText: '18. Registered Federation / Cooperative',
+              labelText: '18. Registered Federation / Cooperative *',
               prefixIcon: const Icon(Icons.account_balance_outlined, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
-              fillColor: AppColors.surfaceContainerHigh.withValues(alpha: 0.3),
+              fillColor: AppColors.surfaceContainerLowest,
             ),
+            items: FederationModel.defaultFederations.map((fed) {
+              return DropdownMenuItem<String>(
+                value: fed.id,
+                child: Text(
+                  fed.name,
+                  style: const TextStyle(fontSize: 13),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              );
+            }).toList(),
+            onChanged: (val) {
+              if (val != null) {
+                final fed = FederationModel.defaultFederations.firstWhere((f) => f.id == val);
+                setState(() {
+                  _selectedFederationId = val;
+                  _federationName = fed.name;
+                  if (_districtController.text.trim().isEmpty) {
+                    _districtController.text = fed.district;
+                  }
+                  if (_cityController.text.trim().isEmpty) {
+                    _cityController.text = fed.district;
+                  }
+                });
+              }
+            },
           ),
           const SizedBox(height: 14),
           TextFormField(

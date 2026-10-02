@@ -1,5 +1,6 @@
 import '../../features/admin/data/models/admin_models.dart';
 import '../../features/worker/data/models/worker_models.dart';
+import '../models/insurance_models.dart';
 
 abstract class IAdminRepository {
   Future<AdminDashboardStats> getDashboardStats();
@@ -19,6 +20,12 @@ abstract class IAdminRepository {
 
   /// Fetch verification history audit trail for a worker.
   Future<List<WorkerVerificationHistoryItem>> getVerificationHistory(String workerId);
+
+  /// Fetch worker welfare & insurance policy
+  Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId);
+
+  /// Update worker insurance policy / verification status
+  Future<void> updateWorkerInsurance(WorkerInsuranceModel insurance);
 
   Future<List<JobRequest>> getBookings();
   Stream<List<JobRequest>> watchBookings();

@@ -239,7 +239,7 @@ class _AdminDemandForecastScreenState extends State<AdminDemandForecastScreen> {
                     Text('Forecasting Algorithm', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 6),
                     DropdownButtonFormField<String>(
-                      value: _selectedModel,
+                      initialValue: _selectedModel,
                       isDense: true,
                       decoration: InputDecoration(
                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),

@@ -14,6 +14,7 @@ class Booking {
   final String address;
   final double amount;
   final BookingStatus status;
+  final String bookingType;
 
   Booking({
     required this.id,
@@ -27,6 +28,7 @@ class Booking {
     required this.address,
     required this.amount,
     this.status = BookingStatus.pending,
+    this.bookingType = 'NORMAL',
   });
 }
 
@@ -39,6 +41,8 @@ class BookingFlowState {
   String? addressId;
   double? latitude;
   double? longitude;
+  bool isEmergency;
+  String bookingType;
 
   BookingFlowState({
     this.selectedCategory,
@@ -49,6 +53,8 @@ class BookingFlowState {
     this.addressId,
     this.latitude,
     this.longitude,
+    this.isEmergency = false,
+    this.bookingType = 'NORMAL',
   });
 }
 

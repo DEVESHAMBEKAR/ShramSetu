@@ -38,6 +38,15 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Future<void> _loadCustomerAddress() async {
+    // If address is already selected in booking flow state, honor it as the source of truth
+    if (bookingFlowState.address != null && bookingFlowState.address!.isNotEmpty) {
+      setState(() {
+        _customerAddressText = bookingFlowState.address;
+        _customerAddressId = bookingFlowState.addressId;
+      });
+      return;
+    }
+
     try {
       final user = await DI.authRepo.getCurrentUser();
       String? userId = user?.id;
@@ -58,6 +67,185 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         }
       }
     } catch (_) {}
+  }
+
+  Future<void> _showAddressSelectionModal() async {
+    final user = await DI.authRepo.getCurrentUser();
+    String? userId = user?.id;
+    if (userId == null && !AppConfig.useMockData) {
+      try {
+        userId = AppConfig.supabaseClient.auth.currentUser?.id;
+      } catch (_) {}
+    }
+    if (userId == null) return;
+
+    final addresses = await DI.userRepo.getUserAddresses(userId);
+
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.all(AppSpacing.marginMobile),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Select Service Address', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                      IconButton(icon: const Icon(Icons.close, size: 20), onPressed: () => Navigator.pop(ctx)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  if (addresses.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: Text('No saved addresses found. Please add a new service address below.', style: AppTypography.bodySm),
+                    )
+                  else
+                    ...addresses.map((a) {
+                      final isSelected = a.id == _customerAddressId;
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: isSelected ? AppColors.primary : AppColors.outlineVariant),
+                          borderRadius: AppRadius.radiusMd,
+                          color: isSelected ? AppColors.surfaceContainerLow : Colors.white,
+                        ),
+                        child: ListTile(
+                          leading: Icon(
+                            isSelected ? Icons.check_circle : Icons.location_on_outlined,
+                            color: isSelected ? AppColors.primary : AppColors.outline,
+                          ),
+                          title: Text(a.addressLine, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.bold)),
+                          subtitle: Text('${a.area.isNotEmpty ? "${a.area}, " : ""}${a.city} - ${a.postalCode}', style: AppTypography.bodySm),
+                          onTap: () {
+                            setState(() {
+                              _customerAddressId = a.id;
+                              _customerAddressText = '${a.addressLine}, ${a.area.isNotEmpty ? "${a.area}, " : ""}${a.city} - ${a.postalCode}';
+                              bookingFlowState.addressId = a.id;
+                              bookingFlowState.address = _customerAddressText;
+                              bookingFlowState.latitude = a.latitude;
+                              bookingFlowState.longitude = a.longitude;
+                            });
+                            Navigator.pop(ctx);
+                          },
+                        ),
+                      );
+                    }),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.add, size: 18),
+                      label: const Text('Add New Address'),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        _showAddNewAddressDialog(userId!);
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showAddNewAddressDialog(String userId) {
+    final lineCtrl = TextEditingController();
+    final areaCtrl = TextEditingController();
+    final cityCtrl = TextEditingController();
+    final zipCtrl = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: const Text('New Service Address'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: lineCtrl,
+                decoration: const InputDecoration(labelText: 'Flat / Building / Street *', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: areaCtrl,
+                decoration: const InputDecoration(labelText: 'Locality / Area', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: cityCtrl,
+                      decoration: const InputDecoration(labelText: 'City *', border: OutlineInputBorder()),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: TextField(
+                      controller: zipCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'PIN Code', border: OutlineInputBorder()),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            onPressed: () async {
+              if (lineCtrl.text.trim().isEmpty || cityCtrl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill required fields.')));
+                return;
+              }
+              Navigator.pop(dlgCtx);
+              try {
+                final created = await DI.userRepo.createAddress(
+                  userId: userId,
+                  addressLine: lineCtrl.text.trim(),
+                  area: areaCtrl.text.trim(),
+                  city: cityCtrl.text.trim(),
+                  state: 'Maharashtra',
+                  postalCode: zipCtrl.text.trim().isNotEmpty ? zipCtrl.text.trim() : '411001',
+                );
+                setState(() {
+                  _customerAddressId = created.id;
+                  _customerAddressText = created.displayString;
+                  bookingFlowState.addressId = created.id;
+                  bookingFlowState.address = created.displayString;
+                });
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Service address saved and selected.')));
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                }
+              }
+            },
+            child: const Text('Save & Select'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -418,21 +606,42 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-            child: Row(
-              children: [
-                const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    _customerAddressText ?? 'No saved address set',
-                    style: AppTypography.bodySm.copyWith(fontSize: 11, color: _customerAddressText != null ? AppColors.onSurface : AppColors.outline),
-                    overflow: TextOverflow.ellipsis,
+          InkWell(
+            onTap: _showAddressSelectionModal,
+            borderRadius: AppRadius.radiusLg,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppRadius.radiusLg,
+                border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _customerAddressText ?? 'No saved address set (Tap to choose)',
+                      style: AppTypography.bodySm.copyWith(
+                        fontSize: 11,
+                        color: _customerAddressText != null ? AppColors.onSurface : AppColors.error,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                ),
-              ],
+                  TextButton(
+                    onPressed: _showAddressSelectionModal,
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: const Text('Change', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -598,6 +807,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                             scheduledTime: time,
                             amount: total.toDouble(),
                             addressId: _customerAddressId ?? bookingFlowState.addressId,
+                            bookingType: bookingFlowState.bookingType,
                           );
 
                           if (newBookingId == null) {

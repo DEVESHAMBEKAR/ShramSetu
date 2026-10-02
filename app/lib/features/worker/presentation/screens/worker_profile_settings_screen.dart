@@ -202,8 +202,10 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
   }
 
   Widget _buildSettingsList(WorkerProfile worker) {
-    return Container(
-      decoration: BoxDecoration(color: AppColors.surfaceContainerLowest, borderRadius: AppRadius.radiusXl, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)]),
+    return Material(
+      color: AppColors.surfaceContainerLowest,
+      borderRadius: AppRadius.radiusXl,
+      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
           _buildAvailabilityToggle(worker),

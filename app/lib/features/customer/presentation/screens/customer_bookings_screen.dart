@@ -8,6 +8,8 @@ import '../../../../core/theme/app_radius.dart';
 import 'customer_live_tracking_screen.dart';
 import 'customer_booking_detail_screen.dart';
 import '../widgets/review_rating_modal.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
   final VoidCallback? onExploreServices;
@@ -91,81 +93,84 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        titleSpacing: AppSpacing.marginMobile,
-        title: Text(
-          'My Bookings & Orders',
-          style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: Column(
-            children: [
-              // Segmented Tabs: Active Bookings vs Past Orders
-              Container(
-                color: Colors.white,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
-                child: Container(
-                  height: 44,
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceContainerLow,
-                    borderRadius: AppRadius.radiusLg,
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _selectedTab = 0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                              borderRadius: AppRadius.radiusMd,
-                              boxShadow: _selectedTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Active Orders',
-                              style: AppTypography.labelSm.copyWith(
-                                color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
-                                fontWeight: FontWeight.bold,
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: Colors.white,
+            elevation: 0,
+            titleSpacing: AppSpacing.marginMobile,
+            title: Text(
+              'My Bookings & Orders'.tr(),
+              style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+            ),
+          ),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 800),
+              child: Column(
+                children: [
+                  // Segmented Tabs: Active Bookings vs Past Orders
+                  Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
+                    child: Container(
+                      height: 44,
+                      padding: const EdgeInsets.all(3),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: AppRadius.radiusLg,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => setState(() => _selectedTab = 0),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _selectedTab == 0 ? Colors.white : Colors.transparent,
+                                  borderRadius: AppRadius.radiusMd,
+                                  boxShadow: _selectedTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Active Orders'.tr(),
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => setState(() => _selectedTab = 1),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                              borderRadius: AppRadius.radiusMd,
-                              boxShadow: _selectedTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              'Past Orders',
-                              style: AppTypography.labelSm.copyWith(
-                                color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
-                                fontWeight: FontWeight.bold,
+                          Expanded(
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: () => setState(() => _selectedTab = 1),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: _selectedTab == 1 ? Colors.white : Colors.transparent,
+                                  borderRadius: AppRadius.radiusMd,
+                                  boxShadow: _selectedTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
+                                ),
+                                alignment: Alignment.center,
+                                child: Text(
+                                  'Past Orders'.tr(),
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
               const Divider(height: 1, color: AppColors.outlineVariant),
 
               // Bookings Content
@@ -258,6 +263,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
     ),
   ),
 );
+      },
+    );
   }
 
   Widget _buildUrbanCompanyOrderCard(Map<String, dynamic> booking, {required bool isPast}) {

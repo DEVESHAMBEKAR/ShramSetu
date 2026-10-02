@@ -86,6 +86,7 @@ class SharedBookingStore {
     String? customerLocation,
     String? addressId,
     String? notes,
+    String bookingType = 'NORMAL',
   }) async {
     final newId = 'bk_${DateTime.now().millisecondsSinceEpoch}';
     final effectiveCustomerId = customerId ?? 'mock-customer-1';
@@ -94,6 +95,7 @@ class SharedBookingStore {
     final bookingMap = <String, dynamic>{
       'id': newId,
       'worker_id': workerId,
+      'worker_name': workerName,
       'customer_id': effectiveCustomerId,
       'customer_name': effectiveCustomerName,
       'customer_phone': customerPhone ?? '+91 98765 43210',
@@ -103,6 +105,7 @@ class SharedBookingStore {
       'scheduled_date': scheduledDate,
       'scheduled_time': scheduledTime,
       'base_amount': amount,
+      'booking_type': bookingType,
       'labor_allowance': 50.0,
       'distance_km': 1.4,
       'status': BookingStatus.onTheWay.toDbString(),

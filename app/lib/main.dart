@@ -15,6 +15,7 @@ import 'features/auth/presentation/screens/worker_login_screen.dart';
 import 'features/worker/presentation/screens/worker_registration_screen.dart';
 import 'features/worker/presentation/screens/worker_under_verification_screen.dart';
 
+import 'core/localization/locale_controller.dart';
 import 'core/widgets/role_guard.dart';
 
 void main() async {
@@ -30,11 +31,15 @@ class ShramSetuApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: NotificationService.navigatorKey,
-      title: 'ShramSetu',
-      theme: AppTheme.lightTheme,
-      debugShowCheckedModeBanner: false,
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          navigatorKey: NotificationService.navigatorKey,
+          title: 'ShramSetu',
+          locale: Locale(LocaleController.instance.languageCode),
+          theme: AppTheme.lightTheme,
+          debugShowCheckedModeBanner: false,
       initialRoute: '/',
       routes: {
         '/': (context) => const SplashScreen(),
@@ -73,7 +78,8 @@ class ShramSetuApp extends StatelessWidget {
               child: AdminMainLayout(),
             ),
       },
+        );
+      },
     );
   }
-
 }

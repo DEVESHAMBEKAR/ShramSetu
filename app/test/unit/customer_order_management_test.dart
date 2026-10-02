@@ -1,11 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/customer/data/repositories/mock_customer_repository.dart';
-import 'package:app/core/services/shared_booking_store.dart';
 
 void main() {
   group('Customer Order Management Tests', () {
     late MockCustomerRepository customerRepo;
-    late SharedBookingStore store;
 
     setUp(() {
       customerRepo = MockCustomerRepository();

@@ -8,6 +8,8 @@ import 'worker_earnings_screen.dart';
 import 'worker_profile_settings_screen.dart';
 import 'worker_under_verification_screen.dart';
 import '../../data/models/worker_models.dart';
+import '../../../../core/localization/locale_controller.dart';
+import '../../../../core/localization/app_strings.dart';
 
 class WorkerMainLayout extends StatefulWidget {
   const WorkerMainLayout({super.key});
@@ -83,50 +85,55 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
 
     final isWide = MediaQuery.of(context).size.width >= 800;
 
-    if (isWide) {
-      return Scaffold(
-        backgroundColor: AppColors.background,
-        body: Row(
-          children: [
-            _buildDesktopSidebar(),
-            Expanded(child: _screens[_currentIndex]),
-          ],
-        ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.98),
-          border: const Border(
-            top: BorderSide(color: AppColors.outlineVariant, width: 1),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, -2),
-            ),
-          ],
-        ),
-        child: SafeArea(
-          child: SizedBox(
-            height: 60,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
+    return ListenableBuilder(
+      listenable: LocaleController.instance,
+      builder: (context, _) {
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: Row(
               children: [
-                _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'),
-                _buildNavItem(1, Icons.assignment_outlined, Icons.assignment, 'Jobs'),
-                _buildNavItem(2, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Earnings'),
-                _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'),
+                _buildDesktopSidebar(),
+                Expanded(child: _screens[_currentIndex]),
               ],
             ),
+          );
+        }
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          body: _screens[_currentIndex],
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.98),
+              border: const Border(
+                top: BorderSide(color: AppColors.outlineVariant, width: 1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 12,
+                  offset: const Offset(0, -2),
+                ),
+              ],
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                height: 60,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'.tr()),
+                    _buildNavItem(1, Icons.assignment_outlined, Icons.assignment, 'Jobs'.tr()),
+                    _buildNavItem(2, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Earnings'.tr()),
+                    _buildNavItem(3, Icons.person_outline, Icons.person, 'Profile'.tr()),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -177,10 +184,10 @@ class _WorkerMainLayoutState extends State<WorkerMainLayout> {
           ),
           const Divider(height: 1, color: AppColors.outlineVariant),
           const SizedBox(height: 16),
-          _buildDesktopNavItem(0, Icons.home_outlined, Icons.home, 'Dashboard'),
-          _buildDesktopNavItem(1, Icons.assignment_outlined, Icons.assignment, 'Job Requests'),
-          _buildDesktopNavItem(2, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Earnings & Payouts'),
-          _buildDesktopNavItem(3, Icons.person_outline, Icons.person, 'Profile & Guild'),
+          _buildDesktopNavItem(0, Icons.home_outlined, Icons.home, 'Dashboard'.tr()),
+          _buildDesktopNavItem(1, Icons.assignment_outlined, Icons.assignment, 'Job Requests'.tr()),
+          _buildDesktopNavItem(2, Icons.account_balance_wallet_outlined, Icons.account_balance_wallet, 'Earnings & Payouts'.tr()),
+          _buildDesktopNavItem(3, Icons.person_outline, Icons.person, 'Profile & Guild'.tr()),
           const Spacer(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

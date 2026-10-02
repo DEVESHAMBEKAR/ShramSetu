@@ -1,11 +1,13 @@
 import 'i_payment_repository.dart';
 import '../models/payment_models.dart';
 import '../config/dependency_injection.dart';
+import '../services/shared_booking_store.dart';
 
 /// Mock implementation for USE_MOCK_DATA=true.
 class MockPaymentRepository implements IPaymentRepository {
   final Map<String, PaymentModel> _payments = {};
   bool simulateSuccess = true;
+  Duration networkDelay = const Duration(milliseconds: 100);
 
   @override
   Future<PaymentOrderResult> createPaymentOrder(String bookingId) async {
@@ -72,7 +74,31 @@ class MockPaymentRepository implements IPaymentRepository {
   @override
   Future<bool> releaseEscrow(String bookingId) async {
     await Future.delayed(const Duration(milliseconds: 200));
-    final payment = _payments[bookingId];
+    PaymentModel? payment = _payments[bookingId];
+    if (payment == null) {
+      try {
+        final bookings = SharedBookingStore.instance.getWorkerBookings();
+        final bk = bookings.where((b) => b.id == bookingId).firstOrNull;
+        if (bk != null) {
+          final amount = bk.totalAmount > 0 ? bk.totalAmount : 485.0;
+          payment = PaymentModel(
+            id: 'pay_${bookingId}_${DateTime.now().millisecondsSinceEpoch}',
+            bookingId: bookingId,
+            customerId: bk.customerId,
+            workerId: 'mock-worker-id',
+            amount: amount,
+            amountPaise: (amount * 100).toInt(),
+            status: PaymentStatus.paid,
+            escrowStatus: EscrowStatus.held,
+            razorpayOrderId: 'order_$bookingId',
+            paymentMethod: 'UPI / Escrow',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+          );
+          _payments[bookingId] = payment;
+        }
+      } catch (_) {}
+    }
     if (payment == null || !payment.canReleaseEscrow) return false;
     _payments[bookingId] = PaymentModel(
       id: payment.id,
@@ -114,10 +140,39 @@ class MockPaymentRepository implements IPaymentRepository {
 
   @override
   Future<List<PaymentModel>> getWorkerReleasedPayments(String workerId) async {
-    await Future.delayed(const Duration(milliseconds: 100));
+    if (networkDelay > Duration.zero) {
+      await Future.delayed(networkDelay);
+    }
     return _payments.values
-        .where((p) => p.workerId == workerId && p.escrowStatus == EscrowStatus.released)
+        .where((p) =>
+            (p.workerId == workerId ||
+                (workerId == 'worker-1' && p.workerId == 'mock-worker-id')) &&
+            p.escrowStatus == EscrowStatus.released)
         .toList();
+  }
+
+  void addReleasedPayment({
+    required String bookingId,
+    required String workerId,
+    required double amount,
+    DateTime? date,
+    String paymentMethod = 'UPI / Escrow',
+  }) {
+    final now = date ?? DateTime.now();
+    _payments[bookingId] = PaymentModel(
+      id: 'pay_${bookingId}_${now.millisecondsSinceEpoch}',
+      bookingId: bookingId,
+      customerId: 'mock-customer-1',
+      workerId: workerId,
+      amount: amount,
+      amountPaise: (amount * 100).toInt(),
+      status: PaymentStatus.paid,
+      escrowStatus: EscrowStatus.released,
+      razorpayOrderId: 'order_$bookingId',
+      paymentMethod: paymentMethod,
+      createdAt: now,
+      updatedAt: now,
+    );
   }
 
   void _updateStatus(String bookingId, PaymentStatus status, EscrowStatus escrow) {

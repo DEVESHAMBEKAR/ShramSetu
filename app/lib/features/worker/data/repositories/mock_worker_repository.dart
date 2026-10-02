@@ -1,6 +1,9 @@
 import '../../../../core/repositories/i_worker_repository.dart';
 import '../../../../core/services/shared_booking_store.dart';
 import '../models/worker_models.dart';
+import '../../../../core/models/insurance_models.dart';
+import '../../../customer/data/models/customer_models.dart';
+import '../../../customer/data/repositories/mock_customer_repository.dart';
 
 class MockWorkerRepository implements IWorkerRepository {
   static final MockWorkerRepository _instance = MockWorkerRepository._internal();
@@ -16,7 +19,7 @@ class MockWorkerRepository implements IWorkerRepository {
     currentWorker = WorkerProfile(
       id: 'w101',
       name: 'Rahul Patil',
-      profileImage: 'https://via.placeholder.com/150',
+      profileImage: '',
       phone: '+91 98765 43210',
       skills: ['Plumbing', 'Pipe Fitting'],
       experience: '5 Years',
@@ -203,6 +206,69 @@ class MockWorkerRepository implements IWorkerRepository {
       isVerified: false,
       verificationStatus: VerificationStatus.pending,
       isAvailable: false,
+    );
+
+    final String catId;
+    final lowerSkill = skill.toLowerCase();
+    final lowerTrade = (trade ?? '').toLowerCase();
+    if (lowerSkill.contains('elect') || lowerTrade.contains('elect')) {
+      catId = 'c1';
+    } else if (lowerSkill.contains('plumb') || lowerTrade.contains('plumb')) {
+      catId = 'c2';
+    } else if (lowerSkill.contains('carpent') || lowerTrade.contains('carpent')) {
+      catId = 'c3';
+    } else if (lowerSkill.contains('clean') || lowerTrade.contains('clean')) {
+      catId = 'c4';
+    } else if (lowerSkill.contains('paint') || lowerTrade.contains('paint')) {
+      catId = 'c5';
+    } else if (lowerSkill.contains('appliance') || lowerTrade.contains('appliance')) {
+      catId = 'c6';
+    } else if (lowerSkill.contains('garden') || lowerTrade.contains('yard')) {
+      catId = 'c7';
+    } else {
+      catId = 'c2';
+    }
+
+    final newWorker = Worker(
+      id: workerId,
+      name: fullName,
+      categoryId: catId,
+      rate: 349,
+      rating: 4.88,
+      reviewCount: 34,
+      jobsCompleted: 45,
+      distanceKm: 1.5,
+      experience: '$experienceYears yrs exp',
+      availability: 'Available Today',
+      specializations: [skill, trade ?? skill, 'Union Certified'],
+      locationTag: serviceLocation.contains('Pune') ? serviceLocation : '$serviceLocation, Pune',
+      imageUrl: '',
+      customTag: 'Union Certified Artisan',
+      bio: bio ?? 'Certified $skill artisan serving $serviceLocation with $experienceYears years of experience.',
+      federationId: membershipId ?? 'PUN-UNION-2024',
+      insuranceAmount: 'Up to ₹1,50,000',
+      languages: ['मराठी', 'हिंदी', 'English'],
+      serviceAreas: [serviceLocation.replaceAll(', Pune', '').trim(), 'Pune', 'All Areas'],
+      isUnionGold: true,
+      isCoopMaster: true,
+    );
+
+    MockCustomerRepository.registerOrUpdateWorker(newWorker);
+  }
+
+  @override
+  Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId) async {
+    return WorkerInsuranceModel(
+      workerId: workerId,
+      policyNumber: 'FED-GRP-2024-${workerId.hashCode.abs() % 10000}',
+      coverageAmount: 500000.0,
+      status: InsuranceStatus.active,
+      verificationStatus: InsuranceVerificationStatus.verified,
+      providerName: 'Maharashtra State Cooperative Labour Federation Welfare Pool',
+      claimSupportPhone: '1800-266-9090',
+      claimInstructions: 'In case of workplace injury or hospitalization, notify your local federation secretary within 48 hours with hospital discharge summary.',
+      validUntil: DateTime.now().add(const Duration(days: 240)),
+      isExternalIntegrationPending: true,
     );
   }
 }

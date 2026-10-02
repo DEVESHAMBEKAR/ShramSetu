@@ -1,4 +1,4 @@
-﻿# Root .gitignore for ShramSetu
+# Root .gitignore for ShramSetu
 
 # Build & compiled outputs
 **/build/
@@ -35,3 +35,6 @@ app/.dart_tool/
 Thumbs.db
 *.swp
 *~
+
+# Temporary files
+supabase/.temp/

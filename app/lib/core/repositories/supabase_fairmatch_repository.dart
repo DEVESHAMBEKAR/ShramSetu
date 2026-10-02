@@ -21,9 +21,9 @@ class SupabaseFairMatchRepository implements IFairMatchRepository {
     try {
       final Map<String, dynamic> params = {
         'p_service_id': serviceId,
-        if (customerLat != null) 'p_customer_lat': customerLat,
-        if (customerLng != null) 'p_customer_lng': customerLng,
-        if (weights != null) 'p_weights': weights.toJson(),
+        'p_customer_lat': ?customerLat,
+        'p_customer_lng': ?customerLng,
+        'p_weights': ?weights?.toJson(),
         'p_limit': limit,
         'p_algorithm': algorithm,
       };

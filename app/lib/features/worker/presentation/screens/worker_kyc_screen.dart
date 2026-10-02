@@ -8,6 +8,7 @@ import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 import 'package:file_picker/file_picker.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
+import '../../../../shared/widgets/document_viewer/document_viewer_modal.dart';
 
 class WorkerKycScreen extends StatefulWidget {
   const WorkerKycScreen({super.key});
@@ -237,6 +238,7 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(AppSpacing.spacingMd),
+        onTap: hasDoc && doc != null ? () => DocumentViewerModal.show(context, doc: doc) : null,
         leading: Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
@@ -248,7 +250,7 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
         title: Text(title, style: AppTypography.titleMd),
         subtitle: Text(
           hasDoc
-              ? (fileName != null ? 'Uploaded: $fileName' : 'Uploaded • Verified')
+              ? (fileName != null ? 'Uploaded: $fileName (Tap to view)' : 'Uploaded • Verified (Tap to view)')
               : (kIsWeb ? 'Tap to upload document' : 'Pending Upload'),
           style: AppTypography.bodySm.copyWith(
             color: hasDoc ? AppColors.tertiary : AppColors.error,
@@ -257,7 +259,19 @@ class _WorkerKycScreenState extends State<WorkerKycScreen> {
           overflow: TextOverflow.ellipsis,
         ),
         trailing: hasDoc
-            ? const Icon(Icons.check_circle, color: AppColors.tertiary)
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (doc != null)
+                    IconButton(
+                      tooltip: 'View Document',
+                      icon: const Icon(Icons.visibility_outlined, size: 20, color: AppColors.primary),
+                      onPressed: () => DocumentViewerModal.show(context, doc: doc),
+                    ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.check_circle, color: AppColors.tertiary),
+                ],
+              )
             : TextButton.icon(
                 onPressed: () => _uploadDocument(docType),
                 icon: const Icon(Icons.upload_file, size: 18),

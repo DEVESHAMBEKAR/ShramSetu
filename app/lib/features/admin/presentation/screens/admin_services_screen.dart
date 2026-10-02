@@ -89,7 +89,7 @@ class _AdminServicesScreenState extends State<AdminServicesScreen> {
                 Switch(
                   value: isActive,
                   activeThumbImage: null,
-                  activeColor: AppColors.primary, // Actually let's just use activeColor for now since activeThumbColor isn't enough to style everything, but wait, the warning said "Use activeThumbColor instead".
+                  activeThumbColor: AppColors.primary,
                   onChanged: (val) {
                     () async { await DI.adminRepo.toggleServiceStatus(service.id); _refreshData(); }();
                   },

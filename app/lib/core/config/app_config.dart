@@ -60,7 +60,7 @@ class AppConfig {
 
         await Supabase.initialize(
           url: supabaseUrl,
-          anonKey: supabaseAnonKey,
+          publishableKey: supabaseAnonKey,
         );
         debugPrint('[AppConfig] Connected to Supabase LIVE backend successfully.');
       } catch (e) {
