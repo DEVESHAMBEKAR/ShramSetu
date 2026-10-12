@@ -2,6 +2,7 @@ import '../../../../core/repositories/i_worker_repository.dart';
 import '../../../../core/services/shared_booking_store.dart';
 import '../models/worker_models.dart';
 import '../../../../core/models/insurance_models.dart';
+import '../../../../core/models/federation_models.dart';
 import '../../../customer/data/models/customer_models.dart';
 import '../../../customer/data/repositories/mock_customer_repository.dart';
 
@@ -21,6 +22,7 @@ class MockWorkerRepository implements IWorkerRepository {
       name: 'Rahul Patil',
       profileImage: '',
       phone: '+91 98765 43210',
+      email: 'rahul.patil@shramsetu.in',
       skills: ['Plumbing', 'Pipe Fitting'],
       experience: '5 Years',
       rating: 4.88,
@@ -38,6 +40,17 @@ class MockWorkerRepository implements IWorkerRepository {
 
   @override
   Future<WorkerProfile> getWorkerProfile(String workerId) async {
+    final locLower = currentWorker.serviceLocation.toLowerCase();
+    if ((locLower.contains('nagpur') || locLower.contains('sitabuldi') || locLower.contains('dharampeth') || locLower.contains('sadar')) &&
+        (currentWorker.guildName.toLowerCase().contains('pune') || currentWorker.federationRefId == '11111111-0000-0000-0000-000000000001')) {
+      final nagpurFed = FederationModel.defaultFederations.firstWhere((f) => f.id == '55555555-0000-0000-0000-000000000005');
+      currentWorker = currentWorker.copyWith(
+        guildName: nagpurFed.name,
+        federationRefId: nagpurFed.id,
+        district: nagpurFed.district,
+        city: nagpurFed.city,
+      );
+    }
     return currentWorker;
   }
 
@@ -167,6 +180,7 @@ class MockWorkerRepository implements IWorkerRepository {
     required String workerId,
     required String fullName,
     required String phone,
+    String? email,
     required String skill,
     required int experienceYears,
     required String serviceLocation,
@@ -179,14 +193,27 @@ class MockWorkerRepository implements IWorkerRepository {
     String? trade,
     String? skillLevel,
     String? federationName,
+    String? federationId,
     String? membershipId,
     String? bio,
     bool declarationAccepted = true,
   }) async {
+    final resolvedFed = FederationModel.resolveFederation(
+      federationId: federationId,
+      federationName: federationName,
+      district: district,
+      city: city,
+      location: serviceLocation,
+      address: address,
+    );
+    String effFedId = resolvedFed.id;
+    String effFedName = resolvedFed.name;
+
     currentWorker = currentWorker.copyWith(
       id: workerId,
       name: fullName,
       phone: phone,
+      email: email,
       skills: [skill],
       experience: '$experienceYears Years',
       serviceLocation: serviceLocation,
@@ -199,7 +226,8 @@ class MockWorkerRepository implements IWorkerRepository {
       trade: trade ?? skill,
       primarySkill: skill,
       skillLevel: skillLevel ?? 'Intermediate',
-      guildName: federationName ?? 'Pune District Labour Cooperative Federation',
+      guildName: effFedName,
+      federationRefId: effFedId,
       membershipId: membershipId,
       bio: bio,
       declarationAccepted: declarationAccepted,
@@ -245,7 +273,7 @@ class MockWorkerRepository implements IWorkerRepository {
       imageUrl: '',
       customTag: 'Union Certified Artisan',
       bio: bio ?? 'Certified $skill artisan serving $serviceLocation with $experienceYears years of experience.',
-      federationId: membershipId ?? 'PUN-UNION-2024',
+      federationId: effFedId,
       insuranceAmount: 'Up to ₹1,50,000',
       languages: ['मराठी', 'हिंदी', 'English'],
       serviceAreas: [serviceLocation.replaceAll(', Pune', '').trim(), 'Pune', 'All Areas'],
@@ -256,19 +284,49 @@ class MockWorkerRepository implements IWorkerRepository {
     MockCustomerRepository.registerOrUpdateWorker(newWorker);
   }
 
+  static final WorkerInsuranceModel _samplePolicy = WorkerInsuranceModel(
+    workerId: 'test-worker-01',
+    policyNumber: 'NIC-GRP-2026-8941',
+    coverageAmount: 500000.0,
+    status: InsuranceStatus.active,
+    verificationStatus: InsuranceVerificationStatus.verified,
+  );
+
+  final Map<String, WorkerInsuranceModel> _mockInsuranceMap = {
+    'test-worker-01': _samplePolicy,
+  };
+
   @override
   Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId) async {
-    return WorkerInsuranceModel(
+    return _mockInsuranceMap[workerId];
+  }
+
+  @override
+  Future<WorkerInsuranceModel> applyForInsurance(String workerId, {String? coverageType, double? coverageAmount}) async {
+    final pending = WorkerInsuranceModel(
       workerId: workerId,
-      policyNumber: 'FED-GRP-2024-${workerId.hashCode.abs() % 10000}',
-      coverageAmount: 500000.0,
-      status: InsuranceStatus.active,
-      verificationStatus: InsuranceVerificationStatus.verified,
+      policyNumber: 'PENDING_APPROVAL',
       providerName: 'Maharashtra State Cooperative Labour Federation Welfare Pool',
-      claimSupportPhone: '1800-266-9090',
-      claimInstructions: 'In case of workplace injury or hospitalization, notify your local federation secretary within 48 hours with hospital discharge summary.',
-      validUntil: DateTime.now().add(const Duration(days: 240)),
-      isExternalIntegrationPending: true,
+      coverageType: coverageType ?? 'Accidental & Medical Health Cover',
+      coverageAmount: coverageAmount ?? 500000.0,
+      startDate: DateTime.now(),
+      expiryDate: DateTime.now().add(const Duration(days: 365)),
+      status: InsuranceStatus.pending,
+      verificationStatus: InsuranceVerificationStatus.pending,
+    );
+    _mockInsuranceMap[workerId] = pending;
+    return pending;
+  }
+
+  @override
+  Future<void> updateWorkerCredentials(
+    String workerId, {
+    required String phone,
+    required String email,
+  }) async {
+    currentWorker = currentWorker.copyWith(
+      phone: phone.trim(),
+      email: email.trim(),
     );
   }
 }

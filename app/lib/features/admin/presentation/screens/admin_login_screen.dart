@@ -60,29 +60,53 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         if (user != null) {
           final role = await DI.userRepo.getUserRole(user.id);
           final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
-          final isEmailUser = user.email != null && user.email!.isNotEmpty;
+          // SECURITY: Strictly require ADMIN, SUPER_ADMIN, or FEDERATION_ADMIN role from
+          // the authoritative server-side source (public.users.role or auth metadata).
+          // Never trust client-side conditions or email-existence as admin proof.
+          final roleUpper = role?.toUpperCase();
+          final isAuthorizedAdmin = roleUpper == 'ADMIN' ||
+              roleUpper == 'SUPER_ADMIN' ||
+              roleUpper == 'FEDERATION_ADMIN' ||
+              metaRole == 'ADMIN' ||
+              metaRole == 'SUPER_ADMIN' ||
+              metaRole == 'FEDERATION_ADMIN' ||
+              DI.authRepo.runtimeType.toString() == 'MockAuthRepository';
 
-          final isExplicitNonAdmin = role != null && role.toUpperCase() != 'ADMIN';
-          if (!isExplicitNonAdmin && (role == 'ADMIN' || metaRole == 'ADMIN' || isEmailUser || DI.authRepo.runtimeType.toString() == 'MockAuthRepository')) {
-            // Self-heal: ensure role is recorded in public.users if missing
-            try {
-              await DI.userRepo.upsertUserProfile(
-                userId: user.id,
-                role: 'ADMIN',
-                phone: user.phone ?? '',
-                fullName: user.userMetadata?['full_name'] ?? (user.email != null ? 'Admin (${user.email!.split('@').first})' : 'Admin'),
-              );
-            } catch (e) {
-              debugPrint('[AdminLogin] Role sync note: $e');
+          if (isAuthorizedAdmin) {
+            final effectiveRole = roleUpper ?? metaRole;
+            bool mustChangePassword = (user.userMetadata?['requires_password_change'] == true) ||
+                (user.userMetadata?['requires_password_change']?.toString() == 'true') ||
+                (user.appMetadata['requires_password_change'] == true) ||
+                (user.appMetadata['requires_password_change']?.toString() == 'true');
+
+            if (!mustChangePassword) {
+              try {
+                final profile = await DI.userRepo.getUserProfile(user.id);
+                if (profile != null &&
+                    (profile['requires_password_change'] == true ||
+                     profile['requires_password_change']?.toString() == 'true')) {
+                  mustChangePassword = true;
+                }
+              } catch (_) {}
+            }
+
+            if (mustChangePassword && mounted) {
+              await _showFirstTimePasswordResetDialog(context, effectiveRole);
+              return;
             }
 
             if (mounted) {
-              Navigator.of(context).pushReplacementNamed('/admin/home');
+              // Route SUPER_ADMIN to the dedicated Super Admin console
+              if (effectiveRole == 'SUPER_ADMIN') {
+                Navigator.of(context).pushReplacementNamed('/super-admin/home');
+              } else {
+                Navigator.of(context).pushReplacementNamed('/admin/home');
+              }
             }
             return;
           } else {
             await DI.authRepo.logout();
-            setState(() => _errorMsg = 'Unauthorized: Admin role required for ${user.email ?? 'this account'}.');
+            setState(() => _errorMsg = 'Unauthorized: Administrative role required for ${user.email ?? 'this account'}.');
           }
         } else {
            setState(() => _errorMsg = 'User profile not found.');
@@ -91,13 +115,25 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         setState(() => _errorMsg = 'Invalid admin credentials. Please verify your email and password.');
       }
     } catch (e) {
-      String msg = e.toString().replaceAll('Exception: ', '').replaceAll('AuthException(message: ', '');
-      if (msg.endsWith(')')) msg = msg.substring(0, msg.length - 1);
-      final lower = msg.toLowerCase();
-      if (lower.contains('invalid login credentials') || lower.contains('invalid_credentials')) {
-        msg = 'Invalid email or password. If you recently created this admin in Supabase, make sure the email is confirmed (Auth > Users > Confirm User).';
+      final str = e.toString();
+      final lower = str.toLowerCase();
+      String msg;
+      if (lower.contains('database error querying schema') ||
+          lower.contains('database error finding user') ||
+          lower.contains('unexpected_failure')) {
+        msg = 'Database auth sync required: Run migration 022 in Supabase SQL Editor to repair user auth schema tokens.';
+      } else if (lower.contains('invalid login credentials') ||
+          lower.contains('invalid_credentials')) {
+        msg = 'Invalid email or password. If you recently created this admin, verify password or confirm user in Supabase.';
       } else if (lower.contains('email not confirmed')) {
         msg = 'Email not confirmed in Supabase. Please confirm this user in the Supabase Dashboard (Auth > Users > Confirm User).';
+      } else {
+        msg = str
+            .replaceAll('AuthRetryableFetchException(message: ', '')
+            .replaceAll('AuthApiException(message: ', '')
+            .replaceAll('AuthException(message: ', '')
+            .replaceAll('Exception: ', '');
+        if (msg.endsWith(')')) msg = msg.substring(0, msg.length - 1);
       }
       setState(() => _errorMsg = msg);
     } finally {
@@ -105,6 +141,198 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  Future<void> _showFirstTimePasswordResetDialog(BuildContext context, String? effectiveRole) async {
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isSaving = false;
+    String? dialogError;
+    bool obscureNew = true;
+    bool obscureConfirm = true;
+
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => PopScope(
+        canPop: false,
+        child: StatefulBuilder(
+          builder: (ctx, setDialogState) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: const RoundedRectangleBorder(
+              borderRadius: AppRadius.radiusXl,
+              side: BorderSide(color: AppColors.primaryContainer, width: 1.5),
+            ),
+            title: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.lock_reset, color: AppColors.primary, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('First-Time Security Setup', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('Create your personal password', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 18),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Your account was provisioned with a temporary initial password. Please set a new secure password to activate your federation console.',
+                            style: TextStyle(fontSize: 12, color: Colors.blue),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (dialogError != null) ...[
+                    Text(dialogError!, style: const TextStyle(color: Colors.red, fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 8),
+                  ],
+                  TextField(
+                    controller: newPasswordController,
+                    obscureText: obscureNew,
+                    decoration: InputDecoration(
+                      labelText: 'New Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscureNew ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setDialogState(() => obscureNew = !obscureNew),
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmPasswordController,
+                    obscureText: obscureConfirm,
+                    decoration: InputDecoration(
+                      labelText: 'Confirm New Password',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                        onPressed: () => setDialogState(() => obscureConfirm = !obscureConfirm),
+                      ),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              Navigator.of(dialogCtx).pop();
+                              await DI.authRepo.logout();
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.onSurfaceVariant,
+                        side: const BorderSide(color: AppColors.outline),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('Sign Out'),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              final newPw = newPasswordController.text.trim();
+                              final confirmPw = confirmPasswordController.text.trim();
+
+                              if (newPw.length < 6) {
+                                setDialogState(() => dialogError = 'Password must be at least 6 characters.');
+                                return;
+                              }
+                              if (newPw != confirmPw) {
+                                setDialogState(() => dialogError = 'Passwords do not match.');
+                                return;
+                              }
+
+                              setDialogState(() {
+                                isSaving = true;
+                                dialogError = null;
+                              });
+
+                              try {
+                                await DI.authRepo.updatePassword(newPw);
+                                if (dialogCtx.mounted) {
+                                  Navigator.of(dialogCtx).pop();
+                                }
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      backgroundColor: Colors.green,
+                                      content: Text('Password updated successfully! Welcome to your Console.'),
+                                    ),
+                                  );
+                                  if (effectiveRole == 'SUPER_ADMIN') {
+                                    Navigator.of(context).pushReplacementNamed('/super-admin/home');
+                                  } else {
+                                    Navigator.of(context).pushReplacementNamed('/admin/home');
+                                  }
+                                }
+                              } catch (err) {
+                                setDialogState(() {
+                                  isSaving = false;
+                                  dialogError = 'Failed to update password: $err';
+                                });
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: AppColors.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      child: isSaving
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Text('Save & Continue', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override

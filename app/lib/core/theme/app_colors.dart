@@ -1,84 +1,86 @@
 import 'package:flutter/material.dart';
 import '../models/booking_status.dart';
 
-/// Modern Urban Company / Elite Service Standard Color Palette for ShramSetu.
-/// Features Obsidian Black, Urban Company Royal Purple/Violet, and Emerald Trust Green.
+/// National Civic Infrastructure / Bharat DPI Sovereign Palette for ShramSetu.
+/// Reflects the Government of India Digital Public Infrastructure design system:
+/// Deep Sovereign Navy (#001026), Civic Navy Blue (#0B2545), Bharat Saffron (#A83900 & #FC6018),
+/// and Ashoka / Tricolor Civic Green (#001405 & #3A9E58).
 class AppColors {
-  // Primary - Urban Company Obsidian / Pure Black
-  static const Color primary = Color(0xFF111111);
+  // Primary - Deep Sovereign Navy / India Ink (#001026)
+  static const Color primary = Color(0xFF001026);
   static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color primaryContainer = Color(0xFF1C1B1B);
-  static const Color onPrimaryContainer = Color(0xFF858383);
-  static const Color primaryFixed = Color(0xFFE5E2E1);
-  static const Color primaryFixedDim = Color(0xFFC8C6C5);
-  static const Color onPrimaryFixed = Color(0xFF1C1B1B);
-  static const Color onPrimaryFixedVariant = Color(0xFF474646);
+  static const Color primaryContainer = Color(0xFF0B2545);
+  static const Color onPrimaryContainer = Color(0xFF778DB2);
+  static const Color primaryFixed = Color(0xFFD5E3FF);
+  static const Color primaryFixedDim = Color(0xFFB1C7F0);
+  static const Color onPrimaryFixed = Color(0xFF001C3B);
+  static const Color onPrimaryFixedVariant = Color(0xFF314769);
 
-  // Secondary - Urban Company Signature Royal Purple / Violet
-  static const Color secondary = Color(0xFF5A38E4);
+  // Secondary - Sovereign Saffron Ochre & Vibrant Bharat Saffron (#A83900 & #FC6018)
+  static const Color secondary = Color(0xFFA83900);
   static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color secondaryContainer = Color(0xFF7357FE);
-  static const Color onSecondaryContainer = Color(0xFFFFFBFF);
-  static const Color secondaryFixed = Color(0xFFE5DEFF);
-  static const Color secondaryFixedDim = Color(0xFFC8BFFF);
-  static const Color onSecondaryFixed = Color(0xFF1A0063);
-  static const Color onSecondaryFixedVariant = Color(0xFF4413D0);
+  static const Color secondaryContainer = Color(0xFFFC6018);
+  static const Color onSecondaryContainer = Color(0xFF531800);
+  static const Color secondaryFixed = Color(0xFFFFDBCF);
+  static const Color secondaryFixedDim = Color(0xFFFFB59A);
+  static const Color onSecondaryFixed = Color(0xFF380D00);
+  static const Color onSecondaryFixedVariant = Color(0xFF802A00);
 
-  // Tertiary - Emerald Verified / Cooperative Trust Green
-  static const Color tertiary = Color(0xFF002113);
+  // Tertiary - Ashoka / Tricolor Civic Green (#001405 & #3A9E58)
+  static const Color tertiary = Color(0xFF001405);
   static const Color onTertiary = Color(0xFFFFFFFF);
-  static const Color tertiaryContainer = Color(0xFFECFDF3);
-  static const Color onTertiaryContainer = Color(0xFF027A48);
-  static const Color tertiaryFixed = Color(0xFF8DF7C1);
-  static const Color tertiaryFixedDim = Color(0xFF71DBA6);
-  static const Color onTertiaryFixed = Color(0xFF002113);
-  static const Color onTertiaryFixedVariant = Color(0xFF005235);
+  static const Color tertiaryContainer = Color(0xFF002C10);
+  static const Color onTertiaryContainer = Color(0xFF3A9E58);
+  static const Color tertiaryFixed = Color(0xFF93F8A8);
+  static const Color tertiaryFixedDim = Color(0xFF77DB8E);
+  static const Color onTertiaryFixed = Color(0xFF00210B);
+  static const Color onTertiaryFixedVariant = Color(0xFF005224);
 
-  // Error - Clean Coral / Crimson
+  // Error - Clean Crimson
   static const Color error = Color(0xFFBA1A1A);
   static const Color onError = Color(0xFFFFFFFF);
   static const Color errorContainer = Color(0xFFFFDAD6);
   static const Color onErrorContainer = Color(0xFF93000A);
 
-  // Surface & Background - Ultra Clean Urban Company Light Gray / Crisp Minimal
-  static const Color background = Color(0xFFF8F8FA);
-  static const Color onBackground = Color(0xFF1A1B1F);
-  static const Color surface = Color(0xFFF8F8FA);
-  static const Color onSurface = Color(0xFF1A1B1F);
-  static const Color surfaceVariant = Color(0xFFE3E2E7);
-  static const Color onSurfaceVariant = Color(0xFF6B7280);
+  // Surface & Background - Sovereign Light Civic (#F7F9FC)
+  static const Color background = Color(0xFFF7F9FC);
+  static const Color onBackground = Color(0xFF191C1E);
+  static const Color surface = Color(0xFFF7F9FC);
+  static const Color onSurface = Color(0xFF191C1E);
+  static const Color surfaceVariant = Color(0xFFE0E3E6);
+  static const Color onSurfaceVariant = Color(0xFF44474E);
   
   static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color surfaceContainerLow = Color(0xFFF4F3F8);
-  static const Color surfaceContainer = Color(0xFFEFEDF3);
-  static const Color surfaceContainerHigh = Color(0xFFE9E7ED);
-  static const Color surfaceContainerHighest = Color(0xFFE3E2E7);
+  static const Color surfaceContainerLow = Color(0xFFF2F4F7);
+  static const Color surfaceContainer = Color(0xFFECEEF1);
+  static const Color surfaceContainerHigh = Color(0xFFE6E8EB);
+  static const Color surfaceContainerHighest = Color(0xFFE0E3E6);
   
-  static const Color surfaceBright = Color(0xFFFAF8FE);
-  static const Color surfaceDim = Color(0xFFDBD9DF);
-  static const Color surfaceTint = Color(0xFF5A38E4);
+  static const Color surfaceBright = Color(0xFFF7F9FC);
+  static const Color surfaceDim = Color(0xFFD8DADD);
+  static const Color surfaceTint = Color(0xFF495F82);
 
-  // Outline - Subtle Modern Borders
-  static const Color outline = Color(0xFF747878);
-  static const Color outlineVariant = Color(0xFFEAEAEA);
+  // Outline - Subtle Civic Borders
+  static const Color outline = Color(0xFF74777F);
+  static const Color outlineVariant = Color(0xFFC4C6CF);
 
-  // Warning - Warm Amber / Gold
+  // Warning - Warm Saffron Amber
   static const Color warning = Color(0xFFB54708);
   static const Color onWarning = Color(0xFFFFFFFF);
   static const Color warningContainer = Color(0xFFFEF0C7);
   static const Color onWarningContainer = Color(0xFF7A4100);
 
-  // Success - Emerald Cooperative
-  static const Color success = Color(0xFF027A48);
+  // Success - Ashoka Green
+  static const Color success = Color(0xFF3A9E58);
   static const Color onSuccess = Color(0xFFFFFFFF);
-  static const Color successContainer = Color(0xFFECFDF3);
-  static const Color onSuccessContainer = Color(0xFF027A48);
+  static const Color successContainer = Color(0xFFE6F7EC);
+  static const Color onSuccessContainer = Color(0xFF005224);
 
-  // Info - Royal Violet
-  static const Color info = Color(0xFF5A38E4);
+  // Info - Deep Civic Blue
+  static const Color info = Color(0xFF0B2545);
   static const Color onInfo = Color(0xFFFFFFFF);
-  static const Color infoContainer = Color(0xFFE5DEFF);
-  static const Color onInfoContainer = Color(0xFF1A0063);
+  static const Color infoContainer = Color(0xFFD5E3FF);
+  static const Color onInfoContainer = Color(0xFF001C3B);
 
   // Semantic UI Aliases
   static const Color textPrimary = primary;
@@ -87,14 +89,16 @@ class AppColors {
   static const Color border = outlineVariant;
   static const Color divider = outlineVariant;
   static const Color cardBackground = surfaceContainerLowest;
-  static const Color starRating = Color(0xFFF59E0B);
+  static const Color starRating = Color(0xFFFC6018);
   static const Color disabled = Color(0xFF9E9E9E);
   static const Color disabledContainer = surfaceContainerLow;
 
-  // National Identity & Civic Indicators
-  static const Color flagSaffron = Color(0xFFFF9933);
-  static const Color flagNavy = Color(0xFF000080);
-  static const Color flagGreen = Color(0xFF138808);
+  // National Identity & Civic Indicators (Tricolor)
+  static const Color flagSaffron = Color(0xFFFC6018);
+  static const Color flagNavy = Color(0xFF0B2545);
+  static const Color flagGreen = Color(0xFF3A9E58);
+  static const Color civicVerifiedGreen = Color(0xFF3A9E58);
+  static const Color tertiaryFixedVariant = onTertiaryFixedVariant;
 
   // ──────────────── Status Visual Helpers ────────────────
 

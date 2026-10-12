@@ -104,7 +104,7 @@ class InvoiceModel {
       customerPhone: customer['phone'] as String?,
       workerName: (worker['name'] ?? worker['full_name'] ?? 'Certified Union Artisan').toString(),
       workerTrade: (worker['trade'] ?? worker['primary_skill'] ?? 'Specialist Artisan').toString(),
-      federationName: (worker['federation_name'] as String?) ?? 'Pune District Labour Cooperative Federation',
+      federationName: (worker['federation_name'] as String?) ?? 'Cooperative Federation',
       federationRegNo: (worker['federation_reg_no'] as String?) ?? 'MH-COOP-VERIFIED',
       serviceName: (booking['service_name'] as String?) ?? 'Home Maintenance Service',
       serviceLocation: location.isNotEmpty ? location : 'Service Address, Maharashtra',

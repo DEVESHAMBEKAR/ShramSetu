@@ -4,31 +4,57 @@
 library;
 
 enum InsuranceStatus {
-  active,
+  notApplied,
   pending,
+  active,
   expired,
   suspended;
 
-  String toDbString() => name.toUpperCase();
+  String toDbString() {
+    switch (this) {
+      case InsuranceStatus.notApplied:
+        return 'NOT_APPLIED';
+      case InsuranceStatus.pending:
+        return 'PENDING';
+      case InsuranceStatus.active:
+        return 'ACTIVE';
+      case InsuranceStatus.expired:
+        return 'EXPIRED';
+      case InsuranceStatus.suspended:
+        return 'SUSPENDED';
+    }
+  }
 
   static InsuranceStatus fromDbString(String? val) {
-    if (val == null) return InsuranceStatus.pending;
+    if (val == null) return InsuranceStatus.notApplied;
     switch (val.trim().toUpperCase()) {
-      case 'ACTIVE': return InsuranceStatus.active;
-      case 'EXPIRED': return InsuranceStatus.expired;
-      case 'SUSPENDED': return InsuranceStatus.suspended;
+      case 'ACTIVE':
+        return InsuranceStatus.active;
+      case 'EXPIRED':
+        return InsuranceStatus.expired;
+      case 'SUSPENDED':
+        return InsuranceStatus.suspended;
       case 'PENDING':
-      default:
+      case 'PENDING_APPROVAL':
         return InsuranceStatus.pending;
+      case 'NOT_APPLIED':
+      default:
+        return InsuranceStatus.notApplied;
     }
   }
 
   String get displayLabel {
     switch (this) {
-      case InsuranceStatus.active: return 'Active Policy';
-      case InsuranceStatus.pending: return 'Under Verification';
-      case InsuranceStatus.expired: return 'Policy Expired';
-      case InsuranceStatus.suspended: return 'Suspended';
+      case InsuranceStatus.notApplied:
+        return 'Not Applied';
+      case InsuranceStatus.pending:
+        return 'Pending Approval';
+      case InsuranceStatus.active:
+        return 'Active Policy';
+      case InsuranceStatus.expired:
+        return 'Policy Expired';
+      case InsuranceStatus.suspended:
+        return 'Suspended';
     }
   }
 }
@@ -43,8 +69,10 @@ enum InsuranceVerificationStatus {
   static InsuranceVerificationStatus fromDbString(String? val) {
     if (val == null) return InsuranceVerificationStatus.pending;
     switch (val.trim().toUpperCase()) {
-      case 'VERIFIED': return InsuranceVerificationStatus.verified;
-      case 'REJECTED': return InsuranceVerificationStatus.rejected;
+      case 'VERIFIED':
+        return InsuranceVerificationStatus.verified;
+      case 'REJECTED':
+        return InsuranceVerificationStatus.rejected;
       case 'PENDING':
       default:
         return InsuranceVerificationStatus.pending;
@@ -71,32 +99,38 @@ class WorkerInsuranceModel {
   WorkerInsuranceModel({
     String? id,
     required this.workerId,
-    this.providerName = 'National Insurance Co. / Union Group Policy',
+    this.providerName = 'Maharashtra State Cooperative Labour Federation Welfare Pool',
     required this.policyNumber,
-    this.coverageType = 'Accidental & Health Insurance',
+    this.coverageType = 'Accidental & Medical Health Cover',
     this.coverageAmount = 500000.0,
     DateTime? startDate,
     DateTime? expiryDate,
     DateTime? validUntil,
     this.status = InsuranceStatus.active,
-    this.verificationStatus = InsuranceVerificationStatus.verified,
+    this.verificationStatus = InsuranceVerificationStatus.pending,
     this.adminRemarks,
-    this.claimSupportPhone,
+    this.claimSupportPhone = '1800-266-9090',
     this.claimInstructions,
     this.isExternalIntegrationPending = true,
   })  : id = id ?? 'ins-$workerId',
-        startDate = startDate ?? DateTime.now().subtract(const Duration(days: 30)),
-        expiryDate = expiryDate ?? validUntil ?? DateTime.now().add(const Duration(days: 335));
+        startDate = startDate ?? DateTime.now(),
+        expiryDate = expiryDate ?? validUntil ?? DateTime.now().add(const Duration(days: 365));
 
   DateTime get validUntil => expiryDate;
 
   /// Returns masked policy number (e.g., 'POL-••••-4921') to protect worker sensitive data.
   String get maskedPolicyNumber {
+    if (policyNumber == 'PENDING_APPROVAL' || policyNumber.isEmpty) {
+      return 'Pending Issuance';
+    }
     if (policyNumber.length <= 4) return policyNumber;
     final last4 = policyNumber.substring(policyNumber.length - 4);
     return 'POL-••••-$last4';
   }
 
+  bool get isPendingApproval => status == InsuranceStatus.pending;
+  bool get isApproved => status == InsuranceStatus.active;
+  bool get isNotApplied => status == InsuranceStatus.notApplied;
   bool get isExpired => DateTime.now().isAfter(expiryDate);
 
   factory WorkerInsuranceModel.fromJson(Map<String, dynamic> json) {

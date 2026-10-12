@@ -165,6 +165,8 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
                   children: [
                     Text(worker.name, style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                     Text(worker.phone, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
+                    if (worker.email != null && worker.email!.isNotEmpty)
+                      Text(worker.email!, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 12)),
                     const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -211,6 +213,32 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
           _buildAvailabilityToggle(worker),
           const Divider(height: 1, indent: 56),
           ListTile(
+            leading: const Icon(Icons.verified_user_outlined, color: AppColors.primary),
+            title: Row(
+              children: [
+                Text('Account Credentials', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8F5E9),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: const Color(0xFF81C784)),
+                  ),
+                  child: const Text('Required', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                ),
+              ],
+            ),
+            subtitle: Text(
+              'Mobile: ${worker.phone}\nEmail: ${worker.email?.isNotEmpty == true ? worker.email! : 'Not set (Required)'}',
+              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, height: 1.3),
+            ),
+            isThreeLine: true,
+            trailing: const Icon(Icons.edit_outlined, color: AppColors.primary, size: 20),
+            onTap: () => _showEditCredentialsDialog(worker),
+          ),
+          const Divider(height: 1, indent: 56),
+          ListTile(
             leading: const Icon(Icons.verified, color: AppColors.onTertiaryContainer),
             title: Text('KYC Verification', style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold)),
             subtitle: Text('Identity & Documents Verified', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
@@ -241,6 +269,140 @@ class _WorkerProfileSettingsScreenState extends State<WorkerProfileSettingsScree
           ),
         ],
       ),
+    );
+  }
+
+  void _showEditCredentialsDialog(WorkerProfile worker) {
+    final formKey = GlobalKey<FormState>();
+    final phoneCtrl = TextEditingController(text: worker.phone);
+    final emailCtrl = TextEditingController(text: worker.email ?? '');
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surfaceContainerLowest,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: AppSpacing.marginMobile,
+                right: AppSpacing.marginMobile,
+                top: AppSpacing.spacingMd,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + AppSpacing.spacingMd,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text('Update Account Credentials', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.pop(ctx),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Both mobile phone and email are required for official union credentials and payouts.',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: phoneCtrl,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Mobile Number *',
+                        prefixIcon: const Icon(Icons.phone_outlined, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Mobile number is required.';
+                        final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+                        if (clean.length != 10) return 'Enter a valid 10-digit mobile number.';
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email Address *',
+                        prefixIcon: const Icon(Icons.email_outlined, size: 20),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) return 'Email address is required.';
+                        if (!RegExp(r'^[\w\.-]+@[\w-]+\.\w{2,}$').hasMatch(val.trim())) {
+                          return 'Enter a valid email address.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: AppColors.onPrimary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setModalState(() => isSaving = true);
+                                try {
+                                  await DI.workerRepo.updateWorkerCredentials(
+                                    worker.id,
+                                    phone: phoneCtrl.text.trim(),
+                                    email: emailCtrl.text.trim(),
+                                  );
+                                  if (ctx.mounted) {
+                                    Navigator.pop(ctx);
+                                  }
+                                  _refreshData();
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Account credentials updated successfully.'),
+                                        backgroundColor: AppColors.primary,
+                                      ),
+                                    );
+                                  }
+                                } catch (e) {
+                                  setModalState(() => isSaving = false);
+                                  if (mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(content: Text('Failed to update credentials: $e')),
+                                    );
+                                  }
+                                }
+                              },
+                        child: isSaving
+                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            : const Text('Save Credentials', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 

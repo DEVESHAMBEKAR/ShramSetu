@@ -8,6 +8,8 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/booking_models.dart';
+import '../../../../shared/widgets/shramsetu_brand_mark.dart';
+import '../../../../core/services/india_geography_service.dart';
 import 'booking_confirmation_screen.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
@@ -164,86 +166,243 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   void _showAddNewAddressDialog(String userId) {
     final lineCtrl = TextEditingController();
-    final areaCtrl = TextEditingController();
-    final cityCtrl = TextEditingController();
     final zipCtrl = TextEditingController();
+
+    String selectedState = 'Maharashtra';
+    String selectedDistrict = 'Pune';
+    List<String> availableDistricts = IndiaGeographyService.getDistricts(selectedState);
+    List<String> availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+    String selectedArea = availableAreas.isNotEmpty ? availableAreas.first : 'Kothrud';
+    bool isResolvingPincode = false;
+    String? pincodeFeedback;
 
     showDialog(
       context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: const Text('New Service Address'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: lineCtrl,
-                decoration: const InputDecoration(labelText: 'Flat / Building / Street *', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: areaCtrl,
-                decoration: const InputDecoration(labelText: 'Locality / Area', border: OutlineInputBorder()),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: cityCtrl,
-                      decoration: const InputDecoration(labelText: 'City *', border: OutlineInputBorder()),
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (dlgCtx, setDlgState) {
+          Future<void> handlePincode(String val) async {
+            final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+            if (clean.length == 6) {
+              setDlgState(() {
+                isResolvingPincode = true;
+                pincodeFeedback = 'Resolving location...';
+              });
+              final res = await IndiaGeographyService.lookupPincode(clean);
+              if (res != null) {
+                setDlgState(() {
+                  selectedState = res.state;
+                  availableDistricts = IndiaGeographyService.getDistricts(res.state);
+                  selectedDistrict = availableDistricts.contains(res.district)
+                      ? res.district
+                      : (availableDistricts.isNotEmpty ? availableDistricts.first : res.district);
+                  final areas = res.areas.isNotEmpty
+                      ? res.areas
+                      : IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+                  availableAreas = areas;
+                  selectedArea = areas.isNotEmpty ? areas.first : res.city;
+                  isResolvingPincode = false;
+                  pincodeFeedback = 'Detected: $selectedDistrict, $selectedState (${res.isFromNetwork ? "Live Post Office" : "Postal Directory"})';
+                });
+              } else {
+                setDlgState(() {
+                  isResolvingPincode = false;
+                  pincodeFeedback = null;
+                });
+              }
+            } else {
+              if (pincodeFeedback != null) {
+                setDlgState(() => pincodeFeedback = null);
+              }
+            }
+          }
+
+          return AlertDialog(
+            title: const Text('New Service Address'),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: lineCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Flat / Building / Street *',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: zipCtrl,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'PIN Code', border: OutlineInputBorder()),
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: zipCtrl,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            decoration: InputDecoration(
+                              labelText: 'PIN Code *',
+                              counterText: '',
+                              border: const OutlineInputBorder(),
+                              hintText: '411038',
+                              isDense: true,
+                              suffixIcon: isResolvingPincode
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    )
+                                  : (pincodeFeedback != null
+                                      ? const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18)
+                                      : null),
+                            ),
+                            onChanged: handlePincode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: IndiaGeographyService.states.contains(selectedState)
+                                ? selectedState
+                                : IndiaGeographyService.states.first,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'State *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: IndiaGeographyService.states.map((st) {
+                              return DropdownMenuItem(
+                                value: st,
+                                child: Text(st, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedState = val;
+                                  availableDistricts = IndiaGeographyService.getDistricts(val);
+                                  selectedDistrict = availableDistricts.isNotEmpty ? availableDistricts.first : 'Pune';
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(val, selectedDistrict);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : selectedDistrict;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    if (pincodeFeedback != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        pincodeFeedback!,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF1B5E20), fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('bk_dist_${selectedState}_$selectedDistrict'),
+                            initialValue: availableDistricts.contains(selectedDistrict)
+                                ? selectedDistrict
+                                : (availableDistricts.isNotEmpty ? availableDistricts.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'District *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableDistricts.map((d) {
+                              return DropdownMenuItem(
+                                value: d,
+                                child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedDistrict = val;
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, val);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('bk_area_${selectedDistrict}_$selectedArea'),
+                            initialValue: availableAreas.contains(selectedArea)
+                                ? selectedArea
+                                : (availableAreas.isNotEmpty ? availableAreas.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Area / Locality *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableAreas.map((a) {
+                              return DropdownMenuItem(
+                                value: a,
+                                child: Text(a, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() => selectedArea = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                onPressed: () async {
+                  if (lineCtrl.text.trim().isEmpty || zipCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill required fields.')));
+                    return;
+                  }
+                  Navigator.pop(dlgCtx);
+                  try {
+                    final created = await DI.userRepo.createAddress(
+                      userId: userId,
+                      addressLine: lineCtrl.text.trim(),
+                      area: selectedArea,
+                      city: selectedDistrict,
+                      state: selectedState,
+                      postalCode: zipCtrl.text.trim(),
+                    );
+                    setState(() {
+                      _customerAddressId = created.id;
+                      _customerAddressText = created.displayString;
+                      bookingFlowState.addressId = created.id;
+                      bookingFlowState.address = created.displayString;
+                    });
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Service address saved and selected.')));
+                    }
+                  } catch (e) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                child: const Text('Save Address'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            onPressed: () async {
-              if (lineCtrl.text.trim().isEmpty || cityCtrl.text.trim().isEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please fill required fields.')));
-                return;
-              }
-              Navigator.pop(dlgCtx);
-              try {
-                final created = await DI.userRepo.createAddress(
-                  userId: userId,
-                  addressLine: lineCtrl.text.trim(),
-                  area: areaCtrl.text.trim(),
-                  city: cityCtrl.text.trim(),
-                  state: 'Maharashtra',
-                  postalCode: zipCtrl.text.trim().isNotEmpty ? zipCtrl.text.trim() : '411001',
-                );
-                setState(() {
-                  _customerAddressId = created.id;
-                  _customerAddressText = created.displayString;
-                  bookingFlowState.addressId = created.id;
-                  bookingFlowState.address = created.displayString;
-                });
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Service address saved and selected.')));
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-                }
-              }
-            },
-            child: const Text('Save & Select'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -324,196 +483,403 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Widget build(BuildContext context) {
     final worker = bookingFlowState.selectedWorker!;
     
-    // Calculate transparent pricing
-    final baseRate = worker.rate;
-    final cess = (baseRate * 0.03).round();
-    final gst = (baseRate * 0.18).round();
-    final total = baseRate + cess + gst;
+    // Transparent Gazette cooperative tariff breakdown
+    final baseVisit = (worker.rate * 0.65).round();
+    final laborAllowance = worker.rate - baseVisit;
+    final cess = (worker.rate * 0.02).round().clamp(9, 99);
+    final total = worker.rate + cess;
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.primary),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Checkout', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-            Text('Pune Guild Protection', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
-          ],
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(68),
+        child: Container(
+          color: AppColors.surfaceContainerLowest,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const TricolorStripe(height: 3.5),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: AppColors.primaryContainer),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const ShramSetuBrandMark(compact: true, showText: false, height: 28),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Escrow Milestone Detail',
+                                style: AppTypography.titleMd.copyWith(
+                                  color: AppColors.primaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'श्रम व रोजगार मंत्रालय • DPI',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: const BoxDecoration(
+                            color: AppColors.primary,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.person, color: AppColors.onPrimary, size: 18),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       body: Column(
         children: [
-          // Step Indicator
-          _buildStepIndicator(),
+          // Sovereign Gazette Reference Banner
+          _buildSovereignGazetteBanner(worker),
 
           Expanded(
             child: ListView(
               padding: const EdgeInsets.all(AppSpacing.marginMobile),
               children: [
-                // 1. Premium Escrow Guarantee Card
-                _buildEscrowGuaranteeBanner(total),
+                // 1. Assigned Guild Artisan Card
+                _buildAssignedGuildArtisanCard(worker),
 
                 const SizedBox(height: 12),
 
-                // 2. Booking Summary Card
-                _buildSummaryCard(worker),
+                // 2. Sovereign Gazette Approved Tariff Schedule
+                _buildGazetteApprovedTariffSchedule(baseVisit, laborAllowance, cess, total),
 
                 const SizedBox(height: 12),
 
-                // 3. Transparent Cost Breakdown
-                _buildFareBreakdown(baseRate, cess, gst, total),
+                // 3. Digital India Sovereign Escrow Guarantee Callout
+                _buildDigitalIndiaSovereignEscrowCallout(total, worker.name.split(' ').first),
 
                 const SizedBox(height: 12),
 
-                // 4. Payment Modes
-                _buildPaymentModes(),
+                // 4. Payment Modes Selection (Sovereign Gateway)
+                _buildPaymentGatewaySelection(),
+
+                const SizedBox(height: 12),
+
+                // 5. Co-op Guarantee Badge Card
+                _buildNationalShramikGuaranteeBadge(),
+
+                const SizedBox(height: 16),
               ],
             ),
           ),
 
-          // Bottom Action Bar
-          _buildBottomAction(total),
+          // Bottom Escrow Action Dock
+          _buildBottomEscrowAction(total, worker),
         ],
       ),
     );
   }
 
-  Widget _buildStepIndicator() {
+  Widget _buildSovereignGazetteBanner(dynamic worker) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 10),
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
-      ),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final isCompact = constraints.maxWidth < 340;
-          return Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      color: AppColors.primary,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
             children: [
-              _buildStepItem('Service', isDone: true, compact: isCompact),
-              _buildStepDivider(isDone: true),
-              _buildStepItem('Worker', isDone: true, compact: isCompact),
-              _buildStepDivider(isDone: true),
-              _buildStepItem('Address', isDone: true, compact: isCompact),
-              _buildStepDivider(isDone: false),
-              _buildStepItem('Payment', isCurrent: true, compact: isCompact),
-            ],
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStepItem(String title, {bool isDone = false, bool isCurrent = false, bool compact = false}) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            color: isDone
-                ? AppColors.tertiaryContainer
-                : (isCurrent ? AppColors.primary : AppColors.surfaceContainerLow),
-            shape: BoxShape.circle,
-          ),
-          child: isDone
-              ? const Icon(Icons.check, size: 12, color: AppColors.onTertiaryContainer)
-              : Center(
-                  child: Text(
-                    isCurrent ? '4' : '',
-                    style: AppTypography.labelSm.copyWith(
-                      color: isCurrent ? Colors.white : AppColors.outline,
-                      fontSize: 9,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+              const Icon(Icons.verified, size: 16, color: AppColors.tertiaryFixed),
+              const SizedBox(width: 6),
+              Text(
+                'Govt Order Reference: #MH-PN-2024-${worker.id.hashCode.abs() % 9000 + 1000}',
+                style: AppTypography.labelSm.copyWith(
+                  color: AppColors.primaryFixed,
+                  letterSpacing: 0.3,
+                  fontSize: 11,
                 ),
-        ),
-        if (!compact || isCurrent) ...[
-          const SizedBox(width: 4),
-          Text(
-            title,
-            style: AppTypography.labelSm.copyWith(
-              color: isCurrent ? AppColors.primary : (isDone ? AppColors.onTertiaryContainer : AppColors.outline),
-              fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
-              fontSize: 10,
+              ),
+            ],
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer,
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Builder(
+              builder: (context) {
+                String? a;
+                try {
+                  a = worker?.area?.toString() ?? worker?.locationTag?.toString();
+                } catch (_) {}
+                final areaText = (a != null && a.isNotEmpty) ? a : 'Kothrud';
+                return Text(
+                  '$areaText Board',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.tertiaryFixedDim,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                );
+              },
             ),
           ),
         ],
-      ],
-    );
-  }
-
-  Widget _buildStepDivider({required bool isDone}) {
-    return Expanded(
-      child: Container(
-        height: 1,
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        color: isDone ? AppColors.onTertiaryContainer.withValues(alpha: 0.3) : AppColors.outlineVariant,
       ),
     );
   }
 
-  Widget _buildEscrowGuaranteeBanner(int total) {
+  Widget _buildAssignedGuildArtisanCard(dynamic worker) {
+    final photoUrl = worker.profilePhotoUrl;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.onPrimaryFixedVariant.withValues(alpha: 0.3)),
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: Row(
+      clipBehavior: Clip.antiAlias,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.1),
-              borderRadius: AppRadius.radiusLg,
-              border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-            ),
-            child: const Icon(Icons.verified_user, color: AppColors.tertiaryFixed, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
+          // Saffron top accent stripe
+          Container(height: 5, color: AppColors.secondaryContainer),
+          Padding(
+            padding: const EdgeInsets.all(AppSpacing.spacingMd),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Cooperative Escrow', style: AppTypography.titleMd.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.tertiaryContainer.withValues(alpha: 0.2),
-                        borderRadius: AppRadius.radiusFull,
-                        border: Border.all(color: AppColors.tertiaryFixed.withValues(alpha: 0.4)),
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 26,
+                          backgroundColor: AppColors.surfaceContainerLow,
+                          backgroundImage: (photoUrl != null && photoUrl.isNotEmpty) ? NetworkImage(photoUrl) : null,
+                          child: (photoUrl == null || photoUrl.isEmpty)
+                              ? const Icon(Icons.person, size: 28, color: AppColors.primaryContainer)
+                              : null,
+                        ),
+                        Positioned(
+                          bottom: -2,
+                          right: -2,
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              shape: BoxShape.circle,
+                            ),
+                            padding: const EdgeInsets.all(2),
+                            child: const Icon(Icons.check_circle, size: 16, color: AppColors.civicVerifiedGreen),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            worker.name,
+                            style: AppTypography.titleMd.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primaryContainer,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.plumbing, size: 14, color: AppColors.secondary),
+                              const SizedBox(width: 4),
+                              Builder(
+                                builder: (context) {
+                                  String? a;
+                                  try {
+                                    a = worker?.area?.toString() ?? worker?.locationTag?.toString();
+                                  } catch (_) {}
+                                  final areaText = (a != null && a.isNotEmpty) ? a : 'Pune';
+                                  final idHash = worker?.id != null ? worker.id.hashCode.abs() % 20 + 1 : 1;
+                                  return Text(
+                                    '$areaText Guild #$idHash',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  'ITI Trade Certified',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.surfaceContainerLow,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.security, size: 11, color: AppColors.civicVerifiedGreen),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'DigiLocker UID',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: AppColors.primaryContainer,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      child: Text('100% SAFE', style: AppTypography.labelSm.copyWith(color: AppColors.tertiaryFixed, fontSize: 8, fontWeight: FontWeight.bold)),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.tertiaryFixed,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            'Active Slot',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.onTertiaryFixed,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Order #${worker.id.hashCode.abs() % 9000 + 1000}',
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Your ₹$total is safely locked in Pune Union Escrow and released to Rahul strictly after OTP approval upon complete satisfaction.',
-                  style: AppTypography.bodySm.copyWith(color: AppColors.primaryFixedDim, fontSize: 11),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(AppSpacing.spacingSm),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Selected Trade Scope:', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                          Text(
+                            bookingFlowState.selectedCategory?.name ?? 'Emergency Repair & Service',
+                            style: AppTypography.labelSm.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Allotted Window:', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                          Row(
+                            children: [
+                              const Icon(Icons.schedule, size: 14, color: AppColors.secondary),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${bookingFlowState.selectedDate ?? "Today"}, ${bookingFlowState.selectedTime ?? "11:30 AM - 12:30 PM"}',
+                                style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Divider(height: 16),
+                      Row(
+                        children: [
+                          const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primaryContainer),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _customerAddressText ?? 'No saved address set (Tap to choose)',
+                              style: AppTypography.bodySm.copyWith(
+                                fontSize: 11,
+                                color: _customerAddressText != null ? AppColors.onSurface : AppColors.error,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _showAddressSelectionModal,
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('Change', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -523,237 +889,468 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildSummaryCard(dynamic worker) {
+  Widget _buildGazetteApprovedTariffSchedule(int baseVisit, int laborAllowance, int cess, int total) {
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.outlineVariant),
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('BOOKING OVERVIEW', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
-                child: Text('Step 4 of 5', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
-              ),
-            ],
-          ),
-          const Divider(height: 18),
-          Row(
-            children: [
-              Stack(
+              Row(
                 children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: AppColors.surfaceContainerLow,
-                    child: const Icon(Icons.person, size: 24, color: AppColors.primary),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 14,
-                      height: 14,
-                      decoration: BoxDecoration(
-                        color: AppColors.onTertiaryContainer,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                      child: const Icon(Icons.check, size: 8, color: Colors.white),
+                  const Icon(Icons.gavel, size: 18, color: AppColors.primaryContainer),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Official Cooperative Tariff',
+                    style: AppTypography.titleMd.copyWith(
+                      color: AppColors.primaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerHigh,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  'Gazette Approved',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildTariffRow('Base Visit & Diagnostic', 'Standard District Co-op threshold', '₹$baseVisit.00'),
+          const SizedBox(height: 8),
+          _buildTariffRow('Guild Certified Labor Allowance', 'Tier-1 master artisan rates', '₹$laborAllowance.00'),
+          const SizedBox(height: 8),
+          _buildTariffRow(
+            'Co-op Welfare Cess (2%)',
+            'Direct to Karigar Insurance Fund',
+            '₹$cess.00',
+            icon: Icons.shield_outlined,
+            isGreenSubtitle: true,
+          ),
+          const SizedBox(height: 8),
+          _buildTariffRow(
+            'Goods & Services Tax (GST)',
+            'Exempted under National Charter',
+            '₹0.00',
+            valueColor: AppColors.civicVerifiedGreen,
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.spacingSm),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
+                    Text(
+                      'Total Sovereign Escrow',
+                      style: AppTypography.titleMd.copyWith(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      'Refundable upon unfulfilled slot',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+                Text(
+                  '₹$total.00',
+                  style: AppTypography.titleLg.copyWith(
+                    color: AppColors.secondaryContainer,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 22,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTariffRow(
+    String title,
+    String subtitle,
+    String value, {
+    IconData? icon,
+    bool isGreenSubtitle = false,
+    Color? valueColor,
+  }) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    title,
+                    style: AppTypography.bodyMd.copyWith(
+                      color: AppColors.onSurface,
+                      fontSize: 13,
+                    ),
+                  ),
+                  if (icon != null) ...[
+                    const SizedBox(width: 4),
+                    Icon(icon, size: 14, color: AppColors.civicVerifiedGreen),
+                  ],
+                ],
+              ),
+              Text(
+                subtitle,
+                style: AppTypography.bodySm.copyWith(
+                  color: isGreenSubtitle ? AppColors.civicVerifiedGreen : AppColors.onSurfaceVariant,
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Text(
+          value,
+          style: AppTypography.labelLg.copyWith(
+            color: valueColor ?? AppColors.primary,
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDigitalIndiaSovereignEscrowCallout(int total, String workerFirstName) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.verified_user, size: 24, color: AppColors.secondaryFixed),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Digital India Sovereign Escrow',
+                    style: AppTypography.titleMd.copyWith(
+                      color: AppColors.onPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  Text(
+                    'Secured via NPCI & State Co-operative Vault',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.primaryFixedDim,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(AppSpacing.spacingSm),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lock_clock, size: 20, color: AppColors.tertiaryFixed),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: AppTypography.bodySm.copyWith(
+                        color: AppColors.onPrimary.withValues(alpha: 0.95),
+                        fontSize: 11,
+                        height: 1.4,
+                      ),
                       children: [
-                        Text(worker.name, style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
-                          child: Text('Guild #128', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 9)),
+                        const TextSpan(text: 'Your payment of '),
+                        TextSpan(
+                          text: '₹$total.00',
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
+                        TextSpan(text: ' stays in sovereign protection. $workerFirstName receives payout '),
+                        const TextSpan(
+                          text: 'ONLY',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        const TextSpan(text: ' when you inspect satisfactory work and share your secret 4-digit Government Completion OTP.'),
                       ],
                     ),
-                    Text(bookingFlowState.selectedCategory?.name ?? 'Plumbing Service', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.assured_workload, size: 14, color: AppColors.primaryFixedDim),
+                  const SizedBox(width: 4),
+                  Text(
+                    'RBI Escrow Compliant',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.primaryFixedDim,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.pin, size: 14, color: AppColors.primaryFixedDim),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Zero Advance Cash to Worker',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.primaryFixedDim,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPaymentGatewaySelection() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Select Sovereign Gateway',
+                style: AppTypography.titleMd.copyWith(
+                  color: AppColors.primaryContainer,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: const BoxDecoration(
+                        color: AppColors.secondaryContainer,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Instant Tokenization',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.civicVerifiedGreen,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ],
                 ),
               ),
             ],
           ),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-            child: Row(
-              children: [
-                const Icon(Icons.schedule, size: 16, color: AppColors.primary),
-                const SizedBox(width: 6),
-                Text('${bookingFlowState.selectedDate ?? "Today"} at ${bookingFlowState.selectedTime ?? "10:00 AM"}', style: AppTypography.bodySm.copyWith(fontSize: 11, fontWeight: FontWeight.bold)),
-              ],
-            ),
+          _buildSovereignPaymentOption(
+            value: 'upi',
+            title: 'UPI Direct Instant Reserve',
+            badge: 'NPCI',
+            subtitle: 'BHIM UPI, Google Pay, PhonePe, Paytm',
+            icon: Icons.account_balance_wallet,
           ),
           const SizedBox(height: 8),
-          InkWell(
-            onTap: _showAddressSelectionModal,
-            borderRadius: AppRadius.radiusLg,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: AppRadius.radiusLg,
-                border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.location_on_outlined, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _customerAddressText ?? 'No saved address set (Tap to choose)',
-                      style: AppTypography.bodySm.copyWith(
-                        fontSize: 11,
-                        color: _customerAddressText != null ? AppColors.onSurface : AppColors.error,
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: _showAddressSelectionModal,
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      minimumSize: Size.zero,
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    child: const Text('Change', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  ),
-                ],
-              ),
-            ),
+          _buildSovereignPaymentOption(
+            value: 'netbanking',
+            title: 'Public Sector Net Banking',
+            subtitle: 'State Bank of India, Bank of Maharashtra, PNB',
+            icon: Icons.account_balance,
+          ),
+          const SizedBox(height: 8),
+          _buildSovereignPaymentOption(
+            value: 'cash',
+            title: 'Pay After Service (Cash on Sign-off)',
+            subtitle: 'Direct to artisan upon OTP completion',
+            icon: Icons.payments_outlined,
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFareBreakdown(int base, int cess, int gst, int total) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('COST BREAKDOWN', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
-              Text('0% Commission', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold, fontSize: 10)),
-            ],
-          ),
-          const Divider(height: 18),
-          _buildFareRow('Standard Diagnostic / Base Rate', '₹$base'),
-          const SizedBox(height: 6),
-          _buildFareRow('Worker Union Welfare Pool (3%)', '₹$cess'),
-          const SizedBox(height: 6),
-          _buildFareRow('Govt. GST (18%)', '₹$gst'),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Total Amount Locked', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  Text('Held in Pune Union Escrow', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
-                ],
-              ),
-              Text('₹$total', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFareRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
-        Text(value, style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
-  Widget _buildPaymentModes() {
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('SELECT PAYMENT METHOD', style: AppTypography.labelSm.copyWith(color: AppColors.outline, letterSpacing: 0.8)),
-          const Divider(height: 18),
-          _buildPaymentRadio('upi', 'Instant UPI / QR', 'Google Pay, PhonePe, Paytm, BHIM', Icons.qr_code_2),
-          const SizedBox(height: 8),
-          _buildPaymentRadio('wallet', 'Union Escrow Balance', 'Available: ₹1,250', Icons.account_balance_wallet_outlined),
-          const SizedBox(height: 8),
-          _buildPaymentRadio('cash', 'Pay After Service (Cash on Sign-off)', 'Direct to artisan upon satisfaction', Icons.payments_outlined),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPaymentRadio(String value, String title, String subtitle, IconData icon) {
+  Widget _buildSovereignPaymentOption({
+    required String value,
+    required String title,
+    String? badge,
+    required String subtitle,
+    required IconData icon,
+  }) {
     final isSelected = _paymentMode == value;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: () => setState(() => _paymentMode = value),
-      child: Container(
-        padding: const EdgeInsets.all(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.all(AppSpacing.spacingSm),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.secondaryFixed.withValues(alpha: 0.3) : AppColors.surfaceContainerLow,
-          borderRadius: AppRadius.radiusLg,
-          border: Border.all(color: isSelected ? AppColors.secondary : AppColors.outlineVariant),
+          color: isSelected ? AppColors.surfaceContainerLow : AppColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerHigh,
+            width: isSelected ? 1.5 : 1,
+          ),
         ),
         child: Row(
           children: [
-            Icon(icon, color: isSelected ? AppColors.secondary : AppColors.primary, size: 22),
-            const SizedBox(width: 10),
+            Container(
+              width: 18,
+              height: 18,
+              margin: const EdgeInsets.symmetric(horizontal: 6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.outline,
+                  width: isSelected ? 5.5 : 1.5,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: AppTypography.labelMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                  Text(subtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          title,
+                          style: AppTypography.labelMd.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primaryContainer,
+                            fontSize: 12,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (badge != null) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: AppColors.secondary,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            badge,
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.onSecondary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  Text(
+                    subtitle,
+                    style: AppTypography.bodySm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 10,
+                    ),
+                  ),
                 ],
               ),
             ),
             Icon(
-              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
-              color: isSelected ? AppColors.secondary : AppColors.outline,
-              size: 18,
+              icon,
+              color: isSelected ? AppColors.primaryContainer : AppColors.onSurfaceVariant,
+              size: 20,
             ),
           ],
         ),
@@ -761,111 +1358,199 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildBottomAction(int total) {
+  Widget _buildNationalShramikGuaranteeBadge() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.surfaceContainerHigh),
+      ),
+      padding: const EdgeInsets.all(AppSpacing.spacingSm),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: const BoxDecoration(
+              color: AppColors.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.shield, color: AppColors.tertiaryFixed, size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'National Shramik Seva Guarantee',
+                  style: AppTypography.labelMd.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primaryContainer,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  'Dispute escalation officer auto-assigned if artisan is delayed beyond 20 minutes.',
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomEscrowAction(int total, dynamic worker) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.outlineVariant)),
+        color: AppColors.surfaceContainerLowest,
+        border: const Border(top: BorderSide(color: AppColors.surfaceContainerHigh, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 10,
+            offset: const Offset(0, -3),
+          ),
+        ],
       ),
       child: SafeArea(
-        child: Row(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Total Payable', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
-                Text('₹$total', style: AppTypography.titleLg.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-              ],
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  elevation: 0,
-                ),
-                onPressed: _isSubmitting
-                    ? null
-                    : () async {
-                        setState(() => _isSubmitting = true);
-                        try {
-                          final workerId = bookingFlowState.selectedWorker!.id;
-                          final categoryId = bookingFlowState.selectedCategory?.id ?? 'c2';
-                          final date = bookingFlowState.selectedDate ?? '2023-11-01';
-                          final time = bookingFlowState.selectedTime ?? '10:00 AM';
-
-                          // Step 1: Create the booking record
-                          final newBookingId = await DI.customerRepo.createBooking(
-                            workerId: workerId,
-                            serviceId: categoryId,
-                            scheduledDate: date,
-                            scheduledTime: time,
-                            amount: total.toDouble(),
-                            addressId: _customerAddressId ?? bookingFlowState.addressId,
-                            bookingType: bookingFlowState.bookingType,
-                          );
-
-                          if (newBookingId == null) {
-                            throw Exception('Failed to generate booking ID.');
-                          }
-
-                          _pendingBookingId = newBookingId;
-
-                          if (kIsWeb) {
-                            // Web: Razorpay SDK not supported — proceed directly to confirmation
-                            // In production, integrate Razorpay Web SDK via JavaScript interop
-                            if (!mounted) return;
-                            final bookingId = _pendingBookingId!;
-                            _pendingBookingId = null;
-                            Navigator.of(context).pushAndRemoveUntil(
-                              MaterialPageRoute(
-                                builder: (_) => BookingConfirmationScreen(bookingId: bookingId),
-                              ),
-                              (route) => false,
-                            );
-                          } else {
-                            // Mobile: Step 2 — Create Razorpay order via Edge Function
-                            final orderResult = await DI.paymentRepo.createPaymentOrder(newBookingId);
-
-                            // Step 3: Open Razorpay checkout
-                            final options = <String, dynamic>{
-                              'key': orderResult.keyId,
-                              'amount': orderResult.amountPaise,
-                              'currency': orderResult.currency,
-                              'order_id': orderResult.orderId,
-                              'name': 'ShramSetu',
-                              'description': 'Cooperative Escrow Payment',
-                              'prefill': {'contact': '', 'email': ''},
-                              'theme': {'color': '#5B2EFF'},
-                            };
-                            _razorpay!.open(options);
-                            // Payment result handled by _handlePaymentSuccess / _handlePaymentError
-                          }
-                        } catch (e) {
-                          _pendingBookingId = null;
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to initiate payment: $e')),
-                            );
-                            setState(() => _isSubmitting = false);
-                          }
-                        }
-                      },
-                icon: _isSubmitting
-                    ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Icon(Icons.lock_outline, size: 16, color: AppColors.tertiaryFixed),
-                label: Text(
-                  _isSubmitting
-                      ? 'Processing...'
-                      : (kIsWeb ? 'Confirm Booking' : 'Pay via Razorpay'),
-                  style: AppTypography.labelLg.copyWith(fontWeight: FontWeight.bold),
-                ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: AppColors.onPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                minimumSize: const Size.fromHeight(50),
+                elevation: 2,
               ),
+              onPressed: _isSubmitting
+                  ? null
+                  : () async {
+                      setState(() => _isSubmitting = true);
+                      try {
+                        final workerId = bookingFlowState.selectedWorker!.id;
+                        final categoryId = bookingFlowState.selectedCategory?.id ?? 'c2';
+                        final date = bookingFlowState.selectedDate ?? DateTime.now().toIso8601String().split('T').first;
+                        final time = bookingFlowState.selectedTime ?? '10:00 AM';
+
+                        // Step 1: Create the booking record
+                        final newBookingId = await DI.customerRepo.createBooking(
+                          workerId: workerId,
+                          serviceId: categoryId,
+                          scheduledDate: date,
+                          scheduledTime: time,
+                          amount: total.toDouble(),
+                          addressId: _customerAddressId ?? bookingFlowState.addressId,
+                          bookingType: bookingFlowState.bookingType,
+                        );
+
+                        if (newBookingId == null) {
+                          throw Exception('Failed to generate booking ID.');
+                        }
+
+                        _pendingBookingId = newBookingId;
+
+                        if (kIsWeb) {
+                          // Web: Razorpay SDK not supported — proceed directly to confirmation
+                          if (!mounted) return;
+                          final bookingId = _pendingBookingId!;
+                          _pendingBookingId = null;
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => BookingConfirmationScreen(bookingId: bookingId),
+                            ),
+                            (route) => false,
+                          );
+                        } else {
+                          // Mobile: Step 2 — Create Razorpay order via Edge Function
+                          final orderResult = await DI.paymentRepo.createPaymentOrder(newBookingId);
+
+                          // Step 3: Open Razorpay checkout
+                          final options = <String, dynamic>{
+                            'key': orderResult.keyId,
+                            'amount': orderResult.amountPaise,
+                            'currency': orderResult.currency,
+                            'order_id': orderResult.orderId,
+                            'name': 'ShramSetu',
+                            'description': 'Cooperative Escrow Payment',
+                            'prefill': {'contact': '', 'email': ''},
+                            'theme': {'color': '#001026'},
+                          };
+                          _razorpay!.open(options);
+                        }
+                      } catch (e) {
+                        _pendingBookingId = null;
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to initiate payment: $e')),
+                          );
+                          setState(() => _isSubmitting = false);
+                        }
+                      }
+                    },
+              child: _isSubmitting
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Contacting Co-op Escrow Vault...',
+                          style: AppTypography.labelMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.lock, size: 18, color: AppColors.tertiaryFixed),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Lock ₹$total in Sovereign Escrow (सुरक्षित एस्क्रॉ)',
+                            style: AppTypography.labelMd.copyWith(
+                              color: AppColors.onPrimary,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.arrow_forward, size: 16, color: AppColors.onPrimary),
+                      ],
+                    ),
+            ),
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.policy, size: 13, color: AppColors.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Compliant with Consumer Protection Act & National Trade Cooperative Guidelines.',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 9,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ],
             ),
           ],
         ),

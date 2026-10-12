@@ -4,7 +4,9 @@ abstract class IAuthRepository {
   Future<void> sendOtp(String phone);
   Future<bool> verifyOtp(String phone, String otp);
   Future<bool> login(String email, String password);
+  Future<bool> signInWithGoogle({required String role});
   Future<void> logout();
+  Future<void> updatePassword(String newPassword);
   Future<User?> getCurrentUser();
   Future<String?> getUserRole();
   Stream<AuthState> get authStateChanges;

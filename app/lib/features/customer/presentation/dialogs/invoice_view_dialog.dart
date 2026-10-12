@@ -171,8 +171,8 @@ class InvoiceViewDialog extends StatelessWidget {
                         const SizedBox(width: 6),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusSm),
-                          child: const Text('COOP', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                          decoration: BoxDecoration(color: AppColors.secondary, borderRadius: AppRadius.radiusSm),
+                          child: const Text('SHRAMSETU PLUS UNION', style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),

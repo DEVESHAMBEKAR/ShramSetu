@@ -17,6 +17,10 @@ $$ LANGUAGE sql SECURITY DEFINER;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_role_check;
+ALTER TABLE public.users ADD CONSTRAINT users_role_check
+  CHECK (role IN ('CUSTOMER', 'WORKER', 'ADMIN', 'SUPER_ADMIN', 'FEDERATION_ADMIN'));
+
 DROP POLICY IF EXISTS "Users can insert their own profile" ON public.users;
 CREATE POLICY "Users can insert their own profile" ON public.users FOR INSERT WITH CHECK (auth.uid() = id);
 
@@ -27,10 +31,10 @@ DROP POLICY IF EXISTS "Users can update their own profile" ON public.users;
 CREATE POLICY "Users can update their own profile" ON public.users FOR UPDATE USING (auth.uid() = id);
 
 DROP POLICY IF EXISTS "Admins can view all users" ON public.users;
-CREATE POLICY "Admins can view all users" ON public.users FOR SELECT USING (public.auth_user_role() = 'ADMIN');
+CREATE POLICY "Admins can view all users" ON public.users FOR SELECT USING (public.auth_user_role() IN ('ADMIN', 'SUPER_ADMIN', 'FEDERATION_ADMIN'));
 
 DROP POLICY IF EXISTS "Admins can update all users" ON public.users;
-CREATE POLICY "Admins can update all users" ON public.users FOR UPDATE USING (public.auth_user_role() = 'ADMIN');
+CREATE POLICY "Admins can update all users" ON public.users FOR UPDATE USING (public.auth_user_role() IN ('ADMIN', 'SUPER_ADMIN', 'FEDERATION_ADMIN'));
 
 -- 1.2 Services
 ALTER TABLE public.services ADD COLUMN IF NOT EXISTS icon_name TEXT;
@@ -678,7 +682,6 @@ ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 -- 7. ADMIN Setup for ambekardevesh2@gmail.com
 UPDATE auth.users 
 SET email_confirmed_at = COALESCE(email_confirmed_at, NOW()),
-    confirmed_at = COALESCE(confirmed_at, NOW()),
     encrypted_password = crypt('admin123', gen_salt('bf'))
 WHERE email = 'ambekardevesh2@gmail.com';
 
@@ -686,3 +689,359 @@ INSERT INTO public.users (id, role, full_name, email, is_active)
 SELECT id, 'ADMIN', 'Devesh Ambekar', email, true
 FROM auth.users WHERE email = 'ambekardevesh2@gmail.com'
 ON CONFLICT (id) DO UPDATE SET role = 'ADMIN', full_name = 'Devesh Ambekar', is_active = true;
+
+-- 8. Federations (Multi-Federation & Super Admin Architecture)
+CREATE TABLE IF NOT EXISTS public.federations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'Maharashtra',
+    district TEXT NOT NULL,
+    city TEXT NOT NULL,
+    registration_no TEXT UNIQUE,
+    federation_code TEXT UNIQUE,
+    contact_phone TEXT,
+    contact_email TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.federations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone authenticated can view active federations" ON public.federations;
+CREATE POLICY "Anyone authenticated can view active federations" ON public.federations
+    FOR SELECT USING (is_active = true OR public.auth_user_role() IN ('ADMIN', 'SUPER_ADMIN', 'FEDERATION_ADMIN'));
+
+DROP POLICY IF EXISTS "Admins can manage federations" ON public.federations;
+DROP POLICY IF EXISTS "Only super admins can manage federations" ON public.federations;
+CREATE POLICY "Only super admins can manage federations" ON public.federations
+    FOR ALL USING (public.auth_user_role() IN ('SUPER_ADMIN', 'ADMIN'));
+
+INSERT INTO public.federations (id, name, state, district, city, registration_no, federation_code, contact_phone) VALUES
+    ('11111111-0000-0000-0000-000000000001', 'Pune District Labour Cooperative Federation', 'Maharashtra', 'Pune', 'Pune', 'MH-PUN-COOP-2018-88', 'MH-PUN-COOP-2018-88', '+91 20 2553 4401'),
+    ('22222222-0000-0000-0000-000000000002', 'Nashik District Artisans Cooperative Union', 'Maharashtra', 'Nashik', 'Nashik', 'MH-NSK-COOP-2020-14', 'MH-NSK-COOP-2020-14', '+91 253 257 8820'),
+    ('33333333-0000-0000-0000-000000000003', 'Mumbai Metropolitan Labour Federation', 'Maharashtra', 'Mumbai City', 'Mumbai', 'MH-MUM-COOP-2016-09', 'MH-MUM-COOP-2016-09', '+91 22 2261 1140'),
+    ('44444444-0000-0000-0000-000000000004', 'Chhatrapati Sambhajinagar Labour Federation', 'Maharashtra', 'Chhatrapati Sambhajinagar', 'Chhatrapati Sambhajinagar', 'MH-CSN-COOP-2021-32', 'MH-CSN-COOP-2021-32', '+91 240 233 4560'),
+    ('55555555-0000-0000-0000-000000000005', 'Nagpur District Shramik Cooperative Union', 'Maharashtra', 'Nagpur', 'Nagpur', 'MH-NGP-COOP-2019-55', 'MH-NGP-COOP-2019-55', '+91 712 256 7890'),
+    ('66666666-0000-0000-0000-000000000006', 'Hyderabad District Labour Cooperation', 'Telangana', 'Hyderabad', 'Hyderabad', 'TS-HYD-COOP-2022-77', 'TS-HYD-COOP-2022-77', '+91 40 2320 0110')
+ON CONFLICT (registration_no) DO UPDATE SET federation_code = EXCLUDED.federation_code;
+
+-- Workers profile & federation link columns
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS dob DATE;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS gender TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS trade TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS primary_skill TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS skill_level TEXT DEFAULT 'Intermediate';
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS district TEXT DEFAULT 'Pune';
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS pincode TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS federation_name TEXT DEFAULT 'Pune District Labour Cooperative Federation';
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS membership_id TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS verification_remarks TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP WITH TIME ZONE;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS reviewed_by UUID REFERENCES public.users(id);
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS federation_ref_id UUID REFERENCES public.federations(id) ON DELETE SET NULL;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS service_areas TEXT[] DEFAULT '{}';
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS city TEXT;
+ALTER TABLE public.workers ADD COLUMN IF NOT EXISTS state TEXT DEFAULT 'Maharashtra';
+
+ALTER TABLE public.addresses ADD COLUMN IF NOT EXISTS district TEXT;
+
+UPDATE public.workers
+SET federation_ref_id = '11111111-0000-0000-0000-000000000001'
+WHERE federation_ref_id IS NULL;
+
+-- 9. Federation Admin Scope
+CREATE TABLE IF NOT EXISTS public.admin_federation_scope (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
+    federation_id UUID NOT NULL REFERENCES public.federations(id) ON DELETE CASCADE,
+    scope_level TEXT NOT NULL DEFAULT 'FEDERATION' CHECK (scope_level IN ('FEDERATION', 'DISTRICT', 'STATE', 'NATIONAL')),
+    assigned_by UUID REFERENCES public.users(id),
+    assigned_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT true,
+    UNIQUE(user_id, federation_id)
+);
+
+ALTER TABLE public.admin_federation_scope ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Super admins can manage all scopes" ON public.admin_federation_scope;
+CREATE POLICY "Super admins can manage all scopes" ON public.admin_federation_scope
+    FOR ALL USING (public.auth_user_role() = 'SUPER_ADMIN');
+
+DROP POLICY IF EXISTS "Admin users can view their own scope" ON public.admin_federation_scope;
+CREATE POLICY "Admin users can view their own scope" ON public.admin_federation_scope
+    FOR SELECT USING (auth.uid() = user_id);
+
+-- 10. Audit Logs
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id UUID REFERENCES public.users(id),
+    actor_role TEXT,
+    action TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT,
+    federation_id UUID REFERENCES public.federations(id),
+    old_value JSONB,
+    new_value JSONB,
+    reason TEXT,
+    ip_address TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Super admins can view all audit logs" ON public.audit_logs;
+CREATE POLICY "Super admins can view all audit logs" ON public.audit_logs
+    FOR SELECT USING (public.auth_user_role() IN ('SUPER_ADMIN', 'ADMIN'));
+
+DROP POLICY IF EXISTS "Admins can insert audit logs" ON public.audit_logs;
+CREATE POLICY "Admins can insert audit logs" ON public.audit_logs
+    FOR INSERT WITH CHECK (public.auth_user_role() IN ('SUPER_ADMIN', 'ADMIN', 'FEDERATION_ADMIN'));
+
+-- 11. Worker Insurance
+CREATE TABLE IF NOT EXISTS public.worker_insurance (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    worker_id UUID NOT NULL REFERENCES public.workers(id) ON DELETE CASCADE,
+    provider_name TEXT NOT NULL DEFAULT 'National Insurance Co. / Union Group Policy',
+    policy_number TEXT NOT NULL,
+    coverage_type TEXT NOT NULL DEFAULT 'Accidental & Medical Health Cover',
+    coverage_amount NUMERIC(10,2) NOT NULL DEFAULT 500000.00,
+    start_date DATE NOT NULL DEFAULT CURRENT_DATE,
+    expiry_date DATE NOT NULL DEFAULT (CURRENT_DATE + INTERVAL '1 year')::date,
+    status TEXT NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('PENDING', 'ACTIVE', 'EXPIRED', 'SUSPENDED')),
+    verification_status TEXT NOT NULL DEFAULT 'VERIFIED' CHECK (verification_status IN ('PENDING', 'VERIFIED', 'REJECTED')),
+    admin_remarks TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+ALTER TABLE public.worker_insurance ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Workers can view own insurance records" ON public.worker_insurance;
+CREATE POLICY "Workers can view own insurance records" ON public.worker_insurance
+    FOR SELECT USING (auth.uid() = worker_id);
+
+DROP POLICY IF EXISTS "Admins can manage worker insurance records" ON public.worker_insurance;
+CREATE POLICY "Admins can manage worker insurance records" ON public.worker_insurance
+    FOR ALL USING (public.auth_user_role() IN ('ADMIN', 'SUPER_ADMIN', 'FEDERATION_ADMIN'));
+
+-- 12. India States Master Data
+CREATE TABLE IF NOT EXISTS public.india_states (
+    code TEXT PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    type TEXT NOT NULL DEFAULT 'STATE' CHECK (type IN ('STATE', 'UNION_TERRITORY')),
+    is_active BOOLEAN DEFAULT true
+);
+
+ALTER TABLE public.india_states ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Anyone can view India states" ON public.india_states;
+CREATE POLICY "Anyone can view India states" ON public.india_states
+    FOR SELECT USING (true);
+
+INSERT INTO public.india_states (code, name, type) VALUES
+    ('AN', 'Andaman and Nicobar Islands', 'UNION_TERRITORY'),
+    ('AP', 'Andhra Pradesh', 'STATE'),
+    ('AR', 'Arunachal Pradesh', 'STATE'),
+    ('AS', 'Assam', 'STATE'),
+    ('BR', 'Bihar', 'STATE'),
+    ('CH', 'Chandigarh', 'UNION_TERRITORY'),
+    ('CT', 'Chhattisgarh', 'STATE'),
+    ('DL', 'Delhi', 'UNION_TERRITORY'),
+    ('GA', 'Goa', 'STATE'),
+    ('GJ', 'Gujarat', 'STATE'),
+    ('HR', 'Haryana', 'STATE'),
+    ('HP', 'Himachal Pradesh', 'STATE'),
+    ('JK', 'Jammu and Kashmir', 'UNION_TERRITORY'),
+    ('JH', 'Jharkhand', 'STATE'),
+    ('KA', 'Karnataka', 'STATE'),
+    ('KL', 'Kerala', 'STATE'),
+    ('LA', 'Ladakh', 'UNION_TERRITORY'),
+    ('MP', 'Madhya Pradesh', 'STATE'),
+    ('MH', 'Maharashtra', 'STATE'),
+    ('MN', 'Manipur', 'STATE'),
+    ('ML', 'Meghalaya', 'STATE'),
+    ('MZ', 'Mizoram', 'STATE'),
+    ('NL', 'Nagaland', 'STATE'),
+    ('OD', 'Odisha', 'STATE'),
+    ('PB', 'Punjab', 'STATE'),
+    ('PY', 'Puducherry', 'UNION_TERRITORY'),
+    ('RJ', 'Rajasthan', 'STATE'),
+    ('SK', 'Sikkim', 'STATE'),
+    ('TN', 'Tamil Nadu', 'STATE'),
+    ('TG', 'Telangana', 'STATE'),
+    ('TR', 'Tripura', 'STATE'),
+    ('UP', 'Uttar Pradesh', 'STATE'),
+    ('UK', 'Uttarakhand', 'STATE'),
+    ('WB', 'West Bengal', 'STATE'),
+    ('DN', 'Dadra and Nagar Haveli and Daman and Diu', 'UNION_TERRITORY'),
+    ('LD', 'Lakshadweep', 'UNION_TERRITORY')
+ON CONFLICT (code) DO NOTHING;
+
+-- 13. SUPER ADMIN Setup for deveshambekar@gmail.com
+UPDATE auth.users 
+SET email_confirmed_at = COALESCE(email_confirmed_at, NOW())
+WHERE email = 'deveshambekar@gmail.com';
+
+INSERT INTO public.users (id, role, full_name, email, is_active)
+SELECT id, 'SUPER_ADMIN', COALESCE(raw_user_meta_data->>'full_name', 'Devesh Ambekar'), email, true
+FROM auth.users 
+WHERE email = 'deveshambekar@gmail.com'
+ON CONFLICT (id) DO UPDATE SET role = 'SUPER_ADMIN', full_name = EXCLUDED.full_name, is_active = true;
+
+-- 14. Federation Admin Auth Repair & GoTrue Compatibility
+UPDATE auth.users
+SET 
+    confirmation_token         = COALESCE(confirmation_token, ''),
+    recovery_token             = COALESCE(recovery_token, ''),
+    email_change               = COALESCE(email_change, ''),
+    email_change_token_new     = COALESCE(email_change_token_new, ''),
+    email_change_token_current = COALESCE(email_change_token_current, ''),
+    phone_change               = COALESCE(phone_change, ''),
+    phone_change_token         = COALESCE(phone_change_token, ''),
+    reauthentication_token     = COALESCE(reauthentication_token, ''),
+    email_confirmed_at         = COALESCE(email_confirmed_at, NOW()),
+    raw_app_meta_data          = COALESCE(raw_app_meta_data, '{"provider": "email", "providers": ["email"]}'::jsonb),
+    is_sso_user                = COALESCE(is_sso_user, false)
+WHERE 
+    confirmation_token IS NULL
+    OR recovery_token IS NULL
+    OR email_change IS NULL
+    OR email_change_token_new IS NULL
+    OR email_change_token_current IS NULL
+    OR phone_change IS NULL
+    OR phone_change_token IS NULL
+    OR reauthentication_token IS NULL
+    OR email_confirmed_at IS NULL;
+
+-- Note: auth.users tokens are explicitly initialized to '' by create_federation_admin.
+ALTER TABLE public.users ADD COLUMN IF NOT EXISTS requires_password_change BOOLEAN DEFAULT false;
+
+INSERT INTO auth.identities (
+    id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+)
+SELECT 
+    gen_random_uuid(),
+    u.id,
+    u.id::text,
+    jsonb_build_object('sub', u.id::text, 'email', LOWER(TRIM(u.email)), 'email_verified', true, 'phone_verified', false),
+    'email',
+    NOW(), NOW(), NOW()
+FROM auth.users u
+WHERE u.email IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM auth.identities i WHERE i.user_id = u.id AND i.provider = 'email'
+);
+
+-- Upgraded create_federation_admin stored procedure
+CREATE OR REPLACE FUNCTION public.create_federation_admin(
+    p_email TEXT,
+    p_password TEXT,
+    p_full_name TEXT,
+    p_phone TEXT,
+    p_federation_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, auth, extensions, pg_temp
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_actor_role TEXT;
+    v_caller_id UUID;
+    v_encrypted_pw TEXT;
+    v_fed_name TEXT;
+BEGIN
+    v_caller_id := auth.uid();
+    IF v_caller_id IS NOT NULL THEN
+        SELECT role INTO v_actor_role FROM public.users WHERE id = v_caller_id;
+        IF v_actor_role IS NOT NULL AND v_actor_role NOT IN ('SUPER_ADMIN', 'ADMIN') THEN
+            RAISE EXCEPTION 'Unauthorized: Administrative role required to provision Federation Admins (caller has role: %)', v_actor_role;
+        END IF;
+    END IF;
+
+    IF p_email IS NULL OR TRIM(p_email) = '' THEN
+        RAISE EXCEPTION 'Admin email is required';
+    END IF;
+    IF p_password IS NULL OR length(p_password) < 6 THEN
+        RAISE EXCEPTION 'Password must be at least 6 characters';
+    END IF;
+
+    SELECT name INTO v_fed_name FROM public.federations WHERE id = p_federation_id;
+    IF v_fed_name IS NULL THEN
+        RAISE EXCEPTION 'Federation not found with ID: %', p_federation_id;
+    END IF;
+
+    SELECT id INTO v_user_id FROM auth.users WHERE LOWER(email) = LOWER(TRIM(p_email));
+    v_encrypted_pw := crypt(p_password, gen_salt('bf'));
+
+    IF v_user_id IS NULL THEN
+        v_user_id := gen_random_uuid();
+
+        INSERT INTO auth.users (
+            instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+            confirmation_token, recovery_token, email_change, email_change_token_new,
+            email_change_token_current, phone_change, phone_change_token, reauthentication_token,
+            raw_app_meta_data, raw_user_meta_data, is_sso_user, created_at, updated_at
+        ) VALUES (
+            '00000000-0000-0000-0000-000000000000', v_user_id, 'authenticated', 'authenticated',
+            LOWER(TRIM(p_email)), v_encrypted_pw, NOW(),
+            '', '', '', '', '', '', '', '',
+            '{"provider": "email", "providers": ["email"]}'::jsonb,
+            jsonb_build_object('full_name', p_full_name, 'phone', p_phone, 'role', 'FEDERATION_ADMIN', 'federation_id', p_federation_id, 'requires_password_change', true),
+            false, NOW(), NOW()
+        );
+
+        INSERT INTO auth.identities (
+            id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+            gen_random_uuid(), v_user_id, v_user_id::text,
+            jsonb_build_object('sub', v_user_id::text, 'email', LOWER(TRIM(p_email)), 'email_verified', true, 'phone_verified', false),
+            'email', NOW(), NOW(), NOW()
+        );
+    ELSE
+        UPDATE auth.users
+        SET encrypted_password         = v_encrypted_pw,
+            email_confirmed_at         = COALESCE(email_confirmed_at, NOW()),
+            confirmation_token         = COALESCE(confirmation_token, ''),
+            recovery_token             = COALESCE(recovery_token, ''),
+            email_change               = COALESCE(email_change, ''),
+            email_change_token_new     = COALESCE(email_change_token_new, ''),
+            email_change_token_current = COALESCE(email_change_token_current, ''),
+            phone_change               = COALESCE(phone_change, ''),
+            phone_change_token         = COALESCE(phone_change_token, ''),
+            reauthentication_token     = COALESCE(reauthentication_token, ''),
+            raw_app_meta_data          = COALESCE(raw_app_meta_data, '{"provider": "email", "providers": ["email"]}'::jsonb),
+            is_sso_user                = COALESCE(is_sso_user, false),
+            raw_user_meta_data         = COALESCE(raw_user_meta_data, '{}'::jsonb) || jsonb_build_object('full_name', p_full_name, 'phone', p_phone, 'role', 'FEDERATION_ADMIN', 'federation_id', p_federation_id, 'requires_password_change', true),
+            updated_at                 = NOW()
+        WHERE id = v_user_id;
+
+        INSERT INTO auth.identities (
+            id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at
+        ) VALUES (
+            gen_random_uuid(), v_user_id, v_user_id::text,
+            jsonb_build_object('sub', v_user_id::text, 'email', LOWER(TRIM(p_email)), 'email_verified', true, 'phone_verified', false),
+            'email', NOW(), NOW(), NOW()
+        )
+        ON CONFLICT (provider_id, provider) DO UPDATE
+        SET identity_data = jsonb_build_object('sub', v_user_id::text, 'email', LOWER(TRIM(p_email)), 'email_verified', true, 'phone_verified', false),
+            updated_at = NOW();
+    END IF;
+
+    INSERT INTO public.users (id, email, phone, role, full_name, is_active, requires_password_change)
+    VALUES (v_user_id, LOWER(TRIM(p_email)), p_phone, 'FEDERATION_ADMIN', p_full_name, true, true)
+    ON CONFLICT (id) DO UPDATE
+    SET role = 'FEDERATION_ADMIN', full_name = EXCLUDED.full_name, phone = COALESCE(EXCLUDED.phone, public.users.phone), is_active = true, requires_password_change = true;
+
+    INSERT INTO public.admin_federation_scope (user_id, federation_id, scope_level, assigned_by, is_active)
+    VALUES (v_user_id, p_federation_id, 'FEDERATION', v_caller_id, true)
+    ON CONFLICT (user_id, federation_id) DO UPDATE
+    SET is_active = true, scope_level = 'FEDERATION', assigned_by = COALESCE(v_caller_id, admin_federation_scope.assigned_by), assigned_at = NOW();
+
+    RETURN jsonb_build_object('success', true, 'user_id', v_user_id, 'email', LOWER(TRIM(p_email)), 'federation_id', p_federation_id, 'federation_name', v_fed_name);
+END;
+$$;
+
+

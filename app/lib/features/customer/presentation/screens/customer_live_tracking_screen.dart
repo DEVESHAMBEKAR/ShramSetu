@@ -1019,15 +1019,15 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 height: 28,
                 decoration: BoxDecoration(
                   color: isCurrent
-                    ? AppColors.primary
+                    ? AppColors.secondary
                     : (isCompleted ? AppColors.tertiaryFixed : AppColors.surfaceContainerHigh),
                   shape: BoxShape.circle,
-                  border: isCurrent ? Border.all(color: AppColors.primaryFixedDim, width: 3) : null,
+                  border: isCurrent ? Border.all(color: const Color(0xFFE5DBFF), width: 3) : null,
                 ),
                 child: Icon(
                   icon,
                   size: 14,
-                  color: isCurrent ? AppColors.onPrimary : (isCompleted ? AppColors.onTertiaryFixed : AppColors.onSurfaceVariant),
+                  color: isCurrent ? AppColors.onSecondary : (isCompleted ? AppColors.onTertiaryFixed : AppColors.onSurfaceVariant),
                 ),
               ),
               if (!isLast)

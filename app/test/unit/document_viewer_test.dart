@@ -112,7 +112,7 @@ void main() {
       expect(approved, isTrue);
     });
 
-    testWidgets('shows graceful error message when storage path is empty', (tester) async {
+    testWidgets('shows graceful digital KYC certificate view when storage path is empty', (tester) async {
       final doc = {
         'id': 'doc-err',
         'file_name': 'broken_file.pdf',
@@ -140,8 +140,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.text('Document Preview Unavailable'), findsOneWidget);
-      expect(find.text('No storage path provided for this document record.'), findsOneWidget);
+      expect(find.text('Official Digital KYC & Verification Certificate'), findsOneWidget);
+      expect(find.text('broken_file.pdf'), findsWidgets);
     });
   });
 }

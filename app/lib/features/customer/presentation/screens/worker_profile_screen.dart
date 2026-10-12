@@ -8,6 +8,7 @@ import '../../../../core/config/dependency_injection.dart';
 import '../../data/models/customer_models.dart';
 import '../../../booking/data/models/booking_models.dart';
 import '../../../booking/presentation/screens/booking_date_time_screen.dart';
+import '../../../../shared/widgets/shramsetu_brand_mark.dart';
 
 class WorkerProfileScreen extends StatefulWidget {
   final Worker worker;
@@ -46,6 +47,8 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                       children: [
                         _buildFederationBanner(),
                         _buildHeaderCard(),
+                        _buildGovernmentCredentialVault(),
+                        _buildGazetteTariffRateCard(),
                         _buildTabs(),
                         _buildTabContent(),
                         const SizedBox(height: 100), // padding for bottom bar
@@ -65,24 +68,25 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
   Widget _buildSliverAppBar() {
     return SliverAppBar(
       pinned: true,
-      backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-      elevation: 1,
-      shadowColor: Colors.black.withValues(alpha: 0.1),
+      backgroundColor: Colors.white,
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
       titleSpacing: 0,
+      toolbarHeight: 60,
+      bottom: const PreferredSize(
+        preferredSize: Size.fromHeight(3),
+        child: TricolorStripe(height: 3),
+      ),
       leading: IconButton(
-        icon: const Icon(Icons.arrow_back, color: AppColors.onSurface),
+        icon: const Icon(Icons.arrow_back, color: AppColors.primaryContainer),
         onPressed: () => Navigator.pop(context),
       ),
       title: Row(
         children: [
-          Image.asset('assets/images/logo.jpg', height: 28, width: 28, fit: BoxFit.contain),
-          const SizedBox(width: AppSpacing.spacingXs),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('ShramSetu', style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-              Text('Cooperative Verified Protection', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant)),
-            ],
+          ShramSetuBrandMark(
+            size: 30,
+            showText: true,
+            subtitle: 'Artisan Detail • DPI Civic',
           ),
         ],
       ),
@@ -111,9 +115,9 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.verified_user, color: AppColors.primary, size: 28),
+                const Icon(Icons.verified_user, color: AppColors.primaryContainer, size: 28),
                 const SizedBox(width: 12),
-                Text('Cooperative Verification', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                Text('Cooperative Verification', style: AppTypography.titleLg.copyWith(color: AppColors.primaryContainer, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 16),
@@ -126,7 +130,7 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primaryContainer,
                   foregroundColor: AppColors.onPrimary,
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
@@ -142,24 +146,67 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
 
   Widget _buildFederationBanner() {
     return Container(
-      color: AppColors.primary,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
+      color: AppColors.primaryContainer,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
               const Icon(Icons.verified_user, color: AppColors.tertiaryFixed, size: 16),
-              const SizedBox(width: AppSpacing.spacing2xs),
-              Text(
-                'Pune District Labour Cooperative Member #4092'.toUpperCase(),
-                style: AppTypography.labelSm.copyWith(color: AppColors.surfaceBright, letterSpacing: 1.2, fontSize: 9),
+              const SizedBox(width: 6),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'DPI SOVEREIGN REGISTRY: ${widget.worker.federationId != null && widget.worker.federationId!.isNotEmpty ? widget.worker.federationId : "MH-KTR-8842-P"}',
+                    style: AppTypography.labelSm.copyWith(
+                      color: Colors.white,
+                      letterSpacing: 0.8,
+                      fontSize: 9.5,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(
+                    'नागरिक सेवा हमी कायदा अंतर्गत प्रमाणीकृत',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 8.5,
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
-          Text(
-            'Standard Rates',
-            style: AppTypography.labelSm.copyWith(color: AppColors.secondaryFixed, fontWeight: FontWeight.bold),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              borderRadius: AppRadius.radiusSm,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 5,
+                  height: 5,
+                  decoration: const BoxDecoration(
+                    color: AppColors.tertiaryFixed,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  'Active & Audited',
+                  style: AppTypography.labelSm.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 9,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -168,126 +215,556 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
 
   Widget _buildHeaderCard() {
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.marginMobile),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 12, AppSpacing.marginMobile, 8),
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest,
+          borderRadius: AppRadius.radiusXl,
+          border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.primaryContainer.withValues(alpha: 0.04),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            // Top Accent Stripe
+            const TricolorStripe(height: 3),
+
+            Padding(
+              padding: const EdgeInsets.all(AppSpacing.spacingMd),
+              child: Column(
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Stack(
+                        children: [
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: widget.worker.imageUrl.isNotEmpty
+                                ? Image.network(
+                                    widget.worker.imageUrl,
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) => Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: AppColors.surfaceContainerLow,
+                                      child: Center(
+                                        child: Text(
+                                          widget.worker.name.isNotEmpty ? widget.worker.name[0] : 'W',
+                                          style: AppTypography.headlineSm.copyWith(
+                                            color: AppColors.primaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    width: 72,
+                                    height: 72,
+                                    color: AppColors.surfaceContainerLow,
+                                    child: Center(
+                                      child: Text(
+                                        widget.worker.name.isNotEmpty ? widget.worker.name[0] : 'W',
+                                        style: AppTypography.headlineSm.copyWith(
+                                          color: AppColors.primaryContainer,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                          ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              width: 20,
+                              height: 20,
+                              decoration: BoxDecoration(
+                                color: AppColors.civicVerifiedGreen,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 2),
+                              ),
+                              child: const Icon(Icons.check, size: 12, color: Colors.white),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(width: AppSpacing.spacingMd),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    widget.worker.name,
+                                    style: AppTypography.titleLg.copyWith(
+                                      color: AppColors.primaryContainer,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primaryFixed,
+                                    borderRadius: AppRadius.radiusSm,
+                                    border: Border.all(color: AppColors.primaryFixedDim.withValues(alpha: 0.5)),
+                                  ),
+                                  child: Text(
+                                    'MASTER CLASS',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.onPrimaryFixed,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 8.5,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.worker.specializations.isNotEmpty
+                                  ? widget.worker.specializations.first
+                                  : 'Master Artisan & Technician',
+                              style: AppTypography.labelMd.copyWith(
+                                color: AppColors.onSurface,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              'मुख्य तंत्रज्ञ व कुशल कारागीर',
+                              style: AppTypography.bodySm.copyWith(
+                                color: AppColors.onSurfaceVariant,
+                                fontSize: 10.5,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: [
+                                const Icon(Icons.star, size: 14, color: AppColors.secondaryContainer),
+                                const SizedBox(width: 2),
+                                Text(
+                                  widget.worker.rating.toStringAsFixed(2),
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.onSurface,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '• (${widget.worker.jobsCompleted > 0 ? widget.worker.jobsCompleted : widget.worker.reviewCount} Audited Jobs / प्रमाणित कामे)',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Guild Affiliation Sub-Card
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerLow,
+                      borderRadius: AppRadius.radiusLg,
+                      border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.4)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.assured_workload, size: 18, color: AppColors.primaryContainer),
+                            const SizedBox(width: 8),
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'MAHARASHTRA GUILD AFFILIATION',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                    fontSize: 8.5,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.6,
+                                  ),
+                                ),
+                                Text(
+                                  'Member #${widget.worker.id} • ${widget.worker.locationTag}',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.primaryContainer,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: AppRadius.radiusSm,
+                            border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shield, size: 12, color: AppColors.civicVerifiedGreen),
+                              const SizedBox(width: 3),
+                              Text(
+                                '0 Disputes',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.civicVerifiedGreen,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGovernmentCredentialVault() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 8, AppSpacing.marginMobile, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.policy, size: 18, color: AppColors.primaryContainer),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Government Credential Vault',
+                    style: AppTypography.titleMd.copyWith(
+                      color: AppColors.primaryContainer,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerHigh,
+                  borderRadius: AppRadius.radiusSm,
+                ),
+                child: Text(
+                  '4 / 4 VALID',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // 1. Aadhaar Biometric
+          _buildVaultItem(
+            icon: Icons.fingerprint,
+            iconColor: AppColors.primaryContainer,
+            statusBadge: 'DigiLocker Verified',
+            badgeColor: AppColors.civicVerifiedGreen,
+            specCode: 'UIDAI e-KYC 2.1',
+            title: 'Aadhaar Biometric Authenticated',
+            marathiTitle: 'आधार बायोमेट्रिक सत्यप्रत प्रमाणीकरण',
+            auditDetail: 'UID: XXXX-XXXX-8912 • Instant Revocation Audited',
+          ),
+          const SizedBox(height: 6),
+
+          // 2. ITI NTC Grade-A
+          _buildVaultItem(
+            icon: Icons.workspace_premium,
+            iconColor: AppColors.secondaryContainer,
+            statusBadge: 'NTC Grade-A',
+            badgeColor: AppColors.secondaryContainer,
+            specCode: 'NCVT / DVET',
+            title: 'ITI Certified Vocational Trade',
+            marathiTitle: 'आयटीआय प्रमाणित व्यवसाय प्रमाणपत्र',
+            auditDetail: 'Cert #${widget.worker.federationId != null && widget.worker.federationId!.isNotEmpty ? widget.worker.federationId : "MH-PL-90218"} • Directorate of Vocational Education',
+          ),
+          const SizedBox(height: 6),
+
+          // 3. Police NOC
+          _buildVaultItem(
+            icon: Icons.local_police,
+            iconColor: AppColors.primaryContainer,
+            statusBadge: 'NOC Active',
+            badgeColor: AppColors.civicVerifiedGreen,
+            specCode: 'Valid Dec 2025',
+            title: 'Police Character Clearance',
+            marathiTitle: 'पोलीस चारित्र्य पडताळणी प्रमाणपत्र',
+            auditDetail: 'Special Branch Police • Clean Civic Record',
+          ),
+          const SizedBox(height: 6),
+
+          // 4. PM Suraksha Bima
+          _buildVaultItem(
+            icon: Icons.health_and_safety,
+            iconColor: AppColors.civicVerifiedGreen,
+            statusBadge: 'Insured',
+            badgeColor: AppColors.primaryContainer,
+            specCode: '₹5,00,000',
+            title: 'Pradhan Mantri Suraksha Bima',
+            marathiTitle: 'प्रधानमंत्री सुरक्षा विमा योजना कवच',
+            auditDetail: 'Comprehensive Co-op Welfare Accidental & Liability Shield',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVaultItem({
+    required IconData icon,
+    required Color iconColor,
+    required String statusBadge,
+    required Color badgeColor,
+    required String specCode,
+    required String title,
+    required String marathiTitle,
+    required String auditDetail,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceContainerLowest,
+        borderRadius: AppRadius.radiusLg,
+        border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLow,
+              borderRadius: AppRadius.radiusMd,
+            ),
+            child: Icon(icon, size: 20, color: iconColor),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: badgeColor.withValues(alpha: 0.1),
+                        borderRadius: AppRadius.radiusSm,
+                        border: Border.all(color: badgeColor.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.check_circle, size: 10, color: badgeColor),
+                          const SizedBox(width: 3),
+                          Text(
+                            statusBadge,
+                            style: AppTypography.labelSm.copyWith(
+                              color: badgeColor,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 9,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      specCode,
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        fontSize: 9.5,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  title,
+                  style: AppTypography.labelMd.copyWith(
+                    color: AppColors.primaryContainer,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  marathiTitle,
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 10.5,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  auditDetail,
+                  style: AppTypography.bodySm.copyWith(
+                    color: AppColors.outline,
+                    fontSize: 9.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGazetteTariffRateCard() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 8),
       child: Container(
         padding: const EdgeInsets.all(AppSpacing.spacingMd),
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerLowest,
           borderRadius: AppRadius.radiusXl,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4)],
+          border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
         ),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Stack(
+                Row(
                   children: [
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusXl),
-                      child: const Icon(Icons.person, size: 40, color: AppColors.outline),
-                    ),
-                    Positioned(
-                      bottom: -4,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.all(2),
-                        decoration: const BoxDecoration(color: AppColors.tertiaryContainer, shape: BoxShape.circle),
-                        child: const Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
-                      ),
+                    const Icon(Icons.gavel, size: 18, color: AppColors.secondaryContainer),
+                    const SizedBox(width: 6),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Govt Gazette Tariff Rate Card',
+                          style: AppTypography.titleMd.copyWith(
+                            color: AppColors.primaryContainer,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'शासकीय राजपत्रातील प्रमाणित दर • Standardized pricing',
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 9.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-                const SizedBox(width: AppSpacing.spacingMd),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(widget.worker.name, style: AppTypography.headlineSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: AppSpacing.spacing2xs),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                            decoration: BoxDecoration(color: AppColors.secondary.withValues(alpha: 0.1), borderRadius: AppRadius.radiusSm),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.verified, size: 12, color: AppColors.secondary),
-                                const SizedBox(width: 4),
-                                Text('Govt ITI', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text('Master Plumber & Pipe Specialist', style: AppTypography.labelMd.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: AppSpacing.spacing2xs),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.spacing2xs, vertical: 2),
-                            decoration: BoxDecoration(color: AppColors.surfaceContainer, borderRadius: AppRadius.radiusSm),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.star, size: 14, color: AppColors.starRating),
-                                const SizedBox(width: 2),
-                                Text(
-                                  widget.worker.rating > 0 ? widget.worker.rating.toStringAsFixed(1) : 'New',
-                                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold),
-                                ),
-                                Text(
-                                  widget.worker.reviewCount > 0 ? ' (${widget.worker.reviewCount})' : '',
-                                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: AppSpacing.spacing2xs),
-                          Text('• ${widget.worker.jobsCompleted} Jobs', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: AppSpacing.spacing2xs),
-                          Text('• ${widget.worker.experience}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                        ],
-                      ),
-                    ],
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.secondaryFixed,
+                    borderRadius: AppRadius.radiusSm,
+                    border: Border.all(color: AppColors.secondaryFixedDim.withValues(alpha: 0.4)),
+                  ),
+                  child: Text(
+                    'CAPPED RATE',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.onSecondaryFixed,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 8.5,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.spacingMd),
+            const SizedBox(height: 10),
+
+            // Item 1
             Container(
-              padding: const EdgeInsets.all(AppSpacing.spacingXs),
-              decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusLg),
-              child: Column(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppRadius.radiusMd,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.security, size: 16, color: AppColors.onTertiaryContainer),
-                      const SizedBox(width: AppSpacing.spacing2xs),
-                      Text('Police Verified Background & Identity Cleared', style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.bold)),
-                    ],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'तपासणी व प्राथमिक निदान (Diagnostic)',
+                          style: AppTypography.labelMd.copyWith(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Includes 45-min on-site inspection & estimate',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.spacing2xs),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.thumb_up, size: 14, color: AppColors.secondary),
-                          const SizedBox(width: 4),
-                          Text('Top Rated in ${widget.worker.serviceAreas.isNotEmpty ? widget.worker.serviceAreas.first : "area"}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                        ],
+                      Text(
+                        '₹${widget.worker.rate.toStringAsFixed(0)}',
+                        style: AppTypography.titleMd.copyWith(
+                          color: AppColors.primaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: AppColors.tertiaryFixed.withValues(alpha: 0.3), borderRadius: AppRadius.radiusSm),
-                        child: Row(
-                          children: [
-                            Container(width: 6, height: 6, decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle)),
-                            const SizedBox(width: 4),
-                            Text('Today from 10:30 AM', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
-                          ],
+                      Text(
+                        'Max Govt Cap',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.civicVerifiedGreen,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ],
@@ -295,24 +772,75 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.spacingSm),
+            const SizedBox(height: 6),
+
+            // Item 2
             Container(
-              padding: const EdgeInsets.all(AppSpacing.spacingXs),
-              decoration: BoxDecoration(color: AppColors.surfaceBright, borderRadius: AppRadius.radiusLg),
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: AppRadius.radiusMd,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Standard Visit & Diagnosis', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant)),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'मानक दुरुस्ती व सुटे भाग जोडणी',
+                          style: AppTypography.labelMd.copyWith(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        Text(
+                          'Standard repair per running item / fixture',
+                          style: AppTypography.bodySm.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('₹${widget.worker.rate}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 18)),
-                      Text('/ visit', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
+                      Text(
+                        '₹${(widget.worker.rate * 0.75).round()}',
+                        style: AppTypography.titleMd.copyWith(
+                          color: AppColors.primaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Per Task Cap',
+                        style: AppTypography.labelSm.copyWith(
+                          color: AppColors.onSurfaceVariant,
+                          fontSize: 9,
+                        ),
+                      ),
                     ],
                   ),
                 ],
               ),
+            ),
+            const SizedBox(height: 8),
+
+            Row(
+              children: [
+                const Icon(Icons.receipt_long, size: 14, color: AppColors.civicVerifiedGreen),
+                const SizedBox(width: 4),
+                Text(
+                  'Direct digital receipt via ShramSetu • 0% Platform cut',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    fontSize: 10,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -689,30 +1217,53 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
       left: 0,
       right: 0,
       child: Container(
-        color: AppColors.surfaceContainerLowest,
-        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingXs, AppSpacing.marginMobile, 32),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceContainerLowest.withValues(alpha: 0.98),
+          border: const Border(
+            top: BorderSide(color: AppColors.surfaceContainerHigh, width: 1),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 12, AppSpacing.marginMobile, 28),
         child: Row(
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Standard Visit Fee', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.baseline,
-                  textBaseline: TextBaseline.alphabetic,
-                  children: [
-                    Text('₹${widget.worker.rate}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    const SizedBox(width: 4),
-                    Text('fixed', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontWeight: FontWeight.bold)),
-                  ],
+            OutlinedButton.icon(
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('DigiLocker Verified Credential: MH-KTR-8842-P authenticated.'),
+                    backgroundColor: AppColors.primaryContainer,
+                  ),
+                );
+              },
+              icon: const Icon(Icons.description_outlined, size: 18, color: AppColors.primaryContainer),
+              label: Text(
+                'DigiLocker PDF',
+                style: AppTypography.labelMd.copyWith(
+                  color: AppColors.primaryContainer,
+                  fontWeight: FontWeight.bold,
                 ),
-              ],
+              ),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: AppColors.surfaceContainerHigh,
+                side: const BorderSide(color: AppColors.surfaceContainerHigh),
+                minimumSize: const Size(0, 48),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+              ),
             ),
-            const SizedBox(width: AppSpacing.spacingMd),
+            const SizedBox(width: AppSpacing.spacingSm),
             Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () {
+              child: ElevatedButton(
+                onPressed: () {
                   bookingFlowState.selectedCategory = widget.category;
                   bookingFlowState.selectedWorker = widget.worker;
                   Navigator.of(context).push(
@@ -721,22 +1272,31 @@ class _WorkerProfileScreenState extends State<WorkerProfileScreen> {
                     ),
                   );
                 },
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: AppRadius.radiusXl,
-                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.1), blurRadius: 4)],
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.secondaryContainer,
+                  foregroundColor: AppColors.onPrimary,
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
                   ),
-                  alignment: Alignment.center,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Book ${widget.worker.name.split(" ")[0]}', style: AppTypography.labelLg.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: AppSpacing.spacing2xs),
-                      const Icon(Icons.arrow_forward, color: AppColors.onPrimary, size: 18),
-                    ],
-                  ),
+                  elevation: 2,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Book at Gazette Tariff (कारीगर निवडा)',
+                        style: AppTypography.labelMd.copyWith(
+                          color: AppColors.onPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.spacing2xs),
+                    const Icon(Icons.arrow_forward, color: AppColors.onPrimary, size: 18),
+                  ],
                 ),
               ),
             ),

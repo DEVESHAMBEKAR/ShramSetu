@@ -39,6 +39,8 @@ import 'package:app/core/services/fairmatch_engine.dart';
 import 'package:app/core/services/demand_forecasting_engine.dart';
 import 'package:app/core/services/fairmatch_service.dart';
 import 'package:app/core/services/demand_forecast_service.dart';
+import 'package:app/core/services/federation_scope_service.dart';
+import 'package:app/core/services/audit_log_service.dart';
 
 class DI {
   static late IAuthRepository authRepo;
@@ -54,6 +56,7 @@ class DI {
   static late IDemandForecastRepository demandForecastRepo;
   static late IFairMatchService fairMatchService;
   static late IDemandForecastService demandForecastService;
+  static FederationScopeService? federationScopeService;
   static ILocationService locationService = LocationService();
   static NotificationService notificationService = NotificationService.instance;
   static FairMatchEngine fairMatchEngine = FairMatchEngine.instance;
@@ -79,6 +82,7 @@ class DI {
       notificationRepo = MockNotificationRepository();
       fairMatchRepo = MockFairMatchRepository();
       demandForecastRepo = MockDemandForecastRepository(engine: demandForecastEngine);
+      federationScopeService = FederationScopeService();
     } else {
       authRepo = SupabaseAuthRepository(AppConfig.supabaseClient);
       userRepo = SupabaseUserRepository(AppConfig.supabaseClient);
@@ -91,6 +95,8 @@ class DI {
       notificationRepo = SupabaseNotificationRepository(AppConfig.supabaseClient);
       fairMatchRepo = SupabaseFairMatchRepository(AppConfig.supabaseClient);
       demandForecastRepo = SupabaseDemandForecastRepository(AppConfig.supabaseClient, engine: demandForecastEngine);
+      federationScopeService = FederationScopeService(AppConfig.supabaseClient);
+      AuditLogService.initialize(AppConfig.supabaseClient);
     }
     fairMatchService = FairMatchService(fairMatchRepo);
     demandForecastService = DemandForecastService(demandForecastRepo, demandForecastEngine);

@@ -198,10 +198,51 @@ class FairMatchResult {
             .toList() ??
         ['Verified Skill', 'Available Now'];
 
+    final workerId = json['id']?.toString() ?? '';
+    final rawName = json['name']?.toString();
+    final bioStr = json['bio']?.toString() ?? '';
+    final bioLower = bioStr.toLowerCase();
+
+    String catId = json['category_id']?.toString() ?? '';
+    String tradeTitle = 'Artisan';
+    if (catId.isEmpty || catId == 'c2') {
+      if (bioLower.contains('elect') || bioLower.contains('wir') || bioLower.contains('switch')) {
+        catId = 'c1';
+        tradeTitle = 'Electrician';
+      } else if (bioLower.contains('plumb') || bioLower.contains('pipe') || bioLower.contains('tap') || bioLower.contains('leak')) {
+        catId = 'c2';
+        tradeTitle = 'Plumber';
+      } else if (bioLower.contains('carpent') || bioLower.contains('wood')) {
+        catId = 'c3';
+        tradeTitle = 'Carpenter';
+      } else if (bioLower.contains('clean')) {
+        catId = 'c4';
+        tradeTitle = 'Cleaner';
+      } else if (bioLower.contains('paint')) {
+        catId = 'c5';
+        tradeTitle = 'Painter';
+      } else if (bioLower.contains('appliance')) {
+        catId = 'c6';
+        tradeTitle = 'Appliance Specialist';
+      } else if (bioLower.contains('garden')) {
+        catId = 'c7';
+        tradeTitle = 'Gardener';
+      } else if (bioLower.contains('driver')) {
+        catId = 'c8';
+        tradeTitle = 'Driver';
+      } else {
+        catId = catId.isNotEmpty ? catId : 'c1';
+      }
+    }
+
+    final resolvedName = (rawName != null && rawName.isNotEmpty && !rawName.startsWith('User '))
+        ? rawName
+        : 'Registered $tradeTitle';
+
     final worker = Worker(
-      id: json['id']?.toString() ?? '',
-      name: json['name']?.toString() ?? 'Artisan',
-      categoryId: json['category_id']?.toString() ?? 'c2',
+      id: workerId,
+      name: resolvedName,
+      categoryId: catId,
       rate: (json['rate'] as num?)?.toInt() ?? 350,
       rating: (json['rating'] as num?)?.toDouble() ?? 0.0,
       reviewCount: (json['review_count'] as num?)?.toInt() ?? 0,
@@ -212,7 +253,7 @@ class FairMatchResult {
       specializations: tags,
       locationTag: json['location_tag']?.toString() ?? 'Pune Area',
       imageUrl: json['avatar_url']?.toString() ?? '',
-      bio: json['bio']?.toString(),
+      bio: bioStr.isNotEmpty ? bioStr : null,
       isUnionGold: json['is_union_gold'] == true,
       isCoopMaster: json['is_coop_master'] == true,
       customTag: rank == 1 ? 'FairMatch Recommended' : null,

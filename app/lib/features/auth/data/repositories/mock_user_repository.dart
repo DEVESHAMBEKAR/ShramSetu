@@ -1,22 +1,26 @@
 import '../../../../core/repositories/i_user_repository.dart';
+import '../../../../core/models/federation_models.dart';
 import '../../../../features/customer/data/models/customer_profile.dart';
 
 class MockUserRepository implements IUserRepository {
   final Map<String, Map<String, dynamic>> _mockUsers = {};
   final Map<String, List<Map<String, dynamic>>> _mockAddresses = {};
+  int _addrCounter = 1;
 
   MockUserRepository() {
     _seedDefaultMockData();
   }
 
   void _seedDefaultMockData() {
-    // 1. Priya Sharma (9876543210)
+    // 1. Priya Sharma (9876543210) - Pune District
     _mockUsers['mock_customer_01'] = {
       'id': 'mock_customer_01',
       'role': 'CUSTOMER',
       'phone': '9876543210',
       'full_name': 'Priya Sharma',
       'avatar_url': null,
+      'federation_id': '11111111-0000-0000-0000-000000000001',
+      'federation_name': 'Pune District Labour Cooperative Federation',
     };
     _mockAddresses['mock_customer_01'] = [
       {
@@ -26,21 +30,25 @@ class MockUserRepository implements IUserRepository {
         'address_line': '45 Deccan Gymkhana Road',
         'area': 'Deccan',
         'city': 'Pune',
+        'district': 'Pune',
         'state': 'Maharashtra',
         'postal_code': '411004',
         'is_default': true,
         'latitude': 18.5173,
         'longitude': 73.8415,
+        'federation_id': '11111111-0000-0000-0000-000000000001',
       }
     ];
 
-    // 2. Rajesh Patil (9823145890) - hint number in login screen
+    // 2. Rajesh Patil (9823145890) - Pune District
     _mockUsers['mock_customer_02'] = {
       'id': 'mock_customer_02',
       'role': 'CUSTOMER',
       'phone': '9823145890',
       'full_name': 'Rajesh Patil',
       'avatar_url': null,
+      'federation_id': '11111111-0000-0000-0000-000000000001',
+      'federation_name': 'Pune District Labour Cooperative Federation',
     };
     _mockAddresses['mock_customer_02'] = [
       {
@@ -50,11 +58,13 @@ class MockUserRepository implements IUserRepository {
         'address_line': '12 Mayur Colony, Kothrud',
         'area': 'Kothrud',
         'city': 'Pune',
+        'district': 'Pune',
         'state': 'Maharashtra',
         'postal_code': '411038',
         'is_default': true,
         'latitude': 18.5074,
         'longitude': 73.8077,
+        'federation_id': '11111111-0000-0000-0000-000000000001',
       }
     ];
 
@@ -65,6 +75,8 @@ class MockUserRepository implements IUserRepository {
       'phone': '9800012345',
       'full_name': 'Rahul Patil',
       'avatar_url': null,
+      'federation_id': '11111111-0000-0000-0000-000000000001',
+      'federation_name': 'Pune District Labour Cooperative Federation',
     };
     _mockUsers['mock-worker-id'] = _mockUsers['mock_worker_01']!;
 
@@ -76,6 +88,7 @@ class MockUserRepository implements IUserRepository {
       'email': 'admin@shramsetu.in',
       'full_name': 'Devendra Ambdekar (Federation Admin)',
       'avatar_url': null,
+      'federation_id': '11111111-0000-0000-0000-000000000001',
     };
     _mockUsers['mock-admin-id'] = _mockUsers['mock_admin_01']!;
   }
@@ -104,9 +117,9 @@ class MockUserRepository implements IUserRepository {
     required String role,
     required String phone,
     String? fullName,
+    String? federationId,
   }) async {
     final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-    // Check if user exists by userId or phone
     String targetId = userId;
     Map<String, dynamic>? existing = _mockUsers[userId];
     if (existing == null) {
@@ -120,8 +133,12 @@ class MockUserRepository implements IUserRepository {
       }
     }
 
+    String? fedName;
+    if (federationId != null && federationId.isNotEmpty) {
+      fedName = FederationModel.resolveFederation(federationId: federationId).name;
+    }
+
     if (existing != null) {
-      // User exists! Preserve their existing full_name if not explicitly provided
       final existingName = existing['full_name'] as String?;
       _mockUsers[targetId] = {
         ...existing,
@@ -130,6 +147,8 @@ class MockUserRepository implements IUserRepository {
           'full_name': fullName
         else if (existingName == null || existingName.isEmpty)
           'full_name': 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}',
+        if (federationId != null) 'federation_id': federationId,
+        if (fedName != null) 'federation_name': fedName,
       };
     } else {
       _mockUsers[userId] = {
@@ -138,6 +157,8 @@ class MockUserRepository implements IUserRepository {
         'phone': phone,
         'full_name': fullName ?? 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}',
         'avatar_url': null,
+        if (federationId != null) 'federation_id': federationId,
+        if (fedName != null) 'federation_name': fedName,
       };
     }
   }
@@ -171,12 +192,43 @@ class MockUserRepository implements IUserRepository {
       );
       defaultAddr = CustomerAddress.fromMap(defRow);
     }
+
+    String? fedId;
+    String? fedName;
+
+    if (defaultAddr != null) {
+      final resolved = FederationModel.findFederationForLocation(
+        district: defaultAddr.district,
+        city: defaultAddr.city,
+        state: defaultAddr.state,
+        location: defaultAddr.area,
+        address: defaultAddr.addressLine,
+        pincode: defaultAddr.postalCode,
+      );
+      fedId = resolved?.id;
+      fedName = resolved?.name;
+      _mockUsers[targetId] = {
+        ...user,
+        'federation_id': fedId,
+        'federation_name': fedName,
+      };
+    } else {
+      fedId = user['federation_id'] as String?;
+      if (fedId != null && fedId.isNotEmpty) {
+        final matched = FederationModel.findFederationForLocation(federationId: fedId);
+        fedName = matched?.name;
+      }
+    }
+
     return CustomerProfile(
       id: targetId,
       fullName: user['full_name'] as String? ?? '',
       phone: user['phone'] as String? ?? '',
+      email: user['email'] as String?,
       avatarUrl: user['avatar_url'] as String?,
       defaultAddress: defaultAddr,
+      federationId: fedId,
+      federationName: fedName,
     );
   }
 
@@ -196,15 +248,57 @@ class MockUserRepository implements IUserRepository {
   Future<void> updateCustomerProfile({
     required String userId,
     required String fullName,
+    String? phone,
+    String? email,
     String? avatarUrl,
+    String? federationId,
   }) async {
     final user = _mockUsers[userId] ?? {};
+    String? fedName;
+    if (federationId != null && federationId.isNotEmpty) {
+      final matched = FederationModel.findFederationForLocation(federationId: federationId);
+      fedName = matched?.name;
+    }
+
     _mockUsers[userId] = {
       ...user,
       'id': userId,
       'full_name': fullName.trim(),
-      'avatar_url': ?avatarUrl,
+      if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+      if (email != null && email.trim().isNotEmpty) 'email': email.trim(),
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      'federation_id': federationId,
+      'federation_name': fedName,
     };
+  }
+
+  @override
+  Future<String?> assignCustomerFederation({
+    required String userId,
+    String? district,
+    String? city,
+    String? state,
+    String? area,
+    String? addressLine,
+    String? federationId,
+  }) async {
+    final targetFed = FederationModel.findFederationForLocation(
+      federationId: federationId,
+      district: district,
+      city: city,
+      state: state,
+      location: area,
+      address: addressLine,
+    );
+
+    final user = _mockUsers[userId] ?? {'id': userId, 'role': 'CUSTOMER'};
+    _mockUsers[userId] = {
+      ...user,
+      'federation_id': targetFed?.id,
+      'federation_name': targetFed?.name,
+    };
+
+    return targetFed?.id;
   }
 
   @override
@@ -221,25 +315,51 @@ class MockUserRepository implements IUserRepository {
     required String city,
     required String state,
     required String postalCode,
+    String? district,
+    String? federationId,
     String? label,
     double? latitude,
     double? longitude,
   }) async {
     final isFirst = (_mockAddresses[userId] ?? []).isEmpty;
+    final effectiveDistrict = (district != null && district.trim().isNotEmpty) ? district.trim() : city.trim();
+
+    // Auto-resolve federation from location
+    final resolvedFed = FederationModel.findFederationForLocation(
+      federationId: federationId,
+      district: effectiveDistrict,
+      city: city.trim(),
+      state: state.trim(),
+      location: area.trim(),
+      address: addressLine.trim(),
+      pincode: postalCode.trim(),
+    );
+
     final addr = {
-      'id': 'mock_addr_${DateTime.now().millisecondsSinceEpoch}',
+      'id': 'mock_addr_${DateTime.now().microsecondsSinceEpoch}_${_addrCounter++}',
       'user_id': userId,
       'label': label ?? 'Home',
       'address_line': addressLine,
       'area': area,
       'city': city,
+      'district': effectiveDistrict,
       'state': state,
       'postal_code': postalCode,
       'is_default': isFirst,
-      'latitude': ?latitude,
-      'longitude': ?longitude,
+      'federation_id': resolvedFed?.id,
+      'latitude': latitude,
+      'longitude': longitude,
     };
     _mockAddresses[userId] = [...(_mockAddresses[userId] ?? []), addr];
+
+    // Automatically synchronize the customer's assigned cooperative federation
+    final user = _mockUsers[userId] ?? {'id': userId, 'role': 'CUSTOMER'};
+    _mockUsers[userId] = {
+      ...user,
+      'federation_id': resolvedFed?.id,
+      'federation_name': resolvedFed?.name,
+    };
+
     return CustomerAddress.fromMap(addr);
   }
 
@@ -263,11 +383,32 @@ class MockUserRepository implements IUserRepository {
   @override
   Future<void> setDefaultAddress({required String userId, required String addressId}) async {
     final addrs = _mockAddresses[userId] ?? [];
+    CustomerAddress? matchedDefault;
     _mockAddresses[userId] = addrs.map((a) {
       final copy = Map<String, dynamic>.from(a);
-      copy['is_default'] = (copy['id'] == addressId);
+      final isDef = (copy['id'] == addressId);
+      copy['is_default'] = isDef;
+      if (isDef) matchedDefault = CustomerAddress.fromMap(copy);
       return copy;
     }).toList();
+
+    if (matchedDefault != null) {
+      final resolved = FederationModel.findFederationForLocation(
+        federationId: matchedDefault!.federationId,
+        district: matchedDefault!.district,
+        city: matchedDefault!.city,
+        state: matchedDefault!.state,
+        location: matchedDefault!.area,
+        address: matchedDefault!.addressLine,
+        pincode: matchedDefault!.postalCode,
+      );
+      final user = _mockUsers[userId] ?? {'id': userId, 'role': 'CUSTOMER'};
+      _mockUsers[userId] = {
+        ...user,
+        'federation_id': resolved?.id,
+        'federation_name': resolved?.name,
+      };
+    }
   }
 
   @override
@@ -285,19 +426,45 @@ class MockUserRepository implements IUserRepository {
     required String city,
     required String state,
     required String postalCode,
+    String? district,
+    String? federationId,
   }) async {
+    final effectiveDistrict = (district != null && district.trim().isNotEmpty) ? district.trim() : city.trim();
+    final resolvedFed = FederationModel.findFederationForLocation(
+      federationId: federationId,
+      district: effectiveDistrict,
+      city: city.trim(),
+      state: state.trim(),
+      location: area.trim(),
+      address: addressLine.trim(),
+      pincode: postalCode.trim(),
+    );
+
     final addrs = _mockAddresses[userId] ?? [];
+    bool isDefault = false;
     _mockAddresses[userId] = addrs.map((a) {
       if (a['id'] == addressId) {
         final copy = Map<String, dynamic>.from(a);
         copy['address_line'] = addressLine;
         copy['area'] = area;
         copy['city'] = city;
+        copy['district'] = effectiveDistrict;
         copy['state'] = state;
         copy['postal_code'] = postalCode;
+        copy['federation_id'] = resolvedFed?.id;
+        if (copy['is_default'] == true) isDefault = true;
         return copy;
       }
       return a;
     }).toList();
+
+    if (isDefault) {
+      final user = _mockUsers[userId] ?? {'id': userId, 'role': 'CUSTOMER'};
+      _mockUsers[userId] = {
+        ...user,
+        'federation_id': resolvedFed?.id,
+        'federation_name': resolvedFed?.name,
+      };
+    }
   }
 }

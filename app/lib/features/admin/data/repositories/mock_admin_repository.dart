@@ -1,6 +1,8 @@
 import '../../../../core/repositories/i_admin_repository.dart';
 import '../../../../core/services/shared_booking_store.dart';
 import '../../../../core/models/insurance_models.dart';
+import '../../../../core/models/federation_models.dart';
+import '../../../../core/config/dependency_injection.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 import '../../../customer/data/models/customer_models.dart';
@@ -13,8 +15,6 @@ class MockAdminRepository implements IAdminRepository {
     _initializeMockData();
   }
 
-
-
   late AdminDashboardStats _dashboardStats;
   List<WorkerProfile> _workers = [];
   List<PaymentRecord> _payments = [];
@@ -23,25 +23,165 @@ class MockAdminRepository implements IAdminRepository {
   List<AdminCustomerProfile> _customers = [];
   List<AdminService> _services = [];
 
+  Future<List<String>> _getFederationFilter() async {
+    try {
+      final scope = DI.federationScopeService;
+      if (scope == null) return [];
+      return await scope.getAuthorizedFederationIds();
+    } catch (_) {
+      return [];
+    }
+  }
+
   @override
   Future<AdminDashboardStats> getDashboardStats() async {
-    _recalculateStats();
+    final scopedWorkers = await getWorkers();
+    final bookings = SharedBookingStore.instance.getAllBookings();
+    _dashboardStats = AdminDashboardStats(
+      totalWorkers: scopedWorkers.length,
+      verifiedWorkers: scopedWorkers.where((w) => w.verificationStatus == VerificationStatus.approved).length,
+      pendingVerifications: scopedWorkers.where((w) => w.verificationStatus == VerificationStatus.pending).length,
+      activeBookings: bookings.where((b) => b.status != BookingStatus.completed && b.status != BookingStatus.rejected && b.status != BookingStatus.cancelled).length,
+      escrowLocked: 148200.0,
+      welfarePool: 482000.0,
+      fairWorkIndex: 88.0,
+    );
     return _dashboardStats;
   }
+
   @override
-  Future<List<WorkerProfile>> getWorkers() async => _workers;
+  Future<List<WorkerProfile>> getWorkers() async {
+    final federationFilter = await _getFederationFilter();
+    if (federationFilter.isEmpty) {
+      return _workers;
+    }
+    return _workers.where((w) {
+      return w.federationRefId != null && federationFilter.contains(w.federationRefId);
+    }).toList();
+  }
+
   @override
   Future<List<JobRequest>> getBookings() async => SharedBookingStore.instance.getAllBookings();
+
   @override
   Stream<List<JobRequest>> watchBookings() => SharedBookingStore.instance.watchAllBookings();
+
   @override
   Future<List<PaymentRecord>> getPayments() async => _payments;
   @override
   Future<List<Complaint>> getComplaints() async => _complaints;
   @override
   Future<List<WelfareRecord>> getWelfareRecords() async => _welfareRecords;
+
   @override
-  Future<List<AdminCustomerProfile>> getCustomers() async => _customers;
+  Future<List<AdminCustomerProfile>> getCustomers() async {
+    final federationFilter = await _getFederationFilter();
+    if (federationFilter.isEmpty) {
+      return _customers;
+    }
+    return _customers.where((c) {
+      if (c.federationId != null && federationFilter.contains(c.federationId)) {
+        return true;
+      }
+      for (final fedId in federationFilter) {
+        final pool = FederationModel.activePool;
+        final fed = pool.firstWhere(
+          (f) => f.id == fedId,
+          orElse: () => FederationModel.resolveFederation(federationId: fedId),
+        );
+        if ((c.district != null && c.district!.toLowerCase() == fed.district.toLowerCase()) ||
+            (c.city != null && c.city!.toLowerCase() == fed.city.toLowerCase()) ||
+            (c.federationName != null && c.federationName!.toLowerCase().contains(fed.name.toLowerCase()))) {
+          return true;
+        }
+      }
+      return false;
+    }).toList();
+  }
+
+  @override
+  Future<void> updateCustomerDetails({
+    required String customerId,
+    required String fullName,
+    required String phone,
+    String? email,
+    String? state,
+    String? district,
+    String? city,
+    String? area,
+    String? address,
+    String? federationId,
+  }) async {
+    final targetFedId = federationId ??
+        FederationModel.resolveFederation(
+          district: district,
+          city: city,
+          state: state,
+          location: area,
+          address: address,
+        ).id;
+    final fedName = FederationModel.resolveFederation(federationId: targetFedId).name;
+
+    final index = _customers.indexWhere((c) => c.id == customerId);
+    if (index != -1) {
+      final old = _customers[index];
+      _customers[index] = AdminCustomerProfile(
+        id: old.id,
+        name: fullName.trim(),
+        phone: phone.trim(),
+        email: email?.trim() ?? old.email,
+        totalBookings: old.totalBookings,
+        lastBooking: old.lastBooking,
+        status: old.status,
+        state: state ?? old.state,
+        district: district ?? old.district,
+        city: city ?? old.city,
+        area: area ?? address ?? old.area,
+        federationId: targetFedId,
+        federationName: fedName,
+        createdAt: old.createdAt,
+      );
+    } else {
+      _customers.insert(
+        0,
+        AdminCustomerProfile(
+          id: customerId,
+          name: fullName.trim(),
+          phone: phone.trim(),
+          email: email?.trim(),
+          totalBookings: 0,
+          lastBooking: DateTime.now(),
+          status: 'Active',
+          state: state ?? 'Maharashtra',
+          district: district ?? 'Pune',
+          city: city ?? 'Pune',
+          area: area ?? address ?? '',
+          federationId: targetFedId,
+          federationName: fedName,
+          createdAt: DateTime.now(),
+        ),
+      );
+    }
+  }
+
+  @override
+  Future<void> modifyBooking({
+    required String bookingId,
+    BookingStatus? status,
+    String? scheduledDate,
+    String? scheduledTime,
+    String? notes,
+  }) async {
+    await SharedBookingStore.instance.updateBookingDetails(
+      bookingId,
+      status: status,
+      scheduledDate: scheduledDate,
+      scheduledTime: scheduledTime,
+      notes: notes,
+    );
+    _recalculateStats();
+  }
+
   @override
   Future<List<AdminService>> getServices() async => _services;
 
@@ -233,14 +373,20 @@ class MockAdminRepository implements IAdminRepository {
         skills: ['Electrician'],
         experience: '5+ years',
         serviceLocation: 'Pune West',
-        guildId: 'MH-8219',
-        guildName: 'Pune Plumbers Guild',
+        district: 'Pune',
+        state: 'Maharashtra',
+        guildId: 'MH-PUN-01',
+        guildName: 'Pune District Labour Cooperative Federation',
+        federationRefId: '11111111-0000-0000-0000-000000000001',
         rating: 4.8,
         completedJobs: 18,
         earnings: 14280,
         isAvailable: true,
         isVerified: false,
         verificationStatus: VerificationStatus.pending,
+        trade: 'Electrician',
+        primarySkill: 'Wiring & Panels',
+        registeredAt: DateTime.now().subtract(const Duration(days: 3)),
       ),
       WorkerProfile(
         id: 'W2',
@@ -249,15 +395,21 @@ class MockAdminRepository implements IAdminRepository {
         phone: '+91 98765 43211',
         skills: ['Deep Cleaning'],
         experience: '3+ years',
-        serviceLocation: 'Pune City',
-        guildId: 'SHG-102',
-        guildName: 'Pune Women Collective',
+        serviceLocation: 'Shivaji Nagar',
+        district: 'Pune',
+        state: 'Maharashtra',
+        guildId: 'MH-PUN-02',
+        guildName: 'Pune District Labour Cooperative Federation',
+        federationRefId: '11111111-0000-0000-0000-000000000001',
         rating: 4.9,
         completedJobs: 45,
         earnings: 28000,
         isAvailable: true,
         isVerified: false,
         verificationStatus: VerificationStatus.pending,
+        trade: 'Housekeeping',
+        primarySkill: 'Deep Sanitization',
+        registeredAt: DateTime.now().subtract(const Duration(days: 5)),
       ),
       WorkerProfile(
         id: 'W3',
@@ -267,20 +419,173 @@ class MockAdminRepository implements IAdminRepository {
         skills: ['Plumber'],
         experience: '10+ years',
         serviceLocation: 'Kothrud',
-        guildId: 'MH-1122',
-        guildName: 'Pune Plumbers Guild',
+        district: 'Pune',
+        state: 'Maharashtra',
+        guildId: 'MH-PUN-03',
+        guildName: 'Pune District Labour Cooperative Federation',
+        federationRefId: '11111111-0000-0000-0000-000000000001',
         rating: 4.7,
         completedJobs: 120,
         earnings: 85000,
         isAvailable: true,
         isVerified: true,
         verificationStatus: VerificationStatus.approved,
+        trade: 'Plumber',
+        primarySkill: 'Pipe Fitting & Leakage',
+        registeredAt: DateTime.now().subtract(const Duration(days: 20)),
+      ),
+      WorkerProfile(
+        id: 'W4',
+        name: 'Kavita More',
+        profileImage: '',
+        phone: '+91 98765 43213',
+        skills: ['Carpenter'],
+        experience: '7+ years',
+        serviceLocation: 'Panchavati',
+        district: 'Nashik',
+        state: 'Maharashtra',
+        guildId: 'MH-NSK-01',
+        guildName: 'Nashik District Artisans Cooperative Union',
+        federationRefId: '22222222-0000-0000-0000-000000000002',
+        rating: 4.8,
+        completedJobs: 62,
+        earnings: 52000,
+        isAvailable: true,
+        isVerified: false,
+        verificationStatus: VerificationStatus.pending,
+        trade: 'Carpenter',
+        primarySkill: 'Furniture & Woodwork',
+        registeredAt: DateTime.now().subtract(const Duration(days: 2)),
+      ),
+      WorkerProfile(
+        id: 'W5',
+        name: 'Mohd Rafiq',
+        profileImage: '',
+        phone: '+91 98765 43214',
+        skills: ['Painter'],
+        experience: '8+ years',
+        serviceLocation: 'Andheri West',
+        district: 'Mumbai City',
+        state: 'Maharashtra',
+        guildId: 'MH-MUM-01',
+        guildName: 'Mumbai Metropolitan Labour Federation',
+        federationRefId: '33333333-0000-0000-0000-000000000003',
+        rating: 4.6,
+        completedJobs: 88,
+        earnings: 67000,
+        isAvailable: true,
+        isVerified: false,
+        verificationStatus: VerificationStatus.pending,
+        trade: 'Painter',
+        primarySkill: 'Interior Texture Painting',
+        registeredAt: DateTime.now().subtract(const Duration(days: 1)),
+      ),
+      WorkerProfile(
+        id: 'W6',
+        name: 'Santosh Bisen',
+        profileImage: '',
+        phone: '+91 98765 43215',
+        skills: ['Mason'],
+        experience: '12+ years',
+        serviceLocation: 'Sitabuldi',
+        district: 'Nagpur',
+        state: 'Maharashtra',
+        guildId: 'MH-NGP-01',
+        guildName: 'Nagpur District Shramik Cooperative Union',
+        federationRefId: '55555555-0000-0000-0000-000000000005',
+        rating: 4.9,
+        completedJobs: 140,
+        earnings: 94000,
+        isAvailable: true,
+        isVerified: true,
+        verificationStatus: VerificationStatus.approved,
+        trade: 'Mason',
+        primarySkill: 'Tiling & Structural Masonry',
+        registeredAt: DateTime.now().subtract(const Duration(days: 45)),
       ),
     ];
 
     _customers = [
-      AdminCustomerProfile(id: 'C1', name: 'Amit Patil', phone: '+91 9988776655', totalBookings: 5, lastBooking: DateTime.now().subtract(const Duration(days: 2)), status: 'Active'),
-      AdminCustomerProfile(id: 'C2', name: 'Neha Sharma', phone: '+91 9988776656', totalBookings: 12, lastBooking: DateTime.now().subtract(const Duration(days: 10)), status: 'Active'),
+      AdminCustomerProfile(
+        id: 'C1',
+        name: 'Amit Patil',
+        phone: '+91 9988776655',
+        email: 'amit.patil@gmail.com',
+        totalBookings: 5,
+        lastBooking: DateTime.now().subtract(const Duration(days: 2)),
+        status: 'Active',
+        city: 'Pune',
+        district: 'Pune',
+        state: 'Maharashtra',
+        area: 'Kothrud',
+        federationId: '11111111-0000-0000-0000-000000000001',
+        federationName: 'Pune District Labour Cooperative Federation',
+        createdAt: DateTime.now().subtract(const Duration(days: 60)),
+      ),
+      AdminCustomerProfile(
+        id: 'C2',
+        name: 'Neha Sharma',
+        phone: '+91 9988776656',
+        email: 'neha.sharma@gmail.com',
+        totalBookings: 12,
+        lastBooking: DateTime.now().subtract(const Duration(days: 10)),
+        status: 'Active',
+        city: 'Pune',
+        district: 'Pune',
+        state: 'Maharashtra',
+        area: 'Baner',
+        federationId: '11111111-0000-0000-0000-000000000001',
+        federationName: 'Pune District Labour Cooperative Federation',
+        createdAt: DateTime.now().subtract(const Duration(days: 120)),
+      ),
+      AdminCustomerProfile(
+        id: 'C3',
+        name: 'Rajesh Jadhav',
+        phone: '+91 9988776657',
+        email: 'rajesh.jadhav@gmail.com',
+        totalBookings: 3,
+        lastBooking: DateTime.now().subtract(const Duration(days: 4)),
+        status: 'Active',
+        city: 'Nashik',
+        district: 'Nashik',
+        state: 'Maharashtra',
+        area: 'College Road',
+        federationId: '22222222-0000-0000-0000-000000000002',
+        federationName: 'Nashik District Artisans Cooperative Union',
+        createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+      AdminCustomerProfile(
+        id: 'C4',
+        name: 'Priya Merchant',
+        phone: '+91 9988776658',
+        email: 'priya.merchant@gmail.com',
+        totalBookings: 9,
+        lastBooking: DateTime.now().subtract(const Duration(days: 1)),
+        status: 'Active',
+        city: 'Mumbai',
+        district: 'Mumbai City',
+        state: 'Maharashtra',
+        area: 'Bandra West',
+        federationId: '33333333-0000-0000-0000-000000000003',
+        federationName: 'Mumbai Metropolitan Labour Federation',
+        createdAt: DateTime.now().subtract(const Duration(days: 90)),
+      ),
+      AdminCustomerProfile(
+        id: 'C5',
+        name: 'Manoj Verma',
+        phone: '+91 9988776659',
+        email: 'manoj.verma@gmail.com',
+        totalBookings: 2,
+        lastBooking: DateTime.now().subtract(const Duration(days: 15)),
+        status: 'Active',
+        city: 'Nagpur',
+        district: 'Nagpur',
+        state: 'Maharashtra',
+        area: 'Dharampeth',
+        federationId: '55555555-0000-0000-0000-000000000005',
+        federationName: 'Nagpur District Shramik Cooperative Union',
+        createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      ),
     ];
 
 
@@ -370,31 +675,262 @@ class MockAdminRepository implements IAdminRepository {
     await Future.delayed(const Duration(milliseconds: 200));
   }
 
-  final Map<String, WorkerInsuranceModel> _insuranceMap = {};
+  static final WorkerInsuranceModel _samplePolicy = WorkerInsuranceModel(
+    workerId: 'test-worker-01',
+    policyNumber: 'NIC-GRP-2026-8941',
+    coverageAmount: 500000.0,
+    status: InsuranceStatus.active,
+    verificationStatus: InsuranceVerificationStatus.verified,
+  );
+
+  final Map<String, WorkerInsuranceModel> _insuranceMap = {
+    'test-worker-01': _samplePolicy,
+  };
 
   @override
   Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId) async {
-    if (_insuranceMap.containsKey(workerId)) {
-      return _insuranceMap[workerId];
-    }
-    final model = WorkerInsuranceModel(
+    return _insuranceMap[workerId];
+  }
+
+  @override
+  Future<void> updateWorkerInsurance(WorkerInsuranceModel insurance) async {
+    _insuranceMap[insurance.workerId] = insurance;
+  }
+
+  @override
+  Future<WorkerInsuranceModel> approveWorkerInsurance(String workerId, {String? remarks}) async {
+    final year = DateTime.now().year;
+    final suffix = (workerId.hashCode.abs() % 9000 + 1000).toString();
+    final policyNumber = 'POL-$year-$suffix';
+    final approved = WorkerInsuranceModel(
       workerId: workerId,
-      policyNumber: 'FED-GRP-2024-${workerId.hashCode.abs() % 10000}',
+      policyNumber: policyNumber,
       coverageAmount: 500000.0,
       status: InsuranceStatus.active,
       verificationStatus: InsuranceVerificationStatus.verified,
       providerName: 'Maharashtra State Cooperative Labour Federation Welfare Pool',
       claimSupportPhone: '1800-266-9090',
       claimInstructions: 'In case of workplace injury or hospitalization, notify your local federation secretary within 48 hours with hospital discharge summary.',
-      validUntil: DateTime.now().add(const Duration(days: 240)),
+      startDate: DateTime.now(),
+      expiryDate: DateTime.now().add(const Duration(days: 365)),
+      adminRemarks: remarks ?? 'Approved and policy issued by Federation Admin',
       isExternalIntegrationPending: true,
     );
-    _insuranceMap[workerId] = model;
-    return model;
+    _insuranceMap[workerId] = approved;
+    return approved;
   }
 
   @override
-  Future<void> updateWorkerInsurance(WorkerInsuranceModel insurance) async {
-    _insuranceMap[insurance.workerId] = insurance;
+  Future<void> transferWorkerFederation(
+    String workerId,
+    String newFederationId,
+    String newFederationName, {
+    String? reason,
+  }) async {
+    final idx = _workers.indexWhere((w) => w.id == workerId);
+    if (idx != -1) {
+      final old = _workers[idx];
+      final pool = FederationModel.activePool;
+      final targetFed = pool.firstWhere(
+        (f) => f.id == newFederationId,
+        orElse: () => FederationModel.resolveFederation(
+          federationId: newFederationId,
+          federationName: newFederationName,
+        ),
+      );
+      _workers[idx] = WorkerProfile(
+        id: old.id,
+        name: old.name,
+        phone: old.phone,
+        profileImage: old.profileImage,
+        skills: old.skills,
+        experience: old.experience,
+        rating: old.rating,
+        completedJobs: old.completedJobs,
+        isVerified: old.isVerified,
+        isAvailable: old.isAvailable,
+        verificationStatus: old.verificationStatus,
+        earnings: old.earnings,
+        guildId: old.guildId,
+        guildName: newFederationName,
+        serviceLocation: targetFed.city.isNotEmpty ? targetFed.city : targetFed.district,
+        dob: old.dob,
+        gender: old.gender,
+        district: targetFed.district,
+        city: targetFed.city,
+        state: targetFed.state,
+        pinCode: old.pinCode,
+        trade: old.trade,
+        primarySkill: old.primarySkill,
+        skillLevel: old.skillLevel,
+        membershipId: old.membershipId,
+        verificationRemarks: old.verificationRemarks,
+        registeredAt: old.registeredAt,
+        federationRefId: newFederationId,
+      );
+    }
+  }
+
+  void resetMockData() {
+    _initializeMockData();
+    _federationAdmins.clear();
+    _federationAdmins.addAll([
+      {
+        'id': 'scope-pune-admin-1',
+        'user_id': 'ambekar-devesh-pune-uid',
+        'email': 'ambekardevesh2@gmail.com',
+        'full_name': 'Devesh Ambekar',
+        'phone': '+91 98220 12345',
+        'role': 'FEDERATION_ADMIN',
+        'federation_id': '11111111-0000-0000-0000-000000000001',
+        'federation_name': 'Pune District Labour Cooperative Federation',
+        'scope_level': 'FEDERATION',
+        'is_active': true,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+      {
+        'id': 'scope-nashik-admin-1',
+        'user_id': 'adil-atar-nashik-uid',
+        'email': 'adilatar9494@gmail.com',
+        'full_name': 'Adil Atar',
+        'phone': '7822027271',
+        'role': 'FEDERATION_ADMIN',
+        'federation_id': '22222222-0000-0000-0000-000000000002',
+        'federation_name': 'Nashik District Artisans Cooperative Union',
+        'scope_level': 'FEDERATION',
+        'is_active': true,
+        'created_at': DateTime.now().toIso8601String(),
+      },
+    ]);
+  }
+
+  final List<Map<String, dynamic>> _federationAdmins = [
+    {
+      'id': 'scope-pune-admin-1',
+      'user_id': 'ambekar-devesh-pune-uid',
+      'email': 'ambekardevesh2@gmail.com',
+      'full_name': 'Devesh Ambekar',
+      'phone': '+91 98220 12345',
+      'role': 'FEDERATION_ADMIN',
+      'federation_id': '11111111-0000-0000-0000-000000000001',
+      'federation_name': 'Pune District Labour Cooperative Federation',
+      'scope_level': 'FEDERATION',
+      'is_active': true,
+      'created_at': DateTime.now().toIso8601String(),
+    },
+    {
+      'id': 'scope-nashik-admin-1',
+      'user_id': 'adil-atar-nashik-uid',
+      'email': 'adilatar9494@gmail.com',
+      'full_name': 'Adil Atar',
+      'phone': '7822027271',
+      'role': 'FEDERATION_ADMIN',
+      'federation_id': '22222222-0000-0000-0000-000000000002',
+      'federation_name': 'Nashik District Artisans Cooperative Union',
+      'scope_level': 'FEDERATION',
+      'is_active': true,
+      'created_at': DateTime.now().toIso8601String(),
+    },
+  ];
+
+  @override
+  Future<Map<String, dynamic>> createFederationAdmin({
+    required String email,
+    required String password,
+    required String fullName,
+    required String phone,
+    required String federationId,
+  }) async {
+    final entry = {
+      'id': 'scope-${DateTime.now().millisecondsSinceEpoch}',
+      'user_id': 'user-${DateTime.now().millisecondsSinceEpoch}',
+      'email': email.trim().toLowerCase(),
+      'full_name': fullName.trim(),
+      'phone': phone.trim(),
+      'role': 'FEDERATION_ADMIN',
+      'federation_id': federationId,
+      'scope_level': 'FEDERATION',
+      'is_active': true,
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    _federationAdmins.add(entry);
+    return {'success': true, 'admin': entry};
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getFederationAdmins({String? federationId}) async {
+    if (federationId != null) {
+      return _federationAdmins.where((a) => a['federation_id'] == federationId).toList();
+    }
+    return List.from(_federationAdmins);
+  }
+
+  @override
+  Future<void> reassignFederationAdmin({
+    required String userId,
+    required String newFederationId,
+    String? oldFederationId,
+  }) async {
+    final index = _federationAdmins.indexWhere((a) =>
+        a['user_id'] == userId &&
+        (oldFederationId == null || a['federation_id'] == oldFederationId));
+    if (index != -1) {
+      final old = _federationAdmins[index];
+      String newFedName = 'Assigned Cooperative';
+      final fed = FederationModel.defaultFederations.where((f) => f.id == newFederationId).firstOrNull;
+      if (fed != null) {
+        newFedName = fed.name;
+      }
+      _federationAdmins[index] = {
+        ...old,
+        'federation_id': newFederationId,
+        'federation_name': newFedName,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
+  }
+
+  @override
+  Future<void> removeFederationAdmin({
+    required String userId,
+    required String federationId,
+  }) async {
+    _federationAdmins.removeWhere((a) =>
+        a['user_id'] == userId && a['federation_id'] == federationId);
+  }
+
+  @override
+  Future<void> resetFederationAdminPassword({
+    required String userId,
+    required String newPassword,
+    bool requirePasswordChange = true,
+  }) async {
+    final index = _federationAdmins.indexWhere((a) => a['user_id'] == userId || a['email'] == userId);
+    if (index != -1) {
+      _federationAdmins[index] = {
+        ..._federationAdmins[index],
+        'requires_password_change': requirePasswordChange,
+        'password': newPassword,
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
+  }
+
+  @override
+  Future<void> updateFederationAdminDetails({
+    required String userId,
+    String? fullName,
+    String? phone,
+  }) async {
+    final index = _federationAdmins.indexWhere((a) => a['user_id'] == userId || a['email'] == userId);
+    if (index != -1) {
+      final old = _federationAdmins[index];
+      _federationAdmins[index] = {
+        ...old,
+        if (fullName != null && fullName.trim().isNotEmpty) 'full_name': fullName.trim(),
+        if (phone != null) 'phone': phone.trim(),
+        'updated_at': DateTime.now().toIso8601String(),
+      };
+    }
   }
 }

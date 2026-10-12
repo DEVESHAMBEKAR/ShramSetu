@@ -93,6 +93,17 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final allBookings = _bookings ?? [];
+    final activeBookings = allBookings.where((b) {
+      final s = (b['status']?.toString() ?? '').toLowerCase();
+      return s != 'completed' && s != 'cancelled' && s != 'rejected';
+    }).toList();
+
+    final pastBookings = allBookings.where((b) {
+      final s = (b['status']?.toString() ?? '').toLowerCase();
+      return s == 'completed' || s == 'cancelled' || s == 'rejected';
+    }).toList();
+
     return ListenableBuilder(
       listenable: LocaleController.instance,
       builder: (context, _) {
@@ -136,12 +147,34 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                                   boxShadow: _selectedTab == 0 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(
-                                  'Active Orders'.tr(),
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Active Orders'.tr(),
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: _selectedTab == 0 ? AppColors.primary : AppColors.outline,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: _selectedTab == 0 ? AppColors.primary : AppColors.surfaceContainerHigh,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${activeBookings.length}',
+                                        style: TextStyle(
+                                          color: _selectedTab == 0 ? Colors.white : AppColors.onSurfaceVariant,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -157,12 +190,34 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                                   boxShadow: _selectedTab == 1 ? [const BoxShadow(color: Colors.black12, blurRadius: 3)] : null,
                                 ),
                                 alignment: Alignment.center,
-                                child: Text(
-                                  'Past Orders'.tr(),
-                                  style: AppTypography.labelSm.copyWith(
-                                    color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
-                                    fontWeight: FontWeight.bold,
-                                  ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      'Past Orders'.tr(),
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: _selectedTab == 1 ? AppColors.primary : AppColors.outline,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: _selectedTab == 1 ? AppColors.primary : AppColors.surfaceContainerHigh,
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '${pastBookings.length}',
+                                        style: TextStyle(
+                                          color: _selectedTab == 1 ? Colors.white : AppColors.onSurfaceVariant,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          height: 1,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -186,17 +241,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                       if (_errorMessage != null && (_bookings == null || _bookings!.isEmpty)) {
                         return Center(child: Text('Error: $_errorMessage', style: AppTypography.bodyMd));
                       }
-
-                      final allBookings = _bookings ?? [];
-                      final activeBookings = allBookings.where((b) {
-                        final s = (b['status']?.toString() ?? '').toLowerCase();
-                        return s != 'completed' && s != 'cancelled' && s != 'rejected';
-                      }).toList();
-
-                      final pastBookings = allBookings.where((b) {
-                        final s = (b['status']?.toString() ?? '').toLowerCase();
-                        return s == 'completed' || s == 'cancelled' || s == 'rejected';
-                      }).toList();
 
                       final currentList = _selectedTab == 0 ? activeBookings : pastBookings;
 

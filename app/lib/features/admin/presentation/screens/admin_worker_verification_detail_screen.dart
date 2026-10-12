@@ -5,14 +5,17 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../shared/widgets/document_viewer/document_viewer_modal.dart';
 import '../../../../core/models/insurance_models.dart';
+import '../../../../core/models/federation_models.dart';
 import '../../../worker/data/models/worker_models.dart';
 
 class AdminWorkerVerificationDetailScreen extends StatefulWidget {
   final WorkerProfile worker;
+  final bool? isSuperAdmin;
 
   const AdminWorkerVerificationDetailScreen({
     super.key,
     required this.worker,
+    this.isSuperAdmin,
   });
 
   @override
@@ -28,6 +31,8 @@ class _AdminWorkerVerificationDetailScreenState
   WorkerInsuranceModel? _insurance;
   bool _isLoading = true;
   bool _isProcessingAction = false;
+  bool _isAccessDenied = false;
+  bool _isSuperAdmin = false;
 
   @override
   void initState() {
@@ -39,6 +44,29 @@ class _AdminWorkerVerificationDetailScreenState
   Future<void> _loadDetails() async {
     setState(() => _isLoading = true);
     try {
+      await FederationModel.fetchAllFederations();
+      // 1. Check federation authority
+      final scope = DI.federationScopeService;
+      _isSuperAdmin = widget.isSuperAdmin ?? (scope != null ? await scope.hasGlobalScope() : false);
+      if (!_isSuperAdmin) {
+        final authIds = scope != null
+            ? await scope.getAuthorizedFederationIds()
+            : <String>[];
+        final wFedId = _worker.federationRefId;
+
+        final bool isAuthorized = authIds.isNotEmpty && wFedId != null && authIds.contains(wFedId);
+
+        if (!isAuthorized) {
+          if (mounted) {
+            setState(() {
+              _isAccessDenied = true;
+              _isLoading = false;
+            });
+          }
+          return;
+        }
+      }
+
       final docs = await DI.adminRepo.getWorkerDocuments(_worker.id);
       final history = await DI.adminRepo.getVerificationHistory(_worker.id);
       final workers = await DI.adminRepo.getWorkers();
@@ -66,16 +94,6 @@ class _AdminWorkerVerificationDetailScreenState
 
   /// Opens the document directly inside the app viewer modal.
   Future<void> _viewDocument(Map<String, dynamic> doc) async {
-    final storagePath = doc['storage_path']?.toString() ?? '';
-    if (storagePath.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No storage path available for this document.')),
-        );
-      }
-      return;
-    }
-
     await DocumentViewerModal.show(
       context,
       doc: doc,
@@ -162,6 +180,35 @@ class _AdminWorkerVerificationDetailScreenState
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
         }
+      }
+    }
+  }
+
+  Future<void> _approveInsurance() async {
+    setState(() => _isProcessingAction = true);
+    try {
+      final approved = await DI.adminRepo.approveWorkerInsurance(_worker.id);
+      if (mounted) {
+        setState(() {
+          _insurance = approved;
+          _isProcessingAction = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF2E7D32),
+            content: Text('✓ Insurance approved! Policy ${approved.policyNumber} generated.'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isProcessingAction = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Failed to approve insurance: $e'),
+          ),
+        );
       }
     }
   }
@@ -436,6 +483,133 @@ class _AdminWorkerVerificationDetailScreenState
     }
   }
 
+  Future<void> _handleTransferFederation() async {
+    final allFederations = await FederationModel.fetchAllFederations(forceRefresh: true);
+    final activeFederations = allFederations.where((f) => f.isActive).toList();
+    final candidates = activeFederations.isNotEmpty ? activeFederations : allFederations;
+
+    // Pick first candidate that is not the current worker's federation
+    final otherFederations = candidates.where((f) =>
+      f.id != _worker.federationRefId &&
+      f.name.toLowerCase().trim() != _worker.guildName.toLowerCase().trim()
+    ).toList();
+
+    final initialFed = otherFederations.isNotEmpty ? otherFederations.first : candidates.first;
+    String? selectedFedId = initialFed.id;
+    String selectedFedName = initialFed.name;
+    final reasonController = TextEditingController();
+
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.swap_horiz, color: Color(0xFF6A1B9A)),
+              SizedBox(width: 8),
+              Text('Transfer Federation'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Transfer ${_worker.name} from "${_worker.guildName}" to another cooperative federation.',
+                style: const TextStyle(fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                value: selectedFedId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'Target Federation *',
+                  border: OutlineInputBorder(),
+                ),
+                items: candidates.map((fed) {
+                  final isCurrent = fed.id == _worker.federationRefId ||
+                      fed.name.toLowerCase().trim() == _worker.guildName.toLowerCase().trim();
+                  final locationStr = fed.city.isNotEmpty ? fed.city : fed.district;
+                  return DropdownMenuItem(
+                    value: fed.id,
+                    enabled: !isCurrent,
+                    child: Text(
+                      '${fed.name}${locationStr.isNotEmpty ? ' ($locationStr)' : ''}${isCurrent ? ' [Current]' : ''}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isCurrent ? Colors.grey : Colors.black87,
+                        fontWeight: isCurrent ? FontWeight.bold : FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    final target = candidates.firstWhere(
+                      (f) => f.id == val,
+                      orElse: () => candidates.first,
+                    );
+                    setDialogState(() {
+                      selectedFedId = val;
+                      selectedFedName = target.name;
+                    });
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: reasonController,
+                decoration: const InputDecoration(
+                  labelText: 'Transfer Justification / Reason *',
+                  border: OutlineInputBorder(),
+                  hintText: 'e.g. Relocation, regional restructuring',
+                ),
+                maxLines: 2,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white),
+              onPressed: () {
+                if (selectedFedId == _worker.federationRefId ||
+                    selectedFedName.toLowerCase().trim() == _worker.guildName.toLowerCase().trim()) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Please select a different target federation')),
+                  );
+                  return;
+                }
+                if (reasonController.text.trim().isEmpty) {
+                  ScaffoldMessenger.of(ctx).showSnackBar(
+                    const SnackBar(content: Text('Please specify transfer justification')),
+                  );
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Confirm Transfer'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (confirmed == true && selectedFedId != null) {
+      _executeAction(
+        actionName: 'Artisan Transferred to $selectedFedName',
+        action: () => DI.adminRepo.transferWorkerFederation(
+          _worker.id,
+          selectedFedId!,
+          selectedFedName,
+          reason: reasonController.text.trim(),
+        ),
+      );
+    }
+  }
+
   Future<void> _executeAction({
     required String actionName,
     required Future<void> Function() action,
@@ -492,35 +666,70 @@ class _AdminWorkerVerificationDetailScreenState
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-          : Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 860),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(AppSpacing.marginMobile),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeaderCard(),
-                      const SizedBox(height: 16),
-                      _buildActionButtonsCard(),
-                      const SizedBox(height: 16),
-                      _buildProfileInfoCard(),
-                      const SizedBox(height: 16),
-                      _buildWorkSkillsCard(),
-                      const SizedBox(height: 16),
-                      _buildCooperativeCard(),
-                      const SizedBox(height: 16),
-                      _buildInsuranceWelfareCard(),
-                      const SizedBox(height: 16),
-                      _buildDocumentsCard(),
-                      const SizedBox(height: 16),
-                      _buildVerificationHistoryCard(),
-                      const SizedBox(height: 32),
-                    ],
+          : _isAccessDenied
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.gpp_bad, size: 64, color: AppColors.error),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Cooperative Federation Access Restricted',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18, color: AppColors.primary),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Artisan "${_worker.name}" is registered under another cooperative federation (${_worker.federationName}). Under cooperative data isolation policies, only officers of that federation or National Super Admins can access, view, or verify this dossier.',
+                          style: const TextStyle(fontSize: 13, color: AppColors.onSurfaceVariant, height: 1.4),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                          ),
+                          onPressed: () => Navigator.pop(context),
+                          icon: const Icon(Icons.arrow_back, size: 18),
+                          label: const Text('Return to Verification Desk'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 860),
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(AppSpacing.marginMobile),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildHeaderCard(),
+                          const SizedBox(height: 16),
+                          _buildActionButtonsCard(),
+                          const SizedBox(height: 16),
+                          _buildProfileInfoCard(),
+                          const SizedBox(height: 16),
+                          _buildWorkSkillsCard(),
+                          const SizedBox(height: 16),
+                          _buildCooperativeCard(),
+                          const SizedBox(height: 16),
+                          _buildInsuranceWelfareCard(),
+                          const SizedBox(height: 16),
+                          _buildDocumentsCard(),
+                          const SizedBox(height: 16),
+                          _buildVerificationHistoryCard(),
+                          const SizedBox(height: 32),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
     );
   }
 
@@ -754,6 +963,16 @@ class _AdminWorkerVerificationDetailScreenState
                   icon: const Icon(Icons.block, size: 16),
                   label: const Text('Suspend Account'),
                 ),
+              if (_isSuperAdmin)
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF6A1B9A),
+                    side: const BorderSide(color: Color(0xFF6A1B9A)),
+                  ),
+                  onPressed: _isProcessingAction ? null : _handleTransferFederation,
+                  icon: const Icon(Icons.swap_horiz, size: 16),
+                  label: const Text('Transfer Federation'),
+                ),
             ],
           ),
         ],
@@ -859,9 +1078,49 @@ class _AdminWorkerVerificationDetailScreenState
             ],
           ),
           const SizedBox(height: 14),
-          _buildInfoRow('Federation Name', _worker.federationName.isNotEmpty ? _worker.federationName : 'Pune District Cooperative Federation'),
-          _buildInfoRow('Membership / Guild ID', _worker.membershipId?.isNotEmpty == true ? _worker.membershipId! : (_worker.guildId != 'None' ? _worker.guildId : 'Pending Assignment')),
-          _buildInfoRow('Artisan Charter Declaration', 'Accepted on Registration'),
+          () {
+            final pool = FederationModel.activePool;
+            final fed = (_worker.federationRefId != null && _worker.federationRefId!.isNotEmpty)
+                ? pool.firstWhere(
+                    (f) => f.id == _worker.federationRefId,
+                    orElse: () => FederationModel.resolveFederation(
+                      federationId: _worker.federationRefId,
+                      federationName: _worker.federationName,
+                      district: _worker.district,
+                      city: _worker.city,
+                      location: _worker.serviceLocation,
+                      address: _worker.address,
+                    ),
+                  )
+                : FederationModel.resolveFederation(
+                    federationName: _worker.federationName,
+                    district: _worker.district,
+                    city: _worker.city,
+                    location: _worker.serviceLocation,
+                    address: _worker.address,
+                  );
+            final memId = (_worker.membershipId?.isNotEmpty == true && _worker.membershipId != 'Pending Assignment')
+                ? _worker.membershipId!
+                : ((_worker.guildId.isNotEmpty && _worker.guildId != 'None' && _worker.guildId != '#' && _worker.guildId != 'Pending Assignment')
+                    ? _worker.guildId
+                    : 'FED-${fed.city.substring(0, fed.city.length >= 3 ? 3 : fed.city.length).toUpperCase()}-2024-${_worker.id.replaceAll(RegExp(r'[^0-9]'), '').padRight(4, '7').substring(0, 4)}');
+
+            final displayFedName = (_worker.guildName.isNotEmpty &&
+                    _worker.guildName != 'None' &&
+                    _worker.guildName != '#' &&
+                    _worker.guildName != 'General Guild')
+                ? _worker.guildName
+                : fed.name;
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildInfoRow('Federation Name', displayFedName),
+                _buildInfoRow('Membership / Guild ID', memId),
+                _buildInfoRow('Artisan Charter Declaration', 'Accepted on Registration'),
+              ],
+            );
+          }(),
         ],
       ),
     );
@@ -869,7 +1128,30 @@ class _AdminWorkerVerificationDetailScreenState
 
   Widget _buildInsuranceWelfareCard() {
     final ins = _insurance;
-    final policyNum = ins?.maskedPolicyNumber ?? 'FED-GRP-4921';
+    final isPending = ins?.isPendingApproval ?? false;
+    final isApproved = ins?.isApproved ?? false;
+
+    Color badgeBg;
+    Color badgeText;
+    String badgeLabel;
+
+    if (isApproved) {
+      badgeBg = AppColors.tertiaryContainer;
+      badgeText = AppColors.onTertiaryContainer;
+      badgeLabel = 'Active Policy';
+    } else if (isPending) {
+      badgeBg = AppColors.warningContainer;
+      badgeText = AppColors.onWarningContainer;
+      badgeLabel = 'Pending Approval';
+    } else {
+      badgeBg = const Color(0xFFF3F4F6);
+      badgeText = const Color(0xFF4B5563);
+      badgeLabel = 'Not Applied';
+    }
+
+    final policyNum = isApproved
+        ? ins!.maskedPolicyNumber
+        : (isPending ? 'Pending Issuance (Requires Admin Approval)' : 'Not Applied');
     final provider = ins?.providerName ?? 'Maharashtra State Cooperative Labour Federation Welfare Pool';
     final amt = '₹${(ins?.coverageAmount ?? 500000.0).toStringAsFixed(0)}';
 
@@ -902,12 +1184,12 @@ class _AdminWorkerVerificationDetailScreenState
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: badgeBg,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  ins?.status.displayLabel ?? 'Active Policy',
-                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.onTertiaryContainer),
+                  badgeLabel,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: badgeText),
                 ),
               ),
             ],
@@ -920,14 +1202,22 @@ class _AdminWorkerVerificationDetailScreenState
               borderRadius: BorderRadius.circular(8),
               border: Border.all(color: AppColors.outlineVariant),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline, size: 14, color: AppColors.secondary),
-                SizedBox(width: 6),
+                Icon(
+                  isApproved ? Icons.verified_outlined : Icons.info_outline,
+                  size: 14,
+                  color: isApproved ? AppColors.onTertiaryContainer : AppColors.secondary,
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'External insurance provider integration pending. Group coverage active via Federation Welfare Fund.',
-                    style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                    isApproved
+                        ? 'External insurance provider integration pending. Group coverage active via Federation Welfare Fund.'
+                        : (isPending
+                            ? 'Worker submitted group insurance application. Admin approval required to generate policy number and issue certificate.'
+                            : 'Worker has not applied for group insurance coverage yet. Coverage is not automatically active until applied and approved.'),
+                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
                   ),
                 ),
               ],
@@ -939,6 +1229,32 @@ class _AdminWorkerVerificationDetailScreenState
           _buildInfoRow('Welfare Provider', provider),
           _buildInfoRow('Coverage Limit', amt),
           _buildInfoRow('Emergency Support', ins?.claimSupportPhone ?? '1800-266-9090'),
+          if (isApproved && ins != null) ...[
+            _buildInfoRow('Effective From', ins.startDate.toIso8601String().split('T').first),
+            _buildInfoRow('Valid Until', ins.expiryDate.toIso8601String().split('T').first),
+          ],
+          if (!isApproved) ...[
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2E7D32),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                icon: const Icon(Icons.verified_user_outlined, size: 18),
+                label: Text(
+                  isPending
+                      ? 'Approve Insurance & Generate Policy'
+                      : 'Enroll Worker & Issue Group Policy',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                onPressed: _isProcessingAction ? null : _approveInsurance,
+              ),
+            ),
+          ],
         ],
       ),
     );

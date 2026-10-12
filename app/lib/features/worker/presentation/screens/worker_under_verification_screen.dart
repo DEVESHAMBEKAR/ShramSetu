@@ -6,6 +6,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../shared/widgets/document_viewer/document_viewer_modal.dart';
 import '../../data/models/worker_models.dart';
+import '../../../../core/models/federation_models.dart';
 import 'worker_kyc_screen.dart';
 import 'worker_registration_screen.dart';
 
@@ -194,12 +195,22 @@ class _WorkerUnderVerificationScreenState
               title: const Text('Cooperative Helpline', style: TextStyle(fontWeight: FontWeight.bold)),
               subtitle: const Text('1800-266-9090 (Toll Free, 9 AM - 6 PM)'),
             ),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.location_city, color: AppColors.primary),
-              title: const Text('Pune Central Office', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Shramik Bhavan, Shivajinagar, Pune 411005'),
-            ),
+            () {
+              final fed = FederationModel.resolveFederation(
+                federationId: _worker?.federationRefId,
+                federationName: _worker?.federationName,
+                district: _worker?.district,
+                city: _worker?.city,
+                location: _worker?.serviceLocation,
+              );
+              final cityOrDist = fed.city.isNotEmpty ? fed.city : (fed.district.isNotEmpty ? fed.district : 'District');
+              return ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.location_city, color: AppColors.primary),
+                title: Text('$cityOrDist Central Office', style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Text('${fed.name}, $cityOrDist'),
+              );
+            }(),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -363,6 +374,12 @@ class _WorkerUnderVerificationScreenState
     String headline;
     String description;
 
+    final effectiveFedName = _worker?.federationName.trim().isNotEmpty == true
+        ? _worker!.federationName.trim()
+        : (_worker?.guildName.trim().isNotEmpty == true
+            ? _worker!.guildName.trim()
+            : 'District Cooperative Federation');
+
     switch (status) {
       case VerificationStatus.approved:
         bgColor = const Color(0xFFE8F5E9);
@@ -372,7 +389,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.verified_user;
         badgeText = 'VERIFIED & APPROVED';
         headline = 'Registration Approved!';
-        description = 'Your credentials and documents have been verified by the Federation Administrator. You now have full access to job assignments and cooperative benefits.';
+        description = 'Your credentials and documents have been verified by the $effectiveFedName Administrator. You now have full access to job assignments and cooperative benefits.';
         break;
       case VerificationStatus.changesRequired:
         bgColor = const Color(0xFFFFF3E0);
@@ -382,7 +399,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.edit_note;
         badgeText = 'CHANGES REQUIRED';
         headline = 'Action Required: Update Details';
-        description = 'The Federation Administrator has reviewed your submission and requested corrections or clearer documents before approval can be granted.';
+        description = 'The $effectiveFedName Administrator has reviewed your submission and requested corrections or clearer documents before approval can be granted.';
         break;
       case VerificationStatus.underReview:
         bgColor = const Color(0xFFE3F2FD);
@@ -392,7 +409,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.manage_search;
         badgeText = 'UNDER REVIEW';
         headline = 'Application Under Officer Review';
-        description = 'A Federation Verification Officer is currently examining your uploaded documents and trade credentials. No action is needed from you right now.';
+        description = 'A $effectiveFedName Verification Officer is currently examining your uploaded documents and trade credentials. No action is needed from you right now.';
         break;
       case VerificationStatus.rejected:
         bgColor = AppColors.errorContainer.withValues(alpha: 0.3);
@@ -402,7 +419,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.cancel_outlined;
         badgeText = 'APPLICATION DECLINED';
         headline = 'Verification Declined';
-        description = 'Your application could not be verified by the Federation Administrator based on the provided documents.';
+        description = 'Your application could not be verified by the $effectiveFedName Administrator based on the provided documents.';
         break;
       case VerificationStatus.suspended:
         bgColor = const Color(0xFFFFEBEE);
@@ -412,7 +429,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.block;
         badgeText = 'ACCOUNT SUSPENDED';
         headline = 'Artisan Account Suspended';
-        description = 'Your artisan account has been temporarily suspended by the Federation Administration. Please contact your district desk for appeals.';
+        description = 'Your artisan account has been temporarily suspended by the $effectiveFedName Administration. Please contact your district desk for appeals.';
         break;
       case VerificationStatus.pending:
       case VerificationStatus.notSubmitted:
@@ -423,7 +440,7 @@ class _WorkerUnderVerificationScreenState
         iconData = Icons.hourglass_top;
         badgeText = 'UNDER VERIFICATION';
         headline = 'Application In Queue';
-        description = 'Your registration documents have been submitted to the Pune District Cooperative Federation Administrator.\n\nUnder cooperative bylaws, all tradespeople undergo mandatory document and trade verification before receiving customer assignments. You will get full access immediately after administrator approval.';
+        description = 'Your registration documents have been submitted to the $effectiveFedName Administrator.\n\nUnder cooperative bylaws, all tradespeople undergo mandatory document and trade verification before receiving customer assignments. You will get full access immediately after administrator approval.';
         break;
     }
 
@@ -716,7 +733,7 @@ class _WorkerUnderVerificationScreenState
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  '${_worker?.federationName.isNotEmpty == true ? _worker!.federationName : "Pune District Cooperative Federation"} • Registered Artisan Desk',
+                  '$effectiveFedName • Registered Artisan Desk',
                   style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
                   overflow: TextOverflow.ellipsis,
                 ),
@@ -772,7 +789,7 @@ class _WorkerUnderVerificationScreenState
             number: '3',
             title: 'Federation Admin Document Verification',
             subtitle: isApproved
-                ? 'Approved by Federation Administrator'
+                ? 'Approved by ${_worker?.federationName.isNotEmpty == true ? _worker!.federationName : "Federation"} Administrator'
                 : (isUnderReview
                     ? 'Officer currently reviewing credentials'
                     : (isChangesRequired

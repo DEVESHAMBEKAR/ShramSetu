@@ -283,7 +283,7 @@ class _CustomerBookingDetailScreenState
     final workerPhone = workerUserData?['phone']?.toString() ?? '+91 98220 12345';
     final workerRating = (workerData?['rating'] as num?)?.toDouble() ?? 4.8;
     final workerTrade = workerData?['trade']?.toString() ?? 'Certified Artisan';
-    final federationName = workerData?['federation_name']?.toString() ?? 'Pune District Labour Cooperative Federation';
+    final federationName = workerData?['federation_name']?.toString() ?? 'Cooperative Federation';
     final amount = (_booking['base_amount'] as num?)?.toDouble() ?? 399.0;
     final otp = _booking['otp']?.toString() ?? '8492';
     final bookingId = _booking['id']?.toString() ?? '';

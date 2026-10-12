@@ -58,4 +58,10 @@ class Worker {
     this.languages = const [],
     this.serviceAreas = const [],
   });
+
+  /// Compatibility getter for screens expecting worker.area (maps to locationTag)
+  String? get area => locationTag.isNotEmpty ? locationTag : null;
+
+  /// Compatibility getter for screens expecting worker.profilePhotoUrl (maps to imageUrl)
+  String? get profilePhotoUrl => imageUrl.isNotEmpty ? imageUrl : null;
 }

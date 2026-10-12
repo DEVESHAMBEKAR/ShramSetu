@@ -8,6 +8,7 @@ abstract class IUserRepository {
     required String role,
     required String phone,
     String? fullName,
+    String? federationId,
   });
 
   /// Get the role of the current user.
@@ -18,18 +19,33 @@ abstract class IUserRepository {
 
   // ───────────── Customer Profile Methods ─────────────
 
-  /// Load the customer's full profile (including their default address if any).
+  /// Load the customer's full profile (including their default address and assigned federation).
   Future<CustomerProfile?> getCustomerProfile(String userId);
 
   /// Load the customer's full profile by phone number (useful during login lookup).
   Future<CustomerProfile?> getCustomerProfileByPhone(String phone);
 
-  /// Update mutable profile fields (full_name, avatar_url only).
+  /// Update mutable profile fields (full_name, phone, email, avatar_url, federation_id).
   /// Role is never exposed here — prevents privilege escalation.
   Future<void> updateCustomerProfile({
     required String userId,
     required String fullName,
+    String? phone,
+    String? email,
     String? avatarUrl,
+    String? federationId,
+  });
+
+  /// Assign or update customer federation based on their provided location.
+  /// Resolves the corresponding cooperative federation and saves it to users table.
+  Future<String?> assignCustomerFederation({
+    required String userId,
+    String? district,
+    String? city,
+    String? state,
+    String? area,
+    String? addressLine,
+    String? federationId,
   });
 
   /// Returns true if profile is considered complete:
@@ -38,7 +54,7 @@ abstract class IUserRepository {
   Future<bool> isProfileComplete(String userId);
 
   /// Create a new address for the customer.
-  /// If this is their first address, is_default is forced to true.
+  /// Automatically resolves and assigns the cooperative federation from the address location.
   Future<CustomerAddress> createAddress({
     required String userId,
     required String addressLine,
@@ -46,6 +62,8 @@ abstract class IUserRepository {
     required String city,
     required String state,
     required String postalCode,
+    String? district,
+    String? federationId,
     String? label,
     double? latitude,
     double? longitude,
@@ -72,5 +90,7 @@ abstract class IUserRepository {
     required String city,
     required String state,
     required String postalCode,
+    String? district,
+    String? federationId,
   });
 }

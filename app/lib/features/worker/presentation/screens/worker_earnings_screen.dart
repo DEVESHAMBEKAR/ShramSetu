@@ -320,6 +320,31 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
                     guildId: guildId,
                     periodEarnings: periodEarnings,
                     insurance: data.insurance,
+                    workerId: worker.id,
+                  ),
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('PDF generation coming soon')),
+                        );
+                      },
+                      icon: const Icon(Icons.download, size: 18),
+                      label: const Column(
+                        children: [
+                          Text('Download Tax & Earnings Slip (PDF)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                          Text('GST & Union Welfare Compliant', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w400)),
+                        ],
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                    ),
                   ),
                   const SizedBox(height: 80),
                 ],
@@ -1007,14 +1032,54 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
     required String workerName,
     required String guildId,
     required double periodEarnings,
+    required String workerId,
     WorkerInsuranceModel? insurance,
   }) {
     final int cessAccrued = (periodEarnings * 0.02).round();
     final String cessBadge = cessAccrued > 0 ? '+₹$cessAccrued this mo' : '₹0 this mo';
 
+    final bool isApproved = insurance?.isApproved ?? false;
+    final bool isPending = insurance?.isPendingApproval ?? false;
+    final bool isNotApplied = insurance == null || insurance.isNotApplied;
+
+    const headerBadgeBg = AppColors.tertiaryContainer;
+    const headerBadgeBorder = AppColors.tertiaryFixed;
+    const headerBadgeText = AppColors.onTertiaryContainer;
+    const headerBadgeLabel = '100% Protected';
+
     final coverageAmountFormatted = '₹${(insurance?.coverageAmount ?? 500000.0).toStringAsFixed(0)}';
-    final policyMasked = insurance?.maskedPolicyNumber ?? 'FED-MH-4921';
+    final policyMasked = insurance?.maskedPolicyNumber ?? 'Pending Issuance';
     final provider = insurance?.providerName ?? 'Maharashtra State Cooperative Labour Federation Welfare Pool';
+
+    String bannerText;
+    IconData bannerIcon;
+    Color bannerIconColor;
+    if (isApproved) {
+      bannerText = 'External insurance provider integration pending. Group coverage active via Federation Welfare Fund.';
+      bannerIcon = Icons.verified_user_outlined;
+      bannerIconColor = AppColors.onTertiaryContainer;
+    } else if (isPending) {
+      bannerText = 'Group insurance application submitted. Awaiting Federation Admin approval and policy issuance.';
+      bannerIcon = Icons.hourglass_top_rounded;
+      bannerIconColor = AppColors.onWarningContainer;
+    } else {
+      bannerText = 'Artisan group welfare insurance available. Submit your application below to get covered up to ₹5,00,000.';
+      bannerIcon = Icons.info_outline;
+      bannerIconColor = AppColors.secondary;
+    }
+
+    String insuranceCardBadge;
+    String insuranceCardDesc;
+    if (isApproved) {
+      insuranceCardBadge = 'Active Policy';
+      insuranceCardDesc = '$provider\nPolicy: $policyMasked • Helpline: ${insurance?.claimSupportPhone ?? "1800-266-9090"}';
+    } else if (isPending) {
+      insuranceCardBadge = 'Pending Approval';
+      insuranceCardDesc = '$provider\nPolicy: Awaiting Admin Issuance • Application Status: Under Verification';
+    } else {
+      insuranceCardBadge = 'Not Applied';
+      insuranceCardDesc = '$provider\n100% Federation sponsored medical and accident cover for registered artisans.';
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
@@ -1062,16 +1127,16 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: headerBadgeBg,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.tertiaryFixed),
+                  border: Border.all(color: headerBadgeBorder),
                 ),
-                child: const Text(
-                  '100% Protected',
+                child: Text(
+                  headerBadgeLabel,
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.onTertiaryContainer,
+                    color: headerBadgeText,
                   ),
                 ),
               ),
@@ -1079,7 +1144,7 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           ),
           const SizedBox(height: 12),
 
-          // External Provider Integration Pending Banner
+          // External Provider Integration / Status Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -1089,11 +1154,11 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             ),
             child: Row(
               children: [
-                const Icon(Icons.info_outline, size: 14, color: AppColors.secondary),
+                Icon(bannerIcon, size: 14, color: bannerIconColor),
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'External insurance provider integration pending'.tr(),
+                    bannerText,
                     style: const TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w700,
@@ -1108,14 +1173,38 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
 
           _buildWelfareCard(
             icon: Icons.health_and_safety,
+            iconColor: isApproved ? const Color(0xFF0284C7) : (isPending ? const Color(0xFFE65100) : const Color(0xFF6B7280)),
+            iconBgColor: isApproved ? const Color(0xFFE0F2FE) : (isPending ? const Color(0xFFFFF3E0) : const Color(0xFFF3F4F6)),
             title: insurance?.coverageType ?? 'Accidental & Health Insurance',
-            badge: insurance?.status.displayLabel ?? 'Active',
+            badge: insuranceCardBadge,
             amount: coverageAmountFormatted,
-            desc: '$provider\nPolicy: $policyMasked • Helpline: ${insurance?.claimSupportPhone ?? "1800-266-9090"}',
+            desc: insuranceCardDesc,
           ),
+          if (isNotApplied) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                onPressed: () => _handleApplyForInsurance(workerId),
+                icon: const Icon(Icons.security, size: 16),
+                label: const Text(
+                  'Apply for ₹5,00,000 Group Insurance',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           _buildWelfareCard(
             icon: Icons.savings,
+            iconColor: const Color(0xFFB45309),
+            iconBgColor: const Color(0xFFFEF3C7),
             title: 'Welfare Cess Accrued',
             badge: cessBadge,
             desc: 'Held securely in Cooperative Labour Federation Emergency Reserve.'.tr(),
@@ -1123,6 +1212,8 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           const SizedBox(height: 8),
           _buildWelfareCard(
             icon: Icons.elderly,
+            iconColor: const Color(0xFF6D28D9),
+            iconBgColor: const Color(0xFFEDE9FE),
             title: 'Micro-Pension (PMSYM)',
             badge: 'Auto-Draft',
             desc: '₹100/mo matched 1:1 by Central Union Subsidy.',
@@ -1130,7 +1221,9 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
           const SizedBox(height: 8),
           _buildWelfareCard(
             icon: Icons.handyman,
-            title: 'Tool & Equipment Loan',
+            iconColor: const Color(0xFFAC3400),
+            iconBgColor: const Color(0xFFFFEDD5),
+            title: 'Tool Upgrade Loan',
             badge: 'Eligible',
             amount: 'Up to ₹20k',
             desc: '0% interest cooperative loan for approved trade tools.',
@@ -1142,6 +1235,8 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
 
   Widget _buildWelfareCard({
     required IconData icon,
+    required Color iconColor,
+    required Color iconBgColor,
     required String title,
     required String badge,
     String? amount,
@@ -1161,11 +1256,10 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: iconBgColor,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.outlineVariant),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 18),
+            child: Icon(icon, color: iconColor, size: 18),
           ),
           const SizedBox(width: 10),
           Expanded(
@@ -1223,4 +1317,108 @@ class _WorkerEarningsScreenState extends State<WorkerEarningsScreen> {
       ),
     );
   }
+
+  Future<void> _handleApplyForInsurance(String workerId) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.health_and_safety, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Apply for Welfare Insurance', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enroll in the Maharashtra State Cooperative Labour Federation Group Insurance Plan:',
+              style: TextStyle(fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Column(
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.check, size: 16, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 8),
+                      Expanded(child: Text('₹5,00,000 Accidental & Hospitalization Cover', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold))),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.check, size: 16, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 8),
+                      Expanded(child: Text('100% Federation Funded (Zero Premium)', style: TextStyle(fontSize: 12))),
+                    ],
+                  ),
+                  SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Icon(Icons.check, size: 16, color: Color(0xFF2E7D32)),
+                      SizedBox(width: 8),
+                      Expanded(child: Text('24x7 Emergency Claim Helpline 1800-266-9090', style: TextStyle(fontSize: 12))),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your application will be sent to the Federation Admin for verification and official policy number assignment.',
+              style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Submit Application'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await DI.workerRepo.applyForInsurance(workerId);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              backgroundColor: Color(0xFF2E7D32),
+              content: Text('✓ Insurance application submitted! Pending Federation Admin approval.'),
+            ),
+          );
+          _refreshData();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              backgroundColor: AppColors.error,
+              content: Text('Failed to submit application: $e'),
+            ),
+          );
+        }
+      }
+    }
+  }
 }
+

@@ -6,7 +6,10 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
 import '../../../../core/models/federation_models.dart';
+import '../../../../core/services/india_geography_service.dart';
 import 'worker_under_verification_screen.dart';
+import '../../../../shared/widgets/area_not_serviceable_screen.dart';
+import '../../../../core/utils/phone_number_util.dart';
 
 class WorkerRegistrationScreen extends StatefulWidget {
   final bool isResubmission;
@@ -18,6 +21,79 @@ class WorkerRegistrationScreen extends StatefulWidget {
     this.changeRequestReason,
   });
 
+  static const Map<String, List<String>> tradeSubSkills = {
+    'Plumbing': [
+      'Plumbing & Pipe Fitting',
+      'Drainage & Sewage Line Cleaning',
+      'Water Tank Cleaning & Installation',
+      'Bathroom Fittings & Sanitary Fixtures',
+      'Water Pump & Motor Repair',
+      'Leak Detection & Commercial Plumbing',
+    ],
+    'Electrical': [
+      'Electrical & Home Wiring',
+      'Switchboard & MCB Fuse Installation',
+      'Inverter & Battery Wiring',
+      'Ceiling Fan & Light Fixture Installation',
+      'Three-Phase Industrial Wiring',
+      'Earthing & Power Surge Protection',
+    ],
+    'Carpentry': [
+      'Carpentry & Woodwork',
+      'Furniture Assembly & Repair',
+      'Modular Kitchen & Wardrobe Fabrication',
+      'Door, Window & Lock Fitting',
+      'Wood Polishing & Varnishing',
+      'Custom Cabinet & Shelf Making',
+    ],
+    'Masonry & Construction': [
+      'Masonry & Civil Repair',
+      'Tile, Marble & Granite Laying',
+      'Wall Plastering & Bricklaying',
+      'Concrete Flooring & Structural Repair',
+      'Roof Sealing & Waterproofing Works',
+    ],
+    'Cleaning & Sanitation': [
+      'Home Deep Cleaning',
+      'Kitchen & Chimney Degreasing',
+      'Bathroom Disinfection & Tile Scrubbing',
+      'Sofa, Carpet & Mattress Shampooing',
+      'Water Tank Deep Sanitation',
+      'Post-Construction Cleanup',
+    ],
+    'Appliance Repair': [
+      'Appliance Repair (AC / Fridge / Washing Machine)',
+      'AC Servicing, Gas Refill & Installation',
+      'Refrigerator & Deep Freezer Repair',
+      'Washing Machine & Dryer Repair',
+      'Microwave & Induction Hob Repair',
+      'Water Purifier (RO) Servicing & Filter Replacement',
+      'Geyser & Water Heater Repair',
+    ],
+    'Painting & Waterproofing': [
+      'Painting & Wall Waterproofing',
+      'Interior Emulsion & Texture Painting',
+      'Exterior Weatherproof Coating',
+      'Wall Putty, Primer & Crack Sealing',
+      'Wood & Metal Enamel Painting',
+      'Terrace & Balcony Waterproofing',
+    ],
+    'Welding & Fabrication': [
+      'Welding & Metal Fabrication',
+      'Safety Grill & Gate Fabrication',
+      'Shed, Truss & Roof Structure Welding',
+      'Aluminum Sliding Window Fabrication',
+      'Stainless Steel Railing Work',
+    ],
+    'General Maintenance': [
+      'General Maintenance & Handyman',
+      'Minor Civil, Wall Drill & Hanging Services',
+      'Locksmith & Key Duplication Service',
+      'Curtain Rod & Blinds Installation',
+      'Preventive Home Maintenance Inspection',
+    ],
+  };
+
   @override
   State<WorkerRegistrationScreen> createState() =>
       _WorkerRegistrationScreenState();
@@ -26,33 +102,92 @@ class WorkerRegistrationScreen extends StatefulWidget {
 class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // 1. Full Name & 2. Mobile Number
+  // 1. Full Name, 2. Mobile Number & 3. Email Address
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
 
   // 4. DOB & 5. Gender
   final TextEditingController _dobController = TextEditingController();
   String _selectedGender = 'Male';
 
-  // 6. Current Address, 7. City, 8. District, 9. PIN Code
+  // 6. Current Address, 7. City, 8. District, 9. PIN Code & Geographic Dropdowns
   final TextEditingController _addressController = TextEditingController();
   final TextEditingController _cityController = TextEditingController();
   final TextEditingController _districtController = TextEditingController();
   final TextEditingController _pinCodeController = TextEditingController();
 
+  String _selectedState = 'Maharashtra';
+  String _selectedDistrict = 'Pune';
+  String _selectedCityOrArea = 'Kothrud';
+  List<String> _availableDistricts = [];
+  List<String> _availableAreas = [];
+  bool _isResolvingPincode = false;
+  String? _pincodeFeedback;
+
   // 10. Trade, 11. Primary Skill, 12. Skill Level, 13. Experience, 14. Service Area, 15. Availability
-  String _selectedTrade = 'Plumbing';
-  String _selectedSkill = 'Plumbing & Pipe Fitting';
+  String? _selectedTrade;
+  String? _selectedSkill;
   String _selectedSkillLevel = 'Intermediate';
   int _selectedExperienceYears = 3;
   String _selectedArea = 'Kothrud, Pune';
   bool _isAvailable = true;
 
   // 18. Cooperative/Federation, 19. Membership ID
-  String _selectedFederationId = 'fed_pune';
-  String _federationName = 'Pune District Labour Cooperative Federation';
+  String? _selectedFederationId;
+  String _federationName = '';
+  bool _userSelectedFederationManually = false;
   final TextEditingController _membershipIdController = TextEditingController();
+  List<FederationModel> _availableFederations = List.from(FederationModel.defaultFederations);
+
+  Future<void> _loadFederations() async {
+    try {
+      final feds = await FederationModel.fetchAllFederations();
+      if (mounted && feds.isNotEmpty) {
+        setState(() {
+          _availableFederations = feds;
+        });
+        if (!_userSelectedFederationManually) {
+          _autoRouteFederation(_selectedArea);
+        }
+      }
+    } catch (e) {
+      debugPrint('[WorkerRegistration] loadFederations error: $e');
+    }
+  }
+
+  void _autoRouteFederation(String text) {
+    if (text.trim().isEmpty) return;
+    if (_userSelectedFederationManually && _selectedFederationId != null && _selectedFederationId!.isNotEmpty) {
+      return;
+    }
+    final matched = FederationModel.findFederationForLocation(
+      district: _districtController.text.trim().isNotEmpty ? _districtController.text.trim() : _selectedDistrict,
+      city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedCityOrArea,
+      state: _selectedState,
+      pincode: _pinCodeController.text.trim(),
+      location: text,
+      federationsList: _availableFederations,
+    );
+    if (matched != null) {
+      setState(() {
+        _selectedFederationId = matched.id;
+        _federationName = matched.name;
+        _selectedDistrict = matched.district;
+        _districtController.text = matched.district;
+        if (matched.city.isNotEmpty) {
+          _selectedCityOrArea = matched.city;
+          _cityController.text = matched.city;
+        }
+      });
+    } else {
+      setState(() {
+        _selectedFederationId = null;
+        _federationName = 'Cooperative Expansion Zone (${_selectedDistrict.isNotEmpty ? _selectedDistrict : "Waitlist"})';
+      });
+    }
+  }
 
   // 20. Worker Declaration
   bool _agreedToCharter = true;
@@ -84,17 +219,7 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
     'General Maintenance',
   ];
 
-  final List<String> _availableSkills = [
-    'Plumbing & Pipe Fitting',
-    'Electrical & Home Wiring',
-    'Carpentry & Woodwork',
-    'Masonry & Civil Repair',
-    'Home Deep Cleaning',
-    'Appliance Repair (AC / Fridge / Washing Machine)',
-    'Painting & Wall Waterproofing',
-    'Welding & Metal Fabrication',
-    'General Maintenance & Handyman',
-  ];
+  static Map<String, List<String>> get tradeSubSkills => WorkerRegistrationScreen.tradeSubSkills;
 
   final List<String> _serviceAreasList = [
     'Kothrud, Pune',
@@ -128,13 +253,67 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
   @override
   void initState() {
     super.initState();
+    _availableDistricts = IndiaGeographyService.getDistricts(_selectedState);
+    _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
+    _districtController.text = _selectedDistrict;
+    _cityController.text = _selectedCityOrArea;
+    final initialFed = FederationModel.findFederationForLocation(
+      district: _selectedDistrict,
+      city: _selectedCityOrArea,
+      location: _selectedArea,
+      federationsList: _availableFederations,
+    );
+    _selectedFederationId = initialFed?.id;
+    _federationName = initialFed?.name ?? 'Cooperative Expansion Zone ($_selectedDistrict)';
     _loadInitialUserData();
+    _loadFederations();
+  }
+
+  Future<void> _handlePincodeAutoDetect(String val) async {
+    final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+    if (clean.length == 6) {
+      setState(() {
+        _isResolvingPincode = true;
+        _pincodeFeedback = 'Resolving location...';
+      });
+      final res = await IndiaGeographyService.lookupPincode(clean);
+      if (res != null && mounted) {
+        setState(() {
+          _selectedState = res.state;
+          _availableDistricts = IndiaGeographyService.getDistricts(res.state);
+          _selectedDistrict = _availableDistricts.contains(res.district)
+              ? res.district
+              : (_availableDistricts.isNotEmpty ? _availableDistricts.first : res.district);
+          _districtController.text = _selectedDistrict;
+
+          final areas = res.areas.isNotEmpty
+              ? res.areas
+              : IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
+          _availableAreas = areas;
+          _selectedCityOrArea = areas.isNotEmpty ? areas.first : res.city;
+          _cityController.text = _selectedCityOrArea;
+          _isResolvingPincode = false;
+          _pincodeFeedback = 'Detected: $_selectedDistrict, $_selectedState (${res.isFromNetwork ? "Live Post Office" : "Postal Directory"})';
+        });
+        _autoRouteFederation(_selectedDistrict);
+      } else if (mounted) {
+        setState(() {
+          _isResolvingPincode = false;
+          _pincodeFeedback = null;
+        });
+      }
+    } else {
+      if (_pincodeFeedback != null) {
+        setState(() => _pincodeFeedback = null);
+      }
+    }
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _emailController.dispose();
     _bioController.dispose();
     _dobController.dispose();
     _addressController.dispose();
@@ -150,7 +329,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
       final user = await DI.authRepo.getCurrentUser();
       if (user != null) {
         setState(() {
-          _phoneController.text = user.phone ?? '';
+          final rawPhone = user.phone ?? '';
+          final cleanedPhone = PhoneNumberUtil.cleanIndianPhone(rawPhone);
+          _phoneController.text = cleanedPhone.isNotEmpty ? cleanedPhone : rawPhone;
+          if (user.email != null && user.email!.isNotEmpty) {
+            _emailController.text = user.email!;
+          }
           final metaName = (user.userMetadata?['full_name'] ?? user.userMetadata?['name']) as String?;
           if (metaName != null && metaName.isNotEmpty && !metaName.startsWith('User ')) {
             _nameController.text = metaName;
@@ -166,6 +350,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               _nameController.text = dbName;
             });
           }
+          final dbEmail = (dbUser['email'] as String?)?.trim() ?? '';
+          if (dbEmail.isNotEmpty && _emailController.text.isEmpty) {
+            setState(() {
+              _emailController.text = dbEmail;
+            });
+          }
         }
 
         // Check if existing worker record exists to prefill during edit/resubmission
@@ -174,14 +364,19 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           if (worker.id.isNotEmpty && worker.name.isNotEmpty && !worker.name.startsWith('User ')) {
             setState(() {
               if (_nameController.text.isEmpty) _nameController.text = worker.name;
+              if (worker.email != null && worker.email!.isNotEmpty && _emailController.text.isEmpty) {
+                _emailController.text = worker.email!;
+              }
               if (worker.dob != null && worker.dob!.isNotEmpty) _dobController.text = worker.dob!;
               if (worker.gender != null && _genderOptions.contains(worker.gender)) _selectedGender = worker.gender!;
               if (worker.address != null && worker.address!.isNotEmpty) _addressController.text = worker.address!;
               if (worker.city != null && worker.city!.isNotEmpty) _cityController.text = worker.city!;
               if (worker.district != null && worker.district!.isNotEmpty) _districtController.text = worker.district!;
               if (worker.pinCode != null && worker.pinCode!.isNotEmpty) _pinCodeController.text = worker.pinCode!;
-              if (worker.trade != null && _tradeCategories.contains(worker.trade)) _selectedTrade = worker.trade!;
-              if (worker.primarySkill != null && _availableSkills.contains(worker.primarySkill)) {
+              if (worker.trade != null && _tradeCategories.contains(worker.trade)) {
+                _selectedTrade = worker.trade!;
+              }
+              if (worker.primarySkill != null && worker.primarySkill!.isNotEmpty) {
                 _selectedSkill = worker.primarySkill!;
               }
               if (worker.skillLevel != null) {
@@ -211,6 +406,16 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
                 _membershipIdController.text = worker.membershipId!;
               }
               _isAvailable = worker.isAvailable;
+              final fed = FederationModel.resolveFederation(
+                federationId: worker.federationRefId,
+                federationName: worker.guildName,
+                district: worker.district ?? _selectedDistrict,
+                city: worker.city ?? _selectedCityOrArea,
+                location: worker.serviceLocation,
+                address: worker.address,
+              );
+              _selectedFederationId = fed.id;
+              _federationName = fed.name;
             });
           }
         } catch (_) {}
@@ -297,6 +502,42 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
       return;
     }
 
+    if (_selectedTrade == null || _selectedTrade!.trim().isEmpty) {
+      setState(() => _errorMessage = 'Please select your Worker Category / Trade.');
+      return;
+    }
+
+    if (_selectedSkill == null || _selectedSkill!.trim().isEmpty) {
+      setState(() => _errorMessage = 'Please select your specific Primary Sub-Skill.');
+      return;
+    }
+
+    final hasAreaFederation = FederationModel.isAreaCoveredByFederation(
+      district: _districtController.text.trim(),
+      city: _cityController.text.trim(),
+      state: _selectedState,
+      pincode: _pinCodeController.text.trim(),
+      location: _selectedArea,
+      address: _addressController.text.trim(),
+      federationsList: _availableFederations,
+    );
+
+    if (hasAreaFederation && (_selectedFederationId == null || _selectedFederationId!.isEmpty)) {
+      final matching = FederationModel.findFederationForLocation(
+        district: _districtController.text.trim(),
+        city: _cityController.text.trim(),
+        state: _selectedState,
+        pincode: _pinCodeController.text.trim(),
+        location: _selectedArea,
+        address: _addressController.text.trim(),
+        federationsList: _availableFederations,
+      );
+      if (matching != null) {
+        _selectedFederationId = matching.id;
+        _federationName = matching.name;
+      }
+    }
+
     if (!_agreedToCharter) {
       setState(() => _errorMessage = 'Please agree to the ShramSetu Federation Artisan Charter.');
       return;
@@ -309,16 +550,42 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
 
     try {
       final user = await DI.authRepo.getCurrentUser();
-      final userId = user?.id ?? 'worker_${_phoneController.text}';
       final cleanName = _nameController.text.trim();
-      final phone = _phoneController.text.trim();
+      final phone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text.trim());
+      final effectivePhone = phone.isNotEmpty ? phone : _phoneController.text.trim();
+      final userId = user?.id ?? 'worker_$effectivePhone';
+
+      // Resolve authoritative federation using identical ID from Super Admin & dynamic list
+      final targetFed = (_selectedFederationId != null && _selectedFederationId!.isNotEmpty)
+          ? _availableFederations.firstWhere(
+              (f) => f.id == _selectedFederationId,
+              orElse: () => FederationModel.resolveFederation(
+                federationId: _selectedFederationId,
+                federationName: _federationName,
+                district: _districtController.text.trim(),
+                city: _cityController.text.trim(),
+                location: _selectedArea,
+                address: _addressController.text.trim(),
+                federationsList: _availableFederations,
+              ),
+            )
+          : (hasAreaFederation
+              ? FederationModel.resolveFederation(
+                  district: _districtController.text.trim(),
+                  city: _cityController.text.trim(),
+                  location: _selectedArea,
+                  address: _addressController.text.trim(),
+                  federationsList: _availableFederations,
+                )
+              : null);
 
       // 1. Register worker profile in users and workers tables with 20 fields
       await DI.workerRepo.registerWorker(
         workerId: userId,
         fullName: cleanName,
-        phone: phone,
-        skill: _selectedSkill,
+        phone: effectivePhone,
+        email: _emailController.text.trim(),
+        skill: _selectedSkill!,
         experienceYears: _selectedExperienceYears,
         serviceLocation: _selectedArea,
         dob: _dobController.text.trim().isNotEmpty ? _dobController.text.trim() : null,
@@ -327,9 +594,10 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
         city: _cityController.text.trim(),
         district: _districtController.text.trim(),
         pinCode: _pinCodeController.text.trim(),
-        trade: _selectedTrade,
+        trade: _selectedTrade!,
         skillLevel: _selectedSkillLevel,
-        federationName: _federationName,
+        federationName: targetFed?.name ?? 'Cooperative Expansion Zone (${_districtController.text.trim()})',
+        federationId: targetFed?.id,
         membershipId: _membershipIdController.text.trim().isNotEmpty ? _membershipIdController.text.trim() : null,
         bio: _bioController.text.trim().isNotEmpty
             ? _bioController.text.trim()
@@ -379,14 +647,33 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             backgroundColor: AppColors.onTertiaryContainer,
             content: Text(widget.isResubmission
                 ? 'Application updated and resubmitted for Federation Review!'
-                : 'Registration and documents submitted for Federation Verification!'),
+                : (hasAreaFederation
+                    ? 'Registration and documents submitted for Federation Verification!'
+                    : 'Registration saved in Founding Artisan Expansion Waitlist!')),
           ),
         );
 
-        // Replace route directly to Under Verification screen
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (_) => const WorkerUnderVerificationScreen()),
-        );
+        if (hasAreaFederation) {
+          // Replace route directly to Under Verification screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const WorkerUnderVerificationScreen()),
+          );
+        } else {
+          // Replace route to AreaNotServiceableScreen (Expansion Waitlist)
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => AreaNotServiceableScreen(
+                userRole: 'WORKER',
+                reason: ServiceUnavailableReason.noFederation,
+                district: _districtController.text.trim(),
+                area: _selectedCityOrArea,
+                city: _cityController.text.trim(),
+                state: _selectedState,
+                pincode: _pinCodeController.text.trim().isNotEmpty ? _pinCodeController.text.trim() : null,
+              ),
+            ),
+          );
+        }
       }
     } catch (e) {
       setState(() {
@@ -645,15 +932,41 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           const SizedBox(height: 14),
           TextFormField(
             controller: _phoneController,
-            readOnly: true,
+            keyboardType: TextInputType.phone,
+            inputFormatters: [IndianPhoneNumberFormatter()],
             decoration: InputDecoration(
-              labelText: '2. Registered Mobile Number',
+              labelText: '2. Registered Mobile Number *',
+              hintText: 'e.g. 9876543210',
               prefixIcon: const Icon(Icons.phone_outlined, size: 20),
               suffixIcon: const Icon(Icons.check_circle, color: AppColors.onTertiaryContainer, size: 20),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               filled: true,
-              fillColor: AppColors.surfaceContainerHigh.withValues(alpha: 0.4),
+              fillColor: AppColors.surfaceContainerLowest,
             ),
+            validator: (val) => PhoneNumberUtil.validateIndianMobile(val),
+          ),
+          const SizedBox(height: 14),
+          TextFormField(
+            controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
+            decoration: InputDecoration(
+              labelText: '3. Official Email Address *',
+              hintText: 'e.g. artisan@gmail.com',
+              prefixIcon: const Icon(Icons.email_outlined, size: 20),
+              suffixIcon: const Icon(Icons.mark_email_read_outlined, color: AppColors.onTertiaryContainer, size: 20),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              filled: true,
+              fillColor: AppColors.surfaceContainerLowest,
+            ),
+            validator: (val) {
+              if (val == null || val.trim().isEmpty) {
+                return 'Official email address is required.';
+              }
+              if (!RegExp(r'^[\w\.-]+@[\w-]+\.\w{2,}$').hasMatch(val.trim())) {
+                return 'Please enter a valid email address.';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 14),
           Row(
@@ -750,52 +1063,180 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
             },
           ),
           const SizedBox(height: 14),
+
+          // PIN Code with Live Auto-Detection & State Dropdown
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
+                flex: 2,
                 child: TextFormField(
-                  controller: _cityController,
+                  controller: _pinCodeController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 6,
                   decoration: InputDecoration(
-                    labelText: '7. City *',
-                    prefixIcon: const Icon(Icons.map_outlined, size: 20),
+                    labelText: '7. PIN Code *',
+                    hintText: '411038',
+                    counterText: '',
+                    prefixIcon: const Icon(Icons.pin_drop_outlined, size: 20),
+                    suffixIcon: _isResolvingPincode
+                        ? const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                            ),
+                          )
+                        : (_pincodeFeedback != null
+                            ? const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 20)
+                            : null),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     filled: true,
                     fillColor: AppColors.surfaceContainerLowest,
                   ),
-                  validator: (val) => val == null || val.trim().isEmpty ? 'Enter city.' : null,
+                  onChanged: _handlePincodeAutoDetect,
+                  validator: (val) {
+                    if (val == null || val.trim().isEmpty) return 'Enter PIN.';
+                    if (val.trim().length != 6) return '6 digits.';
+                    return null;
+                  },
                 ),
               ),
               const SizedBox(width: 12),
+              // State Dropdown (All 36 States & UTs of India)
               Expanded(
-                child: TextFormField(
-                  controller: _districtController,
+                flex: 3,
+                child: DropdownButtonFormField<String>(
+                  initialValue: IndiaGeographyService.states.contains(_selectedState)
+                      ? _selectedState
+                      : IndiaGeographyService.states.first,
+                  isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: '8. District *',
+                    labelText: '8. State *',
+                    prefixIcon: const Icon(Icons.public, size: 20),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    filled: true,
+                    fillColor: AppColors.surfaceContainerLowest,
+                  ),
+                  items: IndiaGeographyService.states.map((st) {
+                    return DropdownMenuItem(
+                      value: st,
+                      child: Text(st, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedState = val;
+                        _availableDistricts = IndiaGeographyService.getDistricts(val);
+                        _selectedDistrict = _availableDistricts.isNotEmpty ? _availableDistricts.first : 'Pune';
+                        _districtController.text = _selectedDistrict;
+                        _availableAreas = IndiaGeographyService.getAreasForDistrict(val, _selectedDistrict);
+                        _selectedCityOrArea = _availableAreas.isNotEmpty ? _availableAreas.first : _selectedDistrict;
+                        _cityController.text = _selectedCityOrArea;
+                      });
+                      _autoRouteFederation(_selectedDistrict);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+
+          if (_pincodeFeedback != null) ...[
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE8F5E9),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFF81C784)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.auto_awesome, color: Color(0xFF2E7D32), size: 14),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      _pincodeFeedback!,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF1B5E20), fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 14),
+
+          // District & City/Area Dropdowns
+          Row(
+            children: [
+              // District Dropdown
+              Expanded(
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('dist_${_selectedState}_$_selectedDistrict'),
+                  initialValue: _availableDistricts.contains(_selectedDistrict)
+                      ? _selectedDistrict
+                      : (_availableDistricts.isNotEmpty ? _availableDistricts.first : null),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    labelText: '9. District *',
                     prefixIcon: const Icon(Icons.apartment_outlined, size: 20),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     filled: true,
                     fillColor: AppColors.surfaceContainerLowest,
                   ),
-                  validator: (val) => val == null || val.trim().isEmpty ? 'Enter district.' : null,
+                  items: _availableDistricts.map((d) {
+                    return DropdownMenuItem(
+                      value: d,
+                      child: Text(d, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedDistrict = val;
+                        _districtController.text = val;
+                        _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, val);
+                        _selectedCityOrArea = _availableAreas.isNotEmpty ? _availableAreas.first : val;
+                        _cityController.text = _selectedCityOrArea;
+                      });
+                      _autoRouteFederation(val);
+                    }
+                  },
                 ),
               ),
               const SizedBox(width: 12),
+              // City / Area Dropdown
               Expanded(
-                child: TextFormField(
-                  controller: _pinCodeController,
-                  keyboardType: TextInputType.number,
+                child: DropdownButtonFormField<String>(
+                  key: ValueKey('area_${_selectedDistrict}_$_selectedCityOrArea'),
+                  initialValue: _availableAreas.contains(_selectedCityOrArea)
+                      ? _selectedCityOrArea
+                      : (_availableAreas.isNotEmpty ? _availableAreas.first : null),
+                  isExpanded: true,
                   decoration: InputDecoration(
-                    labelText: '9. PIN Code *',
-                    hintText: '411038',
-                    prefixIcon: const Icon(Icons.pin_drop_outlined, size: 20),
+                    labelText: '10. City / Area *',
+                    prefixIcon: const Icon(Icons.map_outlined, size: 20),
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     filled: true,
                     fillColor: AppColors.surfaceContainerLowest,
                   ),
-                  validator: (val) {
-                    if (val == null || val.trim().isEmpty) return 'Enter PIN.';
-                    if (val.trim().length != 6) return '6 digits.';
-                    return null;
+                  items: _availableAreas.map((a) {
+                    return DropdownMenuItem(
+                      value: a,
+                      child: Text(a, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                    );
+                  }).toList(),
+                  onChanged: (val) {
+                    if (val != null) {
+                      setState(() {
+                        _selectedCityOrArea = val;
+                        _cityController.text = val;
+                      });
+                    }
                   },
                 ),
               ),
@@ -832,7 +1273,10 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
-            initialValue: _tradeCategories.contains(_selectedTrade) ? _selectedTrade : _tradeCategories.first,
+            key: ValueKey('trade_$_selectedTrade'),
+            initialValue: _selectedTrade,
+            isExpanded: true,
+            hint: const Text('Select Worker Category / Trade *', style: TextStyle(fontSize: 13, color: AppColors.outline)),
             decoration: InputDecoration(
               labelText: '10. Worker Category / Trade *',
               prefixIcon: const Icon(Icons.category_outlined, size: 20),
@@ -840,30 +1284,59 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               filled: true,
               fillColor: AppColors.surfaceContainerLowest,
             ),
+            validator: (val) => val == null || val.isEmpty ? 'Please select a worker category.' : null,
             items: _tradeCategories.map((trade) {
               return DropdownMenuItem(value: trade, child: Text(trade));
             }).toList(),
             onChanged: (val) {
-              if (val != null) setState(() => _selectedTrade = val);
+              if (val != null) {
+                setState(() {
+                  _selectedTrade = val;
+                  _selectedSkill = null; // Do NOT autofill skill! Worker must select specific sub-skill!
+                });
+              }
             },
           ),
           const SizedBox(height: 14),
-          DropdownButtonFormField<String>(
-            initialValue: _availableSkills.contains(_selectedSkill) ? _selectedSkill : _availableSkills.first,
-            decoration: InputDecoration(
-              labelText: '11. Primary Skill *',
-              prefixIcon: const Icon(Icons.construction, size: 20),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-              filled: true,
-              fillColor: AppColors.surfaceContainerLowest,
-            ),
-            items: _availableSkills.map((skill) {
-              return DropdownMenuItem(value: skill, child: Text(skill));
-            }).toList(),
-            onChanged: (val) {
-              if (val != null) setState(() => _selectedSkill = val);
-            },
-          ),
+          () {
+            final List<String> currentSubSkills = _selectedTrade != null ? (tradeSubSkills[_selectedTrade] ?? []) : [];
+            final bool hasCategory = _selectedTrade != null && _selectedTrade!.isNotEmpty;
+
+            return DropdownButtonFormField<String>(
+              key: ValueKey('skill_${_selectedTrade}_$_selectedSkill'),
+              initialValue: (currentSubSkills.contains(_selectedSkill)) ? _selectedSkill : null,
+              isExpanded: true,
+              hint: Text(
+                !hasCategory
+                    ? 'Select Worker Category first'
+                    : 'Select Specific Sub-Skill *',
+                style: const TextStyle(fontSize: 13, color: AppColors.outline),
+              ),
+              decoration: InputDecoration(
+                labelText: '11. Primary Sub-Skill *',
+                prefixIcon: const Icon(Icons.construction, size: 20),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                filled: true,
+                fillColor: !hasCategory ? const Color(0xFFF3F4F6) : AppColors.surfaceContainerLowest,
+              ),
+              validator: (val) {
+                if (!hasCategory) return 'Please select a worker category first.';
+                if (val == null || val.isEmpty) return 'Please select your specific sub-skill.';
+                return null;
+              },
+              items: currentSubSkills.map((skill) {
+                return DropdownMenuItem(
+                  value: skill,
+                  child: Text(skill, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                );
+              }).toList(),
+              onChanged: !hasCategory
+                  ? null
+                  : (val) {
+                      if (val != null) setState(() => _selectedSkill = val);
+                    },
+            );
+          }(),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -926,7 +1399,12 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               return DropdownMenuItem(value: area, child: Text(area));
             }).toList(),
             onChanged: (val) {
-              if (val != null) setState(() => _selectedArea = val);
+              if (val != null) {
+                setState(() {
+                  _selectedArea = val;
+                });
+                _autoRouteFederation(val);
+              }
             },
           ),
           const SizedBox(height: 14),
@@ -987,8 +1465,10 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
           ),
           const SizedBox(height: 16),
           DropdownButtonFormField<String>(
+            key: ValueKey('fed_select_$_selectedFederationId'),
             initialValue: _selectedFederationId,
             isExpanded: true,
+            hint: const Text('Select your Cooperative Federation', style: TextStyle(fontSize: 13, color: AppColors.outline)),
             decoration: InputDecoration(
               labelText: '18. Registered Federation / Cooperative *',
               prefixIcon: const Icon(Icons.account_balance_outlined, size: 20),
@@ -996,32 +1476,73 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
               filled: true,
               fillColor: AppColors.surfaceContainerLowest,
             ),
-            items: FederationModel.defaultFederations.map((fed) {
-              return DropdownMenuItem<String>(
-                value: fed.id,
-                child: Text(
-                  fed.name,
-                  style: const TextStyle(fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
-                ),
+            validator: (val) {
+              final isCovered = FederationModel.isAreaCoveredByFederation(
+                district: _districtController.text.trim(),
+                city: _cityController.text.trim(),
+                state: _selectedState,
+                pincode: _pinCodeController.text.trim(),
+                location: _selectedArea,
+                federationsList: _availableFederations,
               );
-            }).toList(),
+              if (isCovered && (val == null || val.isEmpty)) {
+                return 'Select a cooperative federation.';
+              }
+              return null;
+            },
+            items: [
+              ..._availableFederations.map((fed) {
+                return DropdownMenuItem<String>(
+                  value: fed.id,
+                  child: Text(
+                    '${fed.name} (${fed.city.isNotEmpty ? fed.city : fed.district})',
+                    style: const TextStyle(fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }),
+            ],
             onChanged: (val) {
               if (val != null) {
-                final fed = FederationModel.defaultFederations.firstWhere((f) => f.id == val);
+                final fed = _availableFederations.firstWhere(
+                  (f) => f.id == val,
+                  orElse: () => FederationModel.defaultFederations.first,
+                );
                 setState(() {
+                  _userSelectedFederationManually = true;
                   _selectedFederationId = val;
                   _federationName = fed.name;
-                  if (_districtController.text.trim().isEmpty) {
-                    _districtController.text = fed.district;
-                  }
-                  if (_cityController.text.trim().isEmpty) {
-                    _cityController.text = fed.district;
-                  }
+                  _selectedDistrict = fed.district;
+                  _districtController.text = fed.district;
+                  _selectedCityOrArea = fed.city;
+                  _cityController.text = fed.city;
                 });
               }
             },
           ),
+          if (_selectedFederationId == null) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: const Color(0xFFFFB300)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: Color(0xFFE65100), size: 16),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'No Federation in $_selectedDistrict yet. Your application will be registered in the State Founding Artisan Waitlist and verified upon district expansion.',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF795548), fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 14),
           TextFormField(
             controller: _membershipIdController,

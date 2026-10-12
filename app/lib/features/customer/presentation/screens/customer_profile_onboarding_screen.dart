@@ -8,7 +8,12 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/repositories/i_storage_repository.dart';
+import '../../../../core/services/india_geography_service.dart';
+import '../../../../core/models/federation_models.dart';
 import '../../../../shared/widgets/map_location_picker_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../shared/widgets/area_not_serviceable_screen.dart';
+import '../../../../core/utils/phone_number_util.dart';
 
 class CustomerProfileOnboardingScreen extends StatefulWidget {
   const CustomerProfileOnboardingScreen({super.key});
@@ -24,16 +29,31 @@ class _CustomerProfileOnboardingScreenState
 
   // Text controllers
   final _nameController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
   final _addressLineController = TextEditingController();
   final _areaController = TextEditingController();
   final _cityController = TextEditingController();
   final _stateController = TextEditingController();
   final _postalCodeController = TextEditingController();
 
+  // Geographic dropdown state
+  String _selectedState = 'Maharashtra';
+  String _selectedDistrict = 'Pune';
+  String _selectedArea = 'Kothrud';
+  List<String> _availableDistricts = [];
+  List<String> _availableAreas = [];
+  bool _isResolvingPincode = false;
+  String? _pincodeFeedback;
+
   // Location state
   double? _latitude;
   double? _longitude;
   bool _isDetectingLocation = false;
+
+  // Assigned Federation state
+  List<FederationModel> _availableFederations = List.from(FederationModel.defaultFederations);
+  FederationModel? _assignedFederation;
 
   // State
   Uint8List? _selectedImageBytes;
@@ -43,7 +63,87 @@ class _CustomerProfileOnboardingScreenState
   @override
   void initState() {
     super.initState();
+    _availableDistricts = IndiaGeographyService.getDistricts(_selectedState);
+    _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
+    _stateController.text = _selectedState;
+    _cityController.text = _selectedDistrict;
+    _areaController.text = _selectedArea;
+    _assignedFederation = FederationModel.findFederationForLocation(
+      district: _selectedDistrict,
+      city: _selectedDistrict,
+      state: _selectedState,
+      location: _selectedArea,
+      federationsList: _availableFederations,
+    );
+    _loadFederations();
     _loadExistingProfile();
+  }
+
+  Future<void> _loadFederations() async {
+    try {
+      final feds = await FederationModel.fetchAllFederations();
+      if (mounted && feds.isNotEmpty) {
+        setState(() {
+          _availableFederations = feds;
+          _updateAssignedFederation();
+        });
+      }
+    } catch (_) {}
+  }
+
+  void _updateAssignedFederation() {
+    final target = FederationModel.findFederationForLocation(
+      district: _selectedDistrict,
+      city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
+      state: _selectedState,
+      location: _selectedArea,
+      pincode: _postalCodeController.text.trim(),
+      federationsList: _availableFederations,
+    );
+    setState(() {
+      _assignedFederation = target;
+    });
+  }
+
+  Future<void> _handlePincodeAutoDetect(String val) async {
+    final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+    if (clean.length == 6) {
+      setState(() {
+        _isResolvingPincode = true;
+        _pincodeFeedback = 'Resolving location...';
+      });
+      final res = await IndiaGeographyService.lookupPincode(clean);
+      if (res != null && mounted) {
+        setState(() {
+          _selectedState = res.state;
+          _stateController.text = res.state;
+          _availableDistricts = IndiaGeographyService.getDistricts(res.state);
+          _selectedDistrict = _availableDistricts.contains(res.district)
+              ? res.district
+              : (_availableDistricts.isNotEmpty ? _availableDistricts.first : res.district);
+          _cityController.text = _selectedDistrict;
+
+          final areas = res.areas.isNotEmpty
+              ? res.areas
+              : IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
+          _availableAreas = areas;
+          _selectedArea = areas.isNotEmpty ? areas.first : res.city;
+          _areaController.text = _selectedArea;
+          _isResolvingPincode = false;
+          _pincodeFeedback = 'Detected: $_selectedDistrict, $_selectedState (${res.isFromNetwork ? "Live Post Office" : "Postal Directory"})';
+          _updateAssignedFederation();
+        });
+      } else if (mounted) {
+        setState(() {
+          _isResolvingPincode = false;
+          _pincodeFeedback = null;
+        });
+      }
+    } else {
+      if (_pincodeFeedback != null) {
+        setState(() => _pincodeFeedback = null);
+      }
+    }
   }
 
   Future<void> _loadExistingProfile() async {
@@ -55,21 +155,59 @@ class _CustomerProfileOnboardingScreenState
         if (profile != null && mounted) {
           setState(() {
             if (profile.fullName.isNotEmpty && _nameController.text.isEmpty) {
-              _nameController.text = profile.fullName;
+              final cleanName = profile.fullName.trim();
+              final isPhone = RegExp(r'^\+?\d{10,13}$').hasMatch(cleanName);
+              if (!cleanName.toLowerCase().startsWith('user ') &&
+                  !isPhone &&
+                  cleanName.toLowerCase() != 'ananya' &&
+                  cleanName.toLowerCase() != 'demo user' &&
+                  cleanName.toLowerCase() != 'test user') {
+                _nameController.text = cleanName;
+              } else {
+                final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
+                if (metaName != null &&
+                    metaName.trim().isNotEmpty &&
+                    !RegExp(r'^\+?\d{10,13}$').hasMatch(metaName.trim())) {
+                  _nameController.text = metaName.trim();
+                }
+              }
+            }
+            final rawPhone = profile.phone.isNotEmpty ? profile.phone : (user?.phone ?? '');
+            final cleanedPhone = PhoneNumberUtil.cleanIndianPhone(rawPhone);
+            if (cleanedPhone.isNotEmpty) {
+              _phoneController.text = cleanedPhone;
+            } else if (_phoneController.text.isNotEmpty) {
+              _phoneController.text = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
+            }
+            if (_emailController.text.isEmpty) {
+              final metaEmail = user?.userMetadata?['email'] as String?;
+              final e = (profile.email != null && profile.email!.isNotEmpty)
+                  ? profile.email!
+                  : ((user?.email != null && user!.email!.isNotEmpty)
+                      ? user.email!
+                      : (metaEmail ?? ''));
+              _emailController.text = e;
             }
             final addr = profile.defaultAddress;
             if (addr != null) {
               if (_addressLineController.text.isEmpty && addr.addressLine.isNotEmpty) {
                 _addressLineController.text = addr.addressLine;
               }
-              if (_areaController.text.isEmpty && addr.area.isNotEmpty) {
+              if (addr.state.isNotEmpty) {
+                final matched = IndiaGeographyService.matchState(addr.state) ?? addr.state;
+                _selectedState = matched;
+                _stateController.text = matched;
+                _availableDistricts = IndiaGeographyService.getDistricts(matched);
+              }
+              if (addr.city.isNotEmpty) {
+                final matchedDist = IndiaGeographyService.matchDistrict(_selectedState, addr.city);
+                _selectedDistrict = matchedDist;
+                _cityController.text = matchedDist;
+                _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
+              }
+              if (addr.area.isNotEmpty) {
+                _selectedArea = addr.area;
                 _areaController.text = addr.area;
-              }
-              if (_cityController.text.isEmpty && addr.city.isNotEmpty) {
-                _cityController.text = addr.city;
-              }
-              if (_stateController.text.isEmpty && addr.state.isNotEmpty) {
-                _stateController.text = addr.state;
               }
               if (_postalCodeController.text.isEmpty && addr.postalCode.isNotEmpty) {
                 _postalCodeController.text = addr.postalCode;
@@ -81,6 +219,7 @@ class _CustomerProfileOnboardingScreenState
                 _longitude = addr.longitude;
               }
             }
+            _updateAssignedFederation();
           });
         }
       }
@@ -90,6 +229,8 @@ class _CustomerProfileOnboardingScreenState
   @override
   void dispose() {
     _nameController.dispose();
+    _phoneController.dispose();
+    _emailController.dispose();
     _addressLineController.dispose();
     _areaController.dispose();
     _cityController.dispose();
@@ -154,6 +295,7 @@ class _CustomerProfileOnboardingScreenState
             if (address.postalCode.isNotEmpty) {
               _postalCodeController.text = address.postalCode;
             }
+            _updateAssignedFederation();
           });
         }
 
@@ -218,6 +360,7 @@ class _CustomerProfileOnboardingScreenState
           if (addr.city.isNotEmpty) _cityController.text = addr.city;
           if (addr.state.isNotEmpty) _stateController.text = addr.state;
           if (addr.postalCode.isNotEmpty) _postalCodeController.text = addr.postalCode;
+          _updateAssignedFederation();
         });
       }
     }
@@ -239,6 +382,11 @@ class _CustomerProfileOnboardingScreenState
         userId = user?.id;
       } catch (_) {
         userId = null;
+      }
+      if (userId == null || userId.isEmpty) {
+        try {
+          userId = Supabase.instance.client.auth.currentUser?.id;
+        } catch (_) {}
       }
 
       if (userId == null && AppConfig.useMockData) {
@@ -272,18 +420,23 @@ class _CustomerProfileOnboardingScreenState
         }
       }
 
-      // Step 2: Save profile name (+ avatar if uploaded)
+      // Step 2: Save profile name (+ avatar if uploaded + assigned federation)
       try {
+        final cleanPhone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text.trim());
         await DI.userRepo.updateCustomerProfile(
           userId: userId,
           fullName: _nameController.text.trim(),
+          phone: cleanPhone.isNotEmpty ? cleanPhone : _phoneController.text.trim(),
+          email: _emailController.text.trim(),
           avatarUrl: avatarUrl,
-        ).timeout(const Duration(seconds: 4));
+          federationId: _assignedFederation?.id,
+        ).timeout(const Duration(seconds: 12));
       } catch (e) {
+        debugPrint('[CustomerOnboarding] updateCustomerProfile warning: $e');
         if (!AppConfig.useMockData) {
           if (mounted) {
             setState(() {
-              _errorMessage = 'Could not save your profile. Please try again.';
+              _errorMessage = 'Could not save your profile. Please check your connection and try again.';
               _isSaving = false;
             });
           }
@@ -291,35 +444,83 @@ class _CustomerProfileOnboardingScreenState
         }
       }
 
-      // Step 3: Save address with coordinates
+      // Step 3: Save address with coordinates & assigned federation
       try {
         await DI.userRepo.createAddress(
           userId: userId,
           addressLine: _addressLineController.text.trim(),
-          area: _areaController.text.trim(),
-          city: _cityController.text.trim(),
-          state: _stateController.text.trim(),
+          area: _selectedArea,
+          city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
+          state: _selectedState,
           postalCode: _postalCodeController.text.trim(),
+          district: _selectedDistrict,
+          federationId: _assignedFederation?.id,
           label: 'Home',
           latitude: _latitude,
           longitude: _longitude,
-        ).timeout(const Duration(seconds: 4));
+        ).timeout(const Duration(seconds: 12));
       } catch (e) {
-        if (!AppConfig.useMockData) {
-          if (mounted) {
-            setState(() {
-              _errorMessage = 'Could not save your address. Please try again.';
-              _isSaving = false;
-            });
-          }
-          return;
+        debugPrint('[CustomerOnboarding] createAddress warning: $e');
+        // Non-blocking: Profile name and location selections are already captured in state and Step 2.
+        // Proceed cleanly to Step 4 so the citizen is never trapped on onboarding.
+      }
+
+      // Step 4: Check if federation exists AND workers exist in the area
+      final hasFederation = _assignedFederation != null;
+      bool hasWorkers = false;
+      if (hasFederation) {
+        try {
+          hasWorkers = await DI.customerRepo.hasWorkersInArea(
+            federationId: _assignedFederation!.id,
+            district: _selectedDistrict,
+            city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
+            pincode: _postalCodeController.text.trim(),
+          ).timeout(const Duration(seconds: 6));
+        } catch (_) {
+          hasWorkers = true; // resilient fallback
         }
       }
 
-      // All done — navigate to home
-      if (mounted) {
-        Navigator.of(context).pushReplacementNamed('/customer/home');
+      if (!mounted) return;
+
+      if (!hasFederation) {
+        // Customer profile is saved, but area is not serviceable yet due to no federation
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AreaNotServiceableScreen(
+              userRole: 'CUSTOMER',
+              reason: ServiceUnavailableReason.noFederation,
+              district: _selectedDistrict,
+              area: _selectedArea,
+              city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
+              state: _selectedState,
+              pincode: _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
+            ),
+          ),
+        );
+        return;
       }
+
+      if (!hasWorkers) {
+        // Customer profile is saved, federation exists, but no active workers/artisans currently in this area
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => AreaNotServiceableScreen(
+              userRole: 'CUSTOMER',
+              reason: ServiceUnavailableReason.noWorkers,
+              district: _selectedDistrict,
+              area: _selectedArea,
+              city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
+              state: _selectedState,
+              pincode: _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
+            ),
+          ),
+        );
+        return;
+      }
+
+      // All good: Both federation exists AND workers are available in the area
+      Navigator.of(context).pushReplacementNamed('/customer/home');
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -338,12 +539,28 @@ class _CustomerProfileOnboardingScreenState
 
   String? _validateName(String? val) {
     if (val == null || val.trim().isEmpty) return 'Full name is required';
-    if (val.trim().length < 2) return 'Please enter your full name';
-    if (val.trim().length > 80) return 'Name is too long';
+    final clean = val.trim();
+    if (clean.length < 2) return 'Please enter your full name';
+    if (clean.length > 80) return 'Name is too long';
+    if (RegExp(r'^\+?\d{10,13}$').hasMatch(clean)) {
+      return 'Please enter your actual name, not your phone number';
+    }
     // Reject obviously invalid placeholder names
-    final lower = val.trim().toLowerCase();
+    final lower = clean.toLowerCase();
     if (lower == 'ananya' || lower == 'demo user' || lower == 'test user') {
       return 'Please enter your real name';
+    }
+    return null;
+  }
+
+  String? _validatePhone(String? val) {
+    return PhoneNumberUtil.validateIndianMobile(val);
+  }
+
+  String? _validateEmail(String? val) {
+    if (val == null || val.trim().isEmpty) return 'Email address is required';
+    if (!RegExp(r'^[\w\.-]+@[\w-]+\.\w{2,}$').hasMatch(val.trim())) {
+      return 'Please enter a valid email address';
     }
     return null;
   }
@@ -436,18 +653,37 @@ class _CustomerProfileOnboardingScreenState
                 _buildAvatarPicker(),
                 const SizedBox(height: AppSpacing.spacingLg),
 
-                // Section: Identity
-                _buildSectionLabel('YOUR IDENTITY'),
+                // Section: Identity & Credentials
+                _buildSectionLabel('YOUR IDENTITY & CREDENTIALS'),
                 const SizedBox(height: AppSpacing.spacingSm),
                 _buildCard(
                   children: [
                     _buildTextField(
                       controller: _nameController,
-                      label: 'Full Name',
+                      label: 'Full Name *',
                       hint: 'e.g. Rajesh Patil',
                       icon: Icons.person_outline,
                       validator: _validateName,
                       textCapitalization: TextCapitalization.words,
+                    ),
+                    const SizedBox(height: AppSpacing.spacingMd),
+                    _buildTextField(
+                      controller: _phoneController,
+                      label: 'Mobile Number *',
+                      hint: 'e.g. 9876543210',
+                      icon: Icons.phone_android_outlined,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [IndianPhoneNumberFormatter()],
+                      validator: _validatePhone,
+                    ),
+                    const SizedBox(height: AppSpacing.spacingMd),
+                    _buildTextField(
+                      controller: _emailController,
+                      label: 'Email Address *',
+                      hint: 'e.g. rajesh.patil@example.com',
+                      icon: Icons.email_outlined,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: _validateEmail,
                     ),
                   ],
                 ),
@@ -530,62 +766,247 @@ class _CustomerProfileOnboardingScreenState
                   children: [
                     _buildTextField(
                       controller: _addressLineController,
-                      label: 'Address Line',
+                      label: 'House / Flat / Street Address *',
                       hint: 'e.g. 45 MG Road, Shivajinagar',
                       icon: Icons.home_outlined,
                       validator: (v) => _validateRequired(v, 'Address line'),
                       textCapitalization: TextCapitalization.sentences,
                     ),
                     const SizedBox(height: AppSpacing.spacingMd),
-                    _buildTextField(
-                      controller: _areaController,
-                      label: 'Area / Locality',
-                      hint: 'e.g. Shivajinagar (optional)',
-                      icon: Icons.location_city_outlined,
-                      validator: null, // optional
-                      textCapitalization: TextCapitalization.words,
-                    ),
-                    const SizedBox(height: AppSpacing.spacingMd),
+
+                    // PIN Code with auto-detect and State Dropdown
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // PIN Code
                         Expanded(
-                          child: _buildTextField(
-                            controller: _cityController,
-                            label: 'City',
-                            hint: 'e.g. Pune',
-                            icon: Icons.location_on_outlined,
-                            validator: (v) => _validateRequired(v, 'City'),
-                            textCapitalization: TextCapitalization.words,
+                          flex: 2,
+                          child: TextFormField(
+                            controller: _postalCodeController,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            enabled: !_isSaving,
+                            style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface),
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(6),
+                            ],
+                            decoration: InputDecoration(
+                              labelText: 'Postal PIN *',
+                              hintText: '411001',
+                              counterText: '',
+                              prefixIcon: const Icon(Icons.markunread_mailbox_outlined, size: 20, color: AppColors.onSurfaceVariant),
+                              suffixIcon: _isResolvingPincode
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                                      ),
+                                    )
+                                  : (_pincodeFeedback != null
+                                      ? const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 20)
+                                      : null),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              border: OutlineInputBorder(borderRadius: AppRadius.radiusLg, borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.outlineVariant, width: 1),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                            onChanged: _handlePincodeAutoDetect,
+                            validator: _validatePostalCode,
                           ),
                         ),
                         const SizedBox(width: AppSpacing.spacingSm),
+
+                        // State Dropdown (All 36 Indian States & UTs)
                         Expanded(
-                          child: _buildTextField(
-                            controller: _stateController,
-                            label: 'State',
-                            hint: 'e.g. Maharashtra',
-                            icon: Icons.map_outlined,
-                            validator: (v) => _validateRequired(v, 'State'),
-                            textCapitalization: TextCapitalization.words,
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: IndiaGeographyService.states.contains(_selectedState)
+                                ? _selectedState
+                                : IndiaGeographyService.states.first,
+                            isExpanded: true,
+                            style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface),
+                            decoration: InputDecoration(
+                              labelText: 'State *',
+                              prefixIcon: const Icon(Icons.public, size: 20, color: AppColors.onSurfaceVariant),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              border: OutlineInputBorder(borderRadius: AppRadius.radiusLg, borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.outlineVariant, width: 1),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                            items: IndiaGeographyService.states.map((st) {
+                              return DropdownMenuItem(
+                                value: st,
+                                child: Text(st, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedState = val;
+                                  _stateController.text = val;
+                                  _availableDistricts = IndiaGeographyService.getDistricts(val);
+                                  _selectedDistrict = _availableDistricts.isNotEmpty ? _availableDistricts.first : 'Pune';
+                                  _cityController.text = _selectedDistrict;
+                                  _availableAreas = IndiaGeographyService.getAreasForDistrict(val, _selectedDistrict);
+                                  _selectedArea = _availableAreas.isNotEmpty ? _availableAreas.first : _selectedDistrict;
+                                  _areaController.text = _selectedArea;
+                                  _updateAssignedFederation();
+                                });
+                              }
+                            },
                           ),
                         ),
                       ],
                     ),
+
+                    if (_pincodeFeedback != null) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFF81C784)),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.auto_awesome, color: Color(0xFF2E7D32), size: 14),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                _pincodeFeedback!,
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF1B5E20), fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
                     const SizedBox(height: AppSpacing.spacingMd),
-                    _buildTextField(
-                      controller: _postalCodeController,
-                      label: 'Postal Code (PIN)',
-                      hint: 'e.g. 411001',
-                      icon: Icons.markunread_mailbox_outlined,
-                      validator: _validatePostalCode,
-                      keyboardType: TextInputType.number,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        LengthLimitingTextInputFormatter(6),
+
+                    // District & Area Dropdowns
+                    Row(
+                      children: [
+                        // District Dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('cust_dist_${_selectedState}_$_selectedDistrict'),
+                            initialValue: _availableDistricts.contains(_selectedDistrict)
+                                ? _selectedDistrict
+                                : (_availableDistricts.isNotEmpty ? _availableDistricts.first : null),
+                            isExpanded: true,
+                            style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface),
+                            decoration: InputDecoration(
+                              labelText: 'District *',
+                              prefixIcon: const Icon(Icons.apartment_outlined, size: 20, color: AppColors.onSurfaceVariant),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              border: OutlineInputBorder(borderRadius: AppRadius.radiusLg, borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.outlineVariant, width: 1),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                            items: _availableDistricts.map((d) {
+                              return DropdownMenuItem(
+                                value: d,
+                                child: Text(d, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedDistrict = val;
+                                  _cityController.text = val;
+                                  _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, val);
+                                  _selectedArea = _availableAreas.isNotEmpty ? _availableAreas.first : val;
+                                  _areaController.text = _selectedArea;
+                                  _updateAssignedFederation();
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: AppSpacing.spacingSm),
+
+                        // Area / Locality Dropdown
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('cust_area_${_selectedDistrict}_$_selectedArea'),
+                            initialValue: _availableAreas.contains(_selectedArea)
+                                ? _selectedArea
+                                : (_availableAreas.isNotEmpty ? _availableAreas.first : null),
+                            isExpanded: true,
+                            style: AppTypography.bodyMd.copyWith(color: AppColors.onSurface),
+                            decoration: InputDecoration(
+                              labelText: 'Area / Locality *',
+                              prefixIcon: const Icon(Icons.location_city_outlined, size: 20, color: AppColors.onSurfaceVariant),
+                              filled: true,
+                              fillColor: AppColors.surfaceContainerLow,
+                              border: OutlineInputBorder(borderRadius: AppRadius.radiusLg, borderSide: BorderSide.none),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.outlineVariant, width: 1),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: AppRadius.radiusLg,
+                                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                              ),
+                            ),
+                            items: _availableAreas.map((a) {
+                              return DropdownMenuItem(
+                                value: a,
+                                child: Text(a, style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setState(() {
+                                  _selectedArea = val;
+                                  _areaController.text = val;
+                                  _updateAssignedFederation();
+                                });
+                              }
+                            },
+                          ),
+                        ),
                       ],
                     ),
                   ],
                 ),
+                const SizedBox(height: AppSpacing.spacingLg),
+
+                // Section: Federation Jurisdiction
+                _buildSectionLabel('ASSIGNED COOPERATIVE FEDERATION'),
+                const SizedBox(height: AppSpacing.spacing3xs),
+                Text(
+                  'Auto-assigned based on your delivery address jurisdiction.',
+                  style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant),
+                ),
+                const SizedBox(height: AppSpacing.spacingSm),
+                _buildAssignedFederationCard(),
                 const SizedBox(height: AppSpacing.spacingXl),
 
                 // Error message
@@ -641,7 +1062,9 @@ class _CustomerProfileOnboardingScreenState
                             ),
                           )
                         : Text(
-                            'Save & Continue',
+                            _assignedFederation != null
+                                ? 'Save & Continue'
+                                : 'Complete Registration & Join Waitlist',
                             style: AppTypography.titleMd.copyWith(
                               color: AppColors.onPrimary,
                               fontWeight: FontWeight.bold,
@@ -802,4 +1225,186 @@ class _CustomerProfileOnboardingScreenState
       ),
     );
   }
+
+  Widget _buildAssignedFederationCard() {
+    if (_assignedFederation == null) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF8E1),
+          borderRadius: AppRadius.radiusMd,
+          border: Border.all(color: const Color(0xFFFFB300), width: 1.2),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Icon(Icons.info_outline, color: Color(0xFFE65100), size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        'Not Serviceable Yet',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF3E0),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: const Color(0xFFFFB74D)),
+                        ),
+                        child: const Text(
+                          'Expansion Waitlist',
+                          style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    'No active cooperative union in $_selectedDistrict. Complete registration to join the priority expansion waitlist.',
+                    style: AppTypography.bodySm.copyWith(color: AppColors.onSurface, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final fed = _assignedFederation!;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.spacingMd),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: AppRadius.radiusLg,
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryContainer,
+                  borderRadius: AppRadius.radiusMd,
+                ),
+                child: const Icon(
+                  Icons.account_balance,
+                  color: AppColors.primary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.spacingSm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            'ASSIGNED COOPERATIVE FEDERATION',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.5,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE8F5E9),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(color: const Color(0xFF81C784)),
+                          ),
+                          child: const Text(
+                            'Auto-Assigned',
+                            style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      fed.name,
+                      style: AppTypography.titleMd.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.spacingSm),
+          const Divider(height: 1, color: AppColors.outlineVariant),
+          const SizedBox(height: AppSpacing.spacingSm),
+          Row(
+            children: [
+              const Icon(Icons.location_on_outlined, size: 14, color: AppColors.onSurfaceVariant),
+              const SizedBox(width: 4),
+              Text(
+                'Jurisdiction: ${fed.district}, ${fed.state}',
+                style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
+              ),
+              if (fed.registrationNo != null) ...[
+                const Spacer(),
+                Text(
+                  fed.registrationNo!,
+                  style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 10),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shield_outlined, size: 14, color: AppColors.primary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'All artisan bookings from your address are guaranteed and regulated by this union.',
+                    style: AppTypography.labelSm.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
+

@@ -10,6 +10,7 @@ import 'worker_discovery_screen.dart';
 import '../../data/models/customer_profile.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../core/services/india_geography_service.dart';
 
 class CustomerMainLayout extends StatefulWidget {
   const CustomerMainLayout({super.key});
@@ -21,8 +22,11 @@ class CustomerMainLayout extends StatefulWidget {
 class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   int _currentIndex = 0;
   String _customerName = 'ShramSetu Member';
-  String _customerSubtitle = 'Pune District Cooperative Federation';
+  String _customerSubtitle = 'Labour Cooperative Federation';
+  String? _customerFederationName;
   String? _customerAvatar;
+  String? _customerPhone;
+  String? _customerEmail;
   String? _currentUserId;
 
   @override
@@ -52,42 +56,77 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
         final profile = await DI.userRepo.getCustomerProfile(userId);
         final userData = await DI.userRepo.getUserProfile(userId);
 
-        if (mounted) {
           setState(() {
             String resolvedName = profile?.fullName.trim() ?? '';
-            if (resolvedName.isEmpty || resolvedName.startsWith('User ')) {
+            final isPlaceholder = resolvedName.isEmpty ||
+                resolvedName.startsWith('User ') ||
+                RegExp(r'^\+?\d{10,13}$').hasMatch(resolvedName) ||
+                resolvedName.toLowerCase() == 'demo user' ||
+                resolvedName.toLowerCase() == 'test user' ||
+                resolvedName.toLowerCase() == 'ananya';
+
+            if (isPlaceholder) {
               final dbName = (userData?['full_name'] as String?)?.trim() ?? '';
-              if (dbName.isNotEmpty && !dbName.startsWith('User ')) {
+              if (dbName.isNotEmpty &&
+                  !dbName.startsWith('User ') &&
+                  !RegExp(r'^\+?\d{10,13}$').hasMatch(dbName) &&
+                  dbName.toLowerCase() != 'demo user' &&
+                  dbName.toLowerCase() != 'test user') {
                 resolvedName = dbName;
+              } else {
+                final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
+                if (metaName != null &&
+                    metaName.trim().isNotEmpty &&
+                    !RegExp(r'^\+?\d{10,13}$').hasMatch(metaName.trim())) {
+                  resolvedName = metaName.trim();
+                }
               }
             }
-            if (resolvedName.isEmpty) {
+
+            if (resolvedName.isEmpty || RegExp(r'^\+?\d{10,13}$').hasMatch(resolvedName)) {
               final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
-              if (metaName != null && metaName.trim().isNotEmpty) {
+              if (metaName != null &&
+                  metaName.trim().isNotEmpty &&
+                  !RegExp(r'^\+?\d{10,13}$').hasMatch(metaName.trim())) {
                 resolvedName = metaName.trim();
+              } else {
+                resolvedName = 'Add Your Name';
               }
-            }
-            if (resolvedName.isEmpty) {
-              final p = profile?.phone.isNotEmpty == true ? profile!.phone : (user?.phone ?? '');
-              resolvedName = p.isNotEmpty ? p : 'Customer';
             }
 
             _customerName = resolvedName;
             _customerAvatar = profile?.avatarUrl ?? userData?['avatar_url'] as String?;
+            _customerFederationName = (profile?.federationName?.isNotEmpty == true)
+                ? profile?.federationName
+                : null;
 
-            final phoneNum = (profile?.phone.isNotEmpty == true) ? profile!.phone : (user?.phone ?? '');
+            final phoneNum = (profile?.phone.isNotEmpty == true)
+                ? profile!.phone
+                : (user?.phone ?? ((userData?['phone'] as String?) ?? ''));
+            final emailAddr = (profile?.email != null && profile!.email!.isNotEmpty)
+                ? profile.email!
+                : ((user?.email != null && user!.email!.isNotEmpty)
+                    ? user.email!
+                    : (((userData?['email'] as String?)?.isNotEmpty == true)
+                        ? (userData!['email'] as String)
+                        : (user?.userMetadata?['email'] as String? ?? '')));
+            _customerPhone = phoneNum;
+            _customerEmail = emailAddr;
+
             if (profile?.defaultAddress != null) {
               final addr = profile!.defaultAddress!;
-              _customerSubtitle = '${addr.area.isNotEmpty ? addr.area : addr.city}, Pune';
+              final areaPart = addr.area.isNotEmpty ? addr.area : addr.city;
+              _customerSubtitle = addr.city.isNotEmpty && addr.city != areaPart
+                  ? '$areaPart, ${addr.city}'
+                  : areaPart;
             } else if (phoneNum.isNotEmpty && _customerName != phoneNum) {
               _customerSubtitle = phoneNum;
             } else {
-              _customerSubtitle = 'Pune District Cooperative Federation';
+              _customerSubtitle = _customerFederationName ?? 'Cooperative Network';
             }
           });
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
   }
 
   List<Widget> get _screens => [
@@ -96,6 +135,198 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
     CustomerBookingsScreen(onExploreServices: () => setState(() => _currentIndex = 1)),
     _buildProfileScreen(),
   ];
+
+  void _showEditCredentialsDialog() {
+    final userId = _currentUserId;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading customer profile, please try again in a moment...')),
+      );
+      return;
+    }
+
+    final initialName = RegExp(r'^\+?\d{10,13}$').hasMatch(_customerName) ? '' : _customerName;
+    final nameCtrl = TextEditingController(text: initialName);
+    final emailCtrl = TextEditingController(text: _customerEmail ?? '');
+    final formKey = GlobalKey<FormState>();
+    bool isSaving = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (dialogCtx, setSheetState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(dialogCtx).viewInsets.bottom + 24,
+              ),
+              child: Form(
+                key: formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primaryContainer,
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.badge_outlined, color: AppColors.primary, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Update Credentials',
+                              style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, size: 20),
+                          onPressed: () => Navigator.of(dialogCtx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      'Ensure your full name and email are up to date for verified cooperative bookings.',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.outline),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name *',
+                        hintText: 'Enter your full name',
+                        prefixIcon: Icon(Icons.person_outline),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Full name is required';
+                        }
+                        if (val.trim().length < 2) {
+                          return 'Please enter a valid full name';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email Address *',
+                        hintText: 'e.g. name@example.com',
+                        prefixIcon: Icon(Icons.email_outlined),
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (val) {
+                        if (val == null || val.trim().isEmpty) {
+                          return 'Email address is required';
+                        }
+                        final emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+                        if (!emailRegex.hasMatch(val.trim())) {
+                          return 'Please enter a valid email address';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      initialValue: _customerPhone,
+                      enabled: false,
+                      decoration: const InputDecoration(
+                        labelText: 'Registered Mobile',
+                        prefixIcon: Icon(Icons.phone_android),
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 48,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                        onPressed: isSaving
+                            ? null
+                            : () async {
+                                if (!formKey.currentState!.validate()) return;
+                                setSheetState(() => isSaving = true);
+                                try {
+                                  await DI.userRepo.updateCustomerProfile(
+                                    userId: userId,
+                                    fullName: nameCtrl.text.trim(),
+                                    email: emailCtrl.text.trim(),
+                                    phone: _customerPhone,
+                                  );
+                                  if (context.mounted) {
+                                    Navigator.of(dialogCtx).pop();
+                                    setState(() {
+                                      _customerName = nameCtrl.text.trim();
+                                      _customerEmail = emailCtrl.text.trim();
+                                    });
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Account credentials updated successfully!'),
+                                        backgroundColor: Color(0xFF2E7D32),
+                                      ),
+                                    );
+                                    await _loadCustomerProfile();
+                                  }
+                                } catch (e) {
+                                  setSheetState(() => isSaving = false);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Failed to update: $e')),
+                                  );
+                                }
+                              },
+                        child: isSaving
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              )
+                            : const Text('Save Credentials', style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Center(
+                      child: TextButton.icon(
+                        icon: const Icon(Icons.edit_location_alt_outlined, size: 16),
+                        label: const Text('Need to change address or location?'),
+                        onPressed: () async {
+                          Navigator.of(dialogCtx).pop();
+                          await Navigator.of(context).pushNamed('/customer/onboarding');
+                          _loadCustomerProfile();
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 
   void _showSavedAddressesDialog() {
     final userId = _currentUserId;
@@ -307,10 +538,12 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                             ? NetworkImage(_customerAvatar!)
                             : null,
                         child: (_customerAvatar == null || _customerAvatar!.isEmpty)
-                            ? Text(
-                                _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
-                                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
-                              )
+                            ? (_customerName == 'Add Your Name' || RegExp(r'^\+?\d+$').hasMatch(_customerName)
+                                ? const Icon(Icons.person_outline, size: 26, color: AppColors.primary)
+                                : Text(
+                                    _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
+                                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                  ))
                             : null,
                       ),
                       const SizedBox(width: 14),
@@ -318,19 +551,262 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(_customerName, style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                            Text(
+                              _customerName,
+                              style: AppTypography.titleMd.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: _customerName == 'Add Your Name' ? AppColors.outline : AppColors.primary,
+                              ),
+                            ),
                             const SizedBox(height: 2),
-                            Text(_customerSubtitle, style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
+                            Text(
+                              _customerName == 'Add Your Name' ? 'Tap edit icon to add your name & email' : _customerSubtitle,
+                              style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                            ),
                           ],
                         ),
                       ),
                       IconButton(
-                        tooltip: 'Edit Profile & Address',
+                        tooltip: 'Edit Profile & Credentials',
                         icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.outline),
-                        onPressed: () async {
-                          await Navigator.of(context).pushNamed('/customer/onboarding');
-                          _loadCustomerProfile();
-                        },
+                        onPressed: _showEditCredentialsDialog,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.radiusXl,
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: _customerFederationName != null
+                                  ? AppColors.primaryContainer
+                                  : const Color(0xFFFFF8E1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              _customerFederationName != null ? Icons.account_balance : Icons.access_time_filled,
+                              color: _customerFederationName != null ? AppColors.primary : const Color(0xFFE65100),
+                              size: 20,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      _customerFederationName != null
+                                          ? 'ASSIGNED COOPERATIVE FEDERATION'
+                                          : 'COOPERATIVE EXPANSION ZONE',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: _customerFederationName != null ? AppColors.primary : const Color(0xFFE65100),
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 10,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: _customerFederationName != null
+                                            ? const Color(0xFFE8F5E9)
+                                            : const Color(0xFFFFF3E0),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: _customerFederationName != null
+                                              ? const Color(0xFF81C784)
+                                              : const Color(0xFFFFB74D),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        _customerFederationName != null ? 'Jurisdiction Assigned' : 'Coming Soon',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                          color: _customerFederationName != null
+                                              ? const Color(0xFF2E7D32)
+                                              : const Color(0xFFE65100),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _customerFederationName ?? 'No Active Cooperative Union Yet',
+                                  style: AppTypography.titleMd.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.onSurface,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      const Divider(height: 1, color: AppColors.outlineVariant),
+                      const SizedBox(height: 10),
+                      Row(
+                        children: [
+                          Icon(
+                            _customerFederationName != null ? Icons.shield_outlined : Icons.info_outline,
+                            size: 14,
+                            color: _customerFederationName != null ? AppColors.primary : const Color(0xFFE65100),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              _customerFederationName != null
+                                  ? 'All artisan bookings from your location are guaranteed by this federation with 0% middleman cut and direct dispute resolution.'
+                                  : 'Artisans and cooperative coverage are expanding to your district. You will be notified when bookings go live.',
+                              style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Account Credentials Card (Required Mobile & Email)
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: AppRadius.radiusXl,
+                    border: Border.all(color: AppColors.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryContainer,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(Icons.verified_user_outlined, color: AppColors.primary, size: 20),
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'ACCOUNT CREDENTIALS',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.5,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: const Color(0xFF81C784)),
+                            ),
+                            child: const Text(
+                              'Required Credentials',
+                              style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.phone_android, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Mobile Number *', style: TextStyle(fontSize: 10, color: AppColors.outline, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    (_customerPhone != null && _customerPhone!.isNotEmpty) ? _customerPhone! : 'Not linked (Required)',
+                                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.check_circle, size: 16, color: Color(0xFF2E7D32)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLow,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: AppColors.outlineVariant),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.email_outlined, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Email Address *', style: TextStyle(fontSize: 10, color: AppColors.outline, fontWeight: FontWeight.w600)),
+                                  Text(
+                                    (_customerEmail != null && _customerEmail!.isNotEmpty) ? _customerEmail! : 'Not linked (Required)',
+                                    style: AppTypography.bodyMd.copyWith(fontWeight: FontWeight.bold),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_customerEmail != null && _customerEmail!.isNotEmpty)
+                              const Icon(Icons.check_circle, size: 16, color: Color(0xFF2E7D32))
+                            else
+                              const Text('Action Required', style: TextStyle(fontSize: 10, color: AppColors.error, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: const BorderSide(color: AppColors.outlineVariant),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: _showEditCredentialsDialog,
+                          icon: const Icon(Icons.edit_outlined, size: 16),
+                          label: const Text('Update Credentials & Address', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
                       ),
                     ],
                   ),
@@ -432,14 +908,14 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
             ),
             child: SafeArea(
               child: SizedBox(
-                height: 58,
+                height: 60,
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildNavItem(0, Icons.home_outlined, Icons.home, 'Home'.tr()),
-                    _buildNavItem(1, Icons.grid_view_outlined, Icons.grid_view, 'Services'.tr()),
-                    _buildNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'Bookings'.tr(), hasBadge: true),
-                    _buildNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile'.tr()),
+                    _buildNavItem(0, Icons.account_balance_outlined, Icons.account_balance, 'Home'.tr()),
+                    _buildNavItem(1, Icons.handyman_outlined, Icons.handyman, 'Services'.tr()),
+                    _buildNavItem(2, Icons.verified_user_outlined, Icons.verified_user, 'Bookings'.tr(), hasBadge: true),
+                    _buildNavItem(3, Icons.badge_outlined, Icons.badge, 'Profile'.tr()),
                   ],
                 ),
               ),
@@ -519,14 +995,16 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                         ? NetworkImage(_customerAvatar!)
                         : null,
                     child: (_customerAvatar == null || _customerAvatar!.isEmpty)
-                        ? Text(
-                            _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          )
+                        ? (_customerName == 'Add Your Name' || RegExp(r'^\+?\d+$').hasMatch(_customerName)
+                            ? const Icon(Icons.person_outline, size: 18, color: AppColors.primary)
+                            : Text(
+                                _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ))
                         : null,
                   ),
                   const SizedBox(width: 10),
@@ -611,7 +1089,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
       onTap: () => setState(() => _currentIndex = index),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
-        width: 64,
+        width: 70,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -620,7 +1098,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
               children: [
                 Icon(
                   isSelected ? iconFilled : iconOutlined,
-                  color: isSelected ? AppColors.primary : AppColors.outline,
+                  color: isSelected ? AppColors.secondary : AppColors.onSurfaceVariant,
                   size: 22,
                 ),
                 if (hasBadge && !isSelected)
@@ -631,7 +1109,7 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
                       width: 7,
                       height: 7,
                       decoration: const BoxDecoration(
-                        color: AppColors.secondary,
+                        color: AppColors.secondaryContainer,
                         shape: BoxShape.circle,
                       ),
                     ),
@@ -642,18 +1120,18 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
             Text(
               label,
               style: AppTypography.labelSm.copyWith(
-                color: isSelected ? AppColors.primary : AppColors.outline,
+                color: isSelected ? AppColors.secondary : AppColors.onSurfaceVariant,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
                 fontSize: 10,
               ),
             ),
             const SizedBox(height: 2),
             Container(
-              width: 4,
-              height: 4,
+              width: 14,
+              height: 2,
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
-                shape: BoxShape.circle,
+                color: isSelected ? AppColors.secondaryContainer : Colors.transparent,
+                borderRadius: BorderRadius.circular(1),
               ),
             ),
           ],
@@ -736,200 +1214,496 @@ class _SavedAddressesSheetState extends State<_SavedAddressesSheet> {
 
   void _showAddAddressDialog() {
     final lineCtrl = TextEditingController();
-    final areaCtrl = TextEditingController();
-    final cityCtrl = TextEditingController(text: 'Pune');
     final pinCtrl = TextEditingController();
-    final stateCtrl = TextEditingController(text: 'Maharashtra');
+
+    String selectedState = 'Maharashtra';
+    String selectedDistrict = 'Pune';
+    List<String> availableDistricts = IndiaGeographyService.getDistricts(selectedState);
+    List<String> availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+    String selectedArea = availableAreas.isNotEmpty ? availableAreas.first : 'Kothrud';
+    bool isResolvingPincode = false;
+    String? pincodeFeedback;
 
     showDialog(
       context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Add New Address', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: lineCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'House / Flat / Street *',
-                  border: OutlineInputBorder(),
-                  hintText: 'e.g. Flat 301, Silver Oak Society',
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: areaCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Area / Locality *',
-                  border: OutlineInputBorder(),
-                  hintText: 'e.g. Kothrud, Shivajinagar, Baner',
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: cityCtrl,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (dlgCtx, setDlgState) {
+          Future<void> handlePincode(String val) async {
+            final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+            if (clean.length == 6) {
+              setDlgState(() {
+                isResolvingPincode = true;
+                pincodeFeedback = 'Resolving location...';
+              });
+              final res = await IndiaGeographyService.lookupPincode(clean);
+              if (res != null) {
+                setDlgState(() {
+                  selectedState = res.state;
+                  availableDistricts = IndiaGeographyService.getDistricts(res.state);
+                  selectedDistrict = availableDistricts.contains(res.district)
+                      ? res.district
+                      : (availableDistricts.isNotEmpty ? availableDistricts.first : res.district);
+                  final areas = res.areas.isNotEmpty
+                      ? res.areas
+                      : IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+                  availableAreas = areas;
+                  selectedArea = areas.isNotEmpty ? areas.first : res.city;
+                  isResolvingPincode = false;
+                  pincodeFeedback = 'Detected: $selectedDistrict, $selectedState (${res.isFromNetwork ? "Live Post Office" : "Postal Directory"})';
+                });
+              } else {
+                setDlgState(() {
+                  isResolvingPincode = false;
+                  pincodeFeedback = null;
+                });
+              }
+            } else {
+              if (pincodeFeedback != null) {
+                setDlgState(() => pincodeFeedback = null);
+              }
+            }
+          }
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.add_location_alt_outlined, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('Add New Address', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: lineCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'City *',
+                        labelText: 'House / Flat / Street *',
                         border: OutlineInputBorder(),
+                        hintText: 'e.g. Flat 301, Silver Oak Society',
+                        isDense: true,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: pinCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'PIN Code *',
-                        border: OutlineInputBorder(),
-                        hintText: '411038',
-                      ),
-                      keyboardType: TextInputType.number,
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: pinCtrl,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            decoration: InputDecoration(
+                              labelText: 'PIN Code *',
+                              counterText: '',
+                              border: const OutlineInputBorder(),
+                              hintText: '411038',
+                              isDense: true,
+                              suffixIcon: isResolvingPincode
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    )
+                                  : (pincodeFeedback != null
+                                      ? const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18)
+                                      : null),
+                            ),
+                            onChanged: handlePincode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: IndiaGeographyService.states.contains(selectedState)
+                                ? selectedState
+                                : IndiaGeographyService.states.first,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'State *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: IndiaGeographyService.states.map((st) {
+                              return DropdownMenuItem(
+                                value: st,
+                                child: Text(st, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedState = val;
+                                  availableDistricts = IndiaGeographyService.getDistricts(val);
+                                  selectedDistrict = availableDistricts.isNotEmpty ? availableDistricts.first : 'Pune';
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(val, selectedDistrict);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : selectedDistrict;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    if (pincodeFeedback != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        pincodeFeedback!,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF1B5E20), fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('add_dist_${selectedState}_$selectedDistrict'),
+                            initialValue: availableDistricts.contains(selectedDistrict)
+                                ? selectedDistrict
+                                : (availableDistricts.isNotEmpty ? availableDistricts.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'District *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableDistricts.map((d) {
+                              return DropdownMenuItem(
+                                value: d,
+                                child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedDistrict = val;
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, val);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('add_area_${selectedDistrict}_$selectedArea'),
+                            initialValue: availableAreas.contains(selectedArea)
+                                ? selectedArea
+                                : (availableAreas.isNotEmpty ? availableAreas.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Area / Locality *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableAreas.map((a) {
+                              return DropdownMenuItem(
+                                value: a,
+                                child: Text(a, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() => selectedArea = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                onPressed: () async {
+                  if (lineCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                      const SnackBar(content: Text('Please fill all required fields.')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(dlgCtx);
+                  try {
+                    await DI.userRepo.createAddress(
+                      userId: widget.userId,
+                      addressLine: lineCtrl.text.trim(),
+                      area: selectedArea,
+                      city: selectedDistrict,
+                      district: selectedDistrict,
+                      state: selectedState,
+                      postalCode: pinCtrl.text.trim(),
+                    );
+                    widget.onAddressChanged?.call();
+                    await _loadAddresses();
+                  } catch (e) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                child: const Text('Save Address'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            onPressed: () async {
-              if (lineCtrl.text.trim().isEmpty || areaCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
-                ScaffoldMessenger.of(dlgCtx).showSnackBar(
-                  const SnackBar(content: Text('Please fill all required fields.')),
-                );
-                return;
-              }
-              Navigator.pop(dlgCtx);
-              try {
-                await DI.userRepo.createAddress(
-                  userId: widget.userId,
-                  addressLine: lineCtrl.text.trim(),
-                  area: areaCtrl.text.trim(),
-                  city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
-                  state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
-                  postalCode: pinCtrl.text.trim(),
-                );
-                widget.onAddressChanged?.call();
-                await _loadAddresses();
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            child: const Text('Save Address'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
 
   void _showEditAddressDialog(CustomerAddress addr) {
     final lineCtrl = TextEditingController(text: addr.addressLine);
-    final areaCtrl = TextEditingController(text: addr.area);
-    final cityCtrl = TextEditingController(text: addr.city.isNotEmpty ? addr.city : 'Pune');
     final pinCtrl = TextEditingController(text: addr.postalCode);
-    final stateCtrl = TextEditingController(text: addr.state.isNotEmpty ? addr.state : 'Maharashtra');
+
+    String selectedState = IndiaGeographyService.matchState(addr.state) ?? 'Maharashtra';
+    List<String> availableDistricts = IndiaGeographyService.getDistricts(selectedState);
+    String selectedDistrict = IndiaGeographyService.matchDistrict(selectedState, addr.city.isNotEmpty ? addr.city : 'Pune');
+    if (!availableDistricts.contains(selectedDistrict) && availableDistricts.isNotEmpty) {
+      selectedDistrict = availableDistricts.first;
+    }
+    List<String> availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+    String selectedArea = addr.area.isNotEmpty ? addr.area : (availableAreas.isNotEmpty ? availableAreas.first : 'Central');
+    if (!availableAreas.contains(selectedArea)) {
+      availableAreas = [selectedArea, ...availableAreas];
+    }
+    bool isResolvingPincode = false;
+    String? pincodeFeedback;
 
     showDialog(
       context: context,
-      builder: (dlgCtx) => AlertDialog(
-        title: const Row(
-          children: [
-            Icon(Icons.edit_location_alt_outlined, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Edit Address', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: lineCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'House / Flat / Street *',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: areaCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Area / Locality *',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: cityCtrl,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (dlgCtx, setDlgState) {
+          Future<void> handlePincode(String val) async {
+            final clean = val.replaceAll(RegExp(r'\D'), '').trim();
+            if (clean.length == 6) {
+              setDlgState(() {
+                isResolvingPincode = true;
+                pincodeFeedback = 'Resolving location...';
+              });
+              final res = await IndiaGeographyService.lookupPincode(clean);
+              if (res != null) {
+                setDlgState(() {
+                  selectedState = res.state;
+                  availableDistricts = IndiaGeographyService.getDistricts(res.state);
+                  selectedDistrict = availableDistricts.contains(res.district)
+                      ? res.district
+                      : (availableDistricts.isNotEmpty ? availableDistricts.first : res.district);
+                  final areas = res.areas.isNotEmpty
+                      ? res.areas
+                      : IndiaGeographyService.getAreasForDistrict(selectedState, selectedDistrict);
+                  availableAreas = areas;
+                  selectedArea = areas.isNotEmpty ? areas.first : res.city;
+                  isResolvingPincode = false;
+                  pincodeFeedback = 'Detected: $selectedDistrict, $selectedState (${res.isFromNetwork ? "Live Post Office" : "Postal Directory"})';
+                });
+              } else {
+                setDlgState(() {
+                  isResolvingPincode = false;
+                  pincodeFeedback = null;
+                });
+              }
+            } else {
+              if (pincodeFeedback != null) {
+                setDlgState(() => pincodeFeedback = null);
+              }
+            }
+          }
+
+          return AlertDialog(
+            title: const Row(
+              children: [
+                Icon(Icons.edit_location_alt_outlined, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('Edit Address', style: TextStyle(fontSize: 16)),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: lineCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'City *',
+                        labelText: 'House / Flat / Street *',
                         border: OutlineInputBorder(),
+                        isDense: true,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: TextField(
-                      controller: pinCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'PIN Code *',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: TextField(
+                            controller: pinCtrl,
+                            keyboardType: TextInputType.number,
+                            maxLength: 6,
+                            decoration: InputDecoration(
+                              labelText: 'PIN Code *',
+                              counterText: '',
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                              suffixIcon: isResolvingPincode
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(10),
+                                      child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                                    )
+                                  : (pincodeFeedback != null
+                                      ? const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 18)
+                                      : null),
+                            ),
+                            onChanged: handlePincode,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 3,
+                          child: DropdownButtonFormField<String>(
+                            initialValue: IndiaGeographyService.states.contains(selectedState)
+                                ? selectedState
+                                : IndiaGeographyService.states.first,
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'State *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: IndiaGeographyService.states.map((st) {
+                              return DropdownMenuItem(
+                                value: st,
+                                child: Text(st, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedState = val;
+                                  availableDistricts = IndiaGeographyService.getDistricts(val);
+                                  selectedDistrict = availableDistricts.isNotEmpty ? availableDistricts.first : 'Pune';
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(val, selectedDistrict);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : selectedDistrict;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                ],
+                    if (pincodeFeedback != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        pincodeFeedback!,
+                        style: const TextStyle(fontSize: 10, color: Color(0xFF1B5E20), fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('edit_dist_${selectedState}_$selectedDistrict'),
+                            initialValue: availableDistricts.contains(selectedDistrict)
+                                ? selectedDistrict
+                                : (availableDistricts.isNotEmpty ? availableDistricts.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'District *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableDistricts.map((d) {
+                              return DropdownMenuItem(
+                                value: d,
+                                child: Text(d, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() {
+                                  selectedDistrict = val;
+                                  availableAreas = IndiaGeographyService.getAreasForDistrict(selectedState, val);
+                                  selectedArea = availableAreas.isNotEmpty ? availableAreas.first : val;
+                                });
+                              }
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            key: ValueKey('edit_area_${selectedDistrict}_$selectedArea'),
+                            initialValue: availableAreas.contains(selectedArea)
+                                ? selectedArea
+                                : (availableAreas.isNotEmpty ? availableAreas.first : null),
+                            isExpanded: true,
+                            decoration: const InputDecoration(
+                              labelText: 'Area / Locality *',
+                              border: OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                            items: availableAreas.map((a) {
+                              return DropdownMenuItem(
+                                value: a,
+                                child: Text(a, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                              );
+                            }).toList(),
+                            onChanged: (val) {
+                              if (val != null) {
+                                setDlgState(() => selectedArea = val);
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+                onPressed: () async {
+                  if (lineCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(dlgCtx).showSnackBar(
+                      const SnackBar(content: Text('Please fill all required fields.')),
+                    );
+                    return;
+                  }
+                  Navigator.pop(dlgCtx);
+                  try {
+                    await DI.userRepo.updateAddress(
+                      userId: widget.userId,
+                      addressId: addr.id,
+                      addressLine: lineCtrl.text.trim(),
+                      area: selectedArea,
+                      city: selectedDistrict,
+                      state: selectedState,
+                      postalCode: pinCtrl.text.trim(),
+                    );
+                    widget.onAddressChanged?.call();
+                    await _loadAddresses();
+                  } catch (e) {
+                    if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+                  }
+                },
+                child: const Text('Save Changes'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('Cancel')),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-            onPressed: () async {
-              if (lineCtrl.text.trim().isEmpty || areaCtrl.text.trim().isEmpty || pinCtrl.text.trim().isEmpty) {
-                ScaffoldMessenger.of(dlgCtx).showSnackBar(
-                  const SnackBar(content: Text('Please fill all required fields.')),
-                );
-                return;
-              }
-              Navigator.pop(dlgCtx);
-              try {
-                await DI.userRepo.updateAddress(
-                  userId: widget.userId,
-                  addressId: addr.id,
-                  addressLine: lineCtrl.text.trim(),
-                  area: areaCtrl.text.trim(),
-                  city: cityCtrl.text.trim().isNotEmpty ? cityCtrl.text.trim() : 'Pune',
-                  state: stateCtrl.text.trim().isNotEmpty ? stateCtrl.text.trim() : 'Maharashtra',
-                  postalCode: pinCtrl.text.trim(),
-                );
-                widget.onAddressChanged?.call();
-                await _loadAddresses();
-              } catch (e) {
-                if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-              }
-            },
-            child: const Text('Save Changes'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }

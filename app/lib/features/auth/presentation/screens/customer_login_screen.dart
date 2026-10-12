@@ -5,6 +5,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../features/customer/data/models/customer_profile.dart';
+import '../../../../core/utils/phone_number_util.dart';
+import '../../../../shared/widgets/google_sign_in_button.dart';
+import '../../data/repositories/mock_auth_repository.dart';
 
 class CustomerLoginScreen extends StatefulWidget {
   const CustomerLoginScreen({super.key});
@@ -20,6 +23,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
   bool _isOtpSent = false;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   Timer? _countdownTimer;
@@ -54,8 +58,8 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
 
     try {
       if (!_isOtpSent) {
-        final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-        if (phone.length < 10) {
+        final phone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
+        if (phone.length != 10) {
           throw Exception('Please enter a valid 10-digit mobile number.');
         }
         await DI.authRepo.sendOtp(phone);
@@ -72,7 +76,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
         if (otp.length != 6) {
           throw Exception('Please enter the 6-digit OTP code.');
         }
-        final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+        final phone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
         final isValid = await DI.authRepo.verifyOtp(phone, otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
@@ -96,15 +100,26 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           // 2. If profile does not exist yet, initialize initial record.
           // If profile exists, ensure user profile record is maintained without wiping out their name.
           try {
+            final defaultName = 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}';
+            final effectiveName = (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : defaultName;
             await DI.userRepo.upsertUserProfile(
               userId: effectiveUserId,
               role: 'CUSTOMER',
               phone: phone,
-              fullName: (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : null,
+              fullName: effectiveName,
             );
+            if (user != null && user.id != effectiveUserId) {
+              await DI.userRepo.upsertUserProfile(
+                userId: user.id,
+                role: 'CUSTOMER',
+                phone: phone,
+                fullName: effectiveName,
+              );
+            }
           } catch (e) {
             debugPrint('[CustomerLogin] Upsert non-critical: $e');
           }
+
 
           // 3. Determine if profile is already complete (has real name and address)
           final isComplete = (profile?.isComplete == true) || await DI.userRepo.isProfileComplete(effectiveUserId);
@@ -140,6 +155,197 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
     _countdownTimer?.cancel();
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await DI.authRepo.signInWithGoogle(role: 'CUSTOMER');
+      if (!success) {
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+
+      final user = await DI.authRepo.getCurrentUser();
+      if (user != null) {
+        final userId = user.id;
+
+        // Authoritative cross-role protection:
+        final existingRole = await DI.userRepo.getUserRole(userId);
+        if (existingRole != null && existingRole.toUpperCase() != 'CUSTOMER') {
+          await DI.authRepo.logout();
+          final roleName = existingRole.toUpperCase() == 'WORKER' ? 'Worker Partner' : 'Cooperative Administrator';
+          throw Exception('Access denied: This Google account is registered as a $roleName. Please use the corresponding portal to sign in.');
+        }
+
+        CustomerProfile? profile = await DI.userRepo.getCustomerProfile(userId);
+        final effectiveUserId = profile?.id ?? userId;
+        final googleName = (user.userMetadata?['full_name'] ?? user.userMetadata?['name'] ?? '').toString().trim();
+        final effectiveName = profile?.fullName ?? (googleName.isNotEmpty ? googleName : 'Customer ${userId.length >= 4 ? userId.substring(0, 4) : userId}');
+        final email = user.email ?? profile?.email;
+
+        try {
+          await DI.userRepo.upsertUserProfile(
+            userId: effectiveUserId,
+            role: 'CUSTOMER',
+            phone: profile?.phone ?? user.phone ?? '',
+            fullName: effectiveName,
+          );
+          if (email != null || user.userMetadata?['avatar_url'] != null || user.userMetadata?['picture'] != null) {
+            await DI.userRepo.updateCustomerProfile(
+              userId: effectiveUserId,
+              fullName: effectiveName,
+              phone: profile?.phone ?? user.phone ?? '',
+              email: email,
+              avatarUrl: user.userMetadata?['avatar_url'] ?? user.userMetadata?['picture'] ?? profile?.avatarUrl,
+            );
+          }
+        } catch (e) {
+          debugPrint('[CustomerLogin] Google upsertUserProfile note: $e');
+        }
+
+        final isProfileComplete = await DI.userRepo.isProfileComplete(effectiveUserId);
+        if (!mounted) return;
+
+        if (isProfileComplete) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/customer/home', (route) => false);
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil('/customer/onboarding', (route) => false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isGoogleLoading = false;
+        });
+        if (e.toString().contains('Google Sign-In is not enabled')) {
+          _showGoogleSetupDialog(context);
+        }
+      }
+    } finally {
+      if (mounted && _isGoogleLoading) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
+  void _showGoogleSetupDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            GoogleLogoIcon(size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Google Sign-In Setup',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFFB45309), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Google Provider is not enabled in your Supabase project yet.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'To enable real Google authentication in Supabase:\n'
+              '1. Open Supabase Dashboard → Authentication → Providers → Google\n'
+              '2. Toggle "Enable Sign in with Google" to ON\n'
+              '3. Enter your Google Client ID & Secret from Google Cloud Console\n'
+              '4. Add the Supabase callback URI in Google Cloud Console.\n\n'
+              'For development and testing, you can continue with a Demo Google Profile below.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF4B5563), height: 1.45),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Use Mobile OTP'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _handleDemoGoogleSignIn();
+            },
+            child: const Text('Continue with Demo Google Profile'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleDemoGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final mockAuth = MockAuthRepository();
+      await mockAuth.signInWithGoogle(role: 'CUSTOMER');
+      final user = await mockAuth.getCurrentUser();
+      if (user != null) {
+        final userId = user.id;
+        final profile = await DI.userRepo.getCustomerProfile(userId);
+        final effectiveUserId = profile?.id ?? userId;
+        final effectiveName = profile?.fullName ?? 'Rajesh Deshmukh';
+        try {
+          await DI.userRepo.upsertUserProfile(
+            userId: effectiveUserId,
+            role: 'CUSTOMER',
+            phone: profile?.phone ?? '+91 98220 12345',
+            fullName: effectiveName,
+          );
+        } catch (_) {}
+        final isProfileComplete = await DI.userRepo.isProfileComplete(effectiveUserId);
+        if (!mounted) return;
+        if (isProfileComplete) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/customer/home', (route) => false);
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil('/customer/onboarding', (route) => false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -166,7 +372,17 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                     _buildEscrowProtectionCallout(),
                     const SizedBox(height: 20),
                     _buildActionCta(),
-                    const SizedBox(height: 14),
+                    if (!_isOtpSent) ...[
+                      const SizedBox(height: 16),
+                      const OrDivider(),
+                      const SizedBox(height: 16),
+                      GoogleSignInButton(
+                        onPressed: _handleGoogleSignIn,
+                        isLoading: _isGoogleLoading,
+                        label: 'Continue with Google',
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     _buildAlternativeModeSwitch(),
                     const SizedBox(height: 40),
                   ],
@@ -448,8 +664,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                     readOnly: _isOtpSent,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
+                      IndianPhoneNumberFormatter(),
                     ],
                     style: const TextStyle(
                       fontSize: 16,
@@ -791,7 +1006,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
                 Icon(Icons.handshake, size: 14, color: AppColors.primary),
                 SizedBox(width: 6),
                 Text(
-                  'Are you a service partner? Switch to Partner Sign-in â†’',
+                  'Are you a service partner? Switch to Partner Sign-in →',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -813,7 +1028,7 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
               Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.secondary),
               SizedBox(width: 5),
               Text(
-                'Federation Official? Admin Console Sign-in â†’',
+                'Federation Official? Admin Console Sign-in →',
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,

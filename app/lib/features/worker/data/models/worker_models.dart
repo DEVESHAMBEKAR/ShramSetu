@@ -133,6 +133,7 @@ class WorkerProfile {
   final String name;
   final String profileImage;
   final String phone;
+  final String? email;
   final List<String> skills;
   final String experience;
   final double rating;
@@ -155,6 +156,7 @@ class WorkerProfile {
   final String? address;
   final String? city;
   final String? district;
+  final String? state;
   final String? pinCode;
   final String? trade;
   final String? primarySkill;
@@ -164,6 +166,7 @@ class WorkerProfile {
   final String? bio;
   final bool declarationAccepted;
   final DateTime? registeredAt;
+  final String? federationRefId;
 
   String get federationName => guildName;
   String? get pincode => pinCode;
@@ -173,6 +176,7 @@ class WorkerProfile {
     required this.name,
     required this.profileImage,
     required this.phone,
+    this.email,
     required this.skills,
     required this.experience,
     required this.rating,
@@ -193,6 +197,7 @@ class WorkerProfile {
     this.address,
     this.city,
     this.district,
+    this.state,
     this.pinCode,
     this.trade,
     this.primarySkill,
@@ -202,6 +207,7 @@ class WorkerProfile {
     this.bio,
     this.declarationAccepted = true,
     this.registeredAt,
+    this.federationRefId,
   });
 
   bool get hasLocation => latitude != null && longitude != null;
@@ -211,6 +217,7 @@ class WorkerProfile {
     String? name,
     String? profileImage,
     String? phone,
+    String? email,
     List<String>? skills,
     String? experience,
     double? rating,
@@ -231,6 +238,7 @@ class WorkerProfile {
     String? address,
     String? city,
     String? district,
+    String? state,
     String? pinCode,
     String? trade,
     String? primarySkill,
@@ -240,12 +248,14 @@ class WorkerProfile {
     String? bio,
     bool? declarationAccepted,
     DateTime? registeredAt,
+    String? federationRefId,
   }) {
     return WorkerProfile(
       id: id ?? this.id,
       name: name ?? this.name,
       profileImage: profileImage ?? this.profileImage,
       phone: phone ?? this.phone,
+      email: email ?? this.email,
       skills: skills ?? this.skills,
       experience: experience ?? this.experience,
       rating: rating ?? this.rating,
@@ -266,6 +276,7 @@ class WorkerProfile {
       address: address ?? this.address,
       city: city ?? this.city,
       district: district ?? this.district,
+      state: state ?? this.state,
       pinCode: pinCode ?? this.pinCode,
       trade: trade ?? this.trade,
       primarySkill: primarySkill ?? this.primarySkill,
@@ -275,6 +286,7 @@ class WorkerProfile {
       bio: bio ?? this.bio,
       declarationAccepted: declarationAccepted ?? this.declarationAccepted,
       registeredAt: registeredAt ?? this.registeredAt,
+      federationRefId: federationRefId ?? this.federationRefId,
     );
   }
 }
@@ -294,6 +306,11 @@ class JobRequest {
   final String? distanceKm;
   final String createdAt;
 
+  final String? workerId;
+  final String? workerName;
+  final String? federationRefId;
+  final String? federationName;
+
   double get totalAmount => baseAmount + laborAllowance;
 
   JobRequest({
@@ -310,6 +327,10 @@ class JobRequest {
     required this.status,
     this.distanceKm,
     required this.createdAt,
+    this.workerId,
+    this.workerName,
+    this.federationRefId,
+    this.federationName,
   });
 
   JobRequest copyWith({
@@ -326,6 +347,10 @@ class JobRequest {
     BookingStatus? status,
     String? distanceKm,
     String? createdAt,
+    String? workerId,
+    String? workerName,
+    String? federationRefId,
+    String? federationName,
   }) {
     return JobRequest(
       id: id ?? this.id,
@@ -341,6 +366,10 @@ class JobRequest {
       status: status ?? this.status,
       distanceKm: distanceKm ?? this.distanceKm,
       createdAt: createdAt ?? this.createdAt,
+      workerId: workerId ?? this.workerId,
+      workerName: workerName ?? this.workerName,
+      federationRefId: federationRefId ?? this.federationRefId,
+      federationName: federationName ?? this.federationName,
     );
   }
 }

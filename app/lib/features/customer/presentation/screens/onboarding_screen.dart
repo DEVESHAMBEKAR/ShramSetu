@@ -281,12 +281,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: isCustomer ? AppColors.primary : AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      'Customer',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isCustomer ? FontWeight.w800 : FontWeight.w600,
-                        color: isCustomer ? AppColors.primary : AppColors.onSurfaceVariant,
+                    Flexible(
+                      child: Text(
+                        'I need home services',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isCustomer ? FontWeight.w800 : FontWeight.w600,
+                          color: isCustomer ? AppColors.primary : AppColors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -323,12 +327,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       color: isWorker ? AppColors.primary : AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: 4),
-                    Text(
-                      'Karigar',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isWorker ? FontWeight.w800 : FontWeight.w600,
-                        color: isWorker ? AppColors.primary : AppColors.onSurfaceVariant,
+                    Flexible(
+                      child: Text(
+                        'I am a skilled Karigar',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: isWorker ? FontWeight.w800 : FontWeight.w600,
+                          color: isWorker ? AppColors.primary : AppColors.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   ],
@@ -588,29 +596,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'By continuing, you agree to ShramSetu\'s Fair Work Terms & Privacy Policy.',
             style: TextStyle(fontSize: 10, color: AppColors.onSurfaceVariant),
           ),
-          const SizedBox(height: 6),
-          InkWell(
-            onTap: () => Navigator.of(context).pushNamed('/login/admin'),
-            borderRadius: BorderRadius.circular(8),
-            child: const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.admin_panel_settings_outlined, size: 14, color: AppColors.secondary),
-                  SizedBox(width: 5),
-                  Text(
-                    'Cooperative Federation Admin Console →',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.secondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Admin Console access is protected and not exposed in public onboarding.
+          // Administrators access the system through a dedicated protected route.
         ],
       ),
     );

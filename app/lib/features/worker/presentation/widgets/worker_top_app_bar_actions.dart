@@ -213,7 +213,7 @@ class _WorkerTopAppBarActionsState extends State<WorkerTopAppBarActions> {
     final worker = widget.worker;
     final guildName = worker?.guildName.isNotEmpty == true
         ? worker!.guildName
-        : 'Pune District Labour Cooperative Federation';
+        : 'Cooperative Federation';
     final guildId = worker?.guildId.isNotEmpty == true ? worker!.guildId : '101';
 
     showModalBottomSheet(

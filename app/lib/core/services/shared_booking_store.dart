@@ -306,6 +306,10 @@ class SharedBookingStore {
         status: status,
         distanceKm: dist,
         createdAt: b['created_at'] as String? ?? 'Recently',
+        workerId: b['worker_id'] as String?,
+        workerName: b['worker_name'] as String?,
+        federationRefId: b['federation_ref_id'] as String?,
+        federationName: b['federation_name'] as String?,
       );
     }).toList();
   }
@@ -350,6 +354,25 @@ class SharedBookingStore {
     }
 
     return true;
+  }
+
+  Future<bool> updateBookingDetails(
+    String bookingId, {
+    BookingStatus? status,
+    String? scheduledDate,
+    String? scheduledTime,
+    String? notes,
+  }) async {
+    final index = _bookings.indexWhere((b) => b['id'] == bookingId);
+    if (index != -1) {
+      if (status != null) _bookings[index]['status'] = status.toDbString();
+      if (scheduledDate != null) _bookings[index]['scheduled_date'] = scheduledDate;
+      if (scheduledTime != null) _bookings[index]['scheduled_time'] = scheduledTime;
+      if (notes != null) _bookings[index]['notes'] = notes;
+      _changeController.add(null);
+      return true;
+    }
+    return false;
   }
 
   // ─────────────────────── Admin Methods ───────────────────────

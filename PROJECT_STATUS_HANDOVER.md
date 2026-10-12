@@ -1,40 +1,46 @@
 # 📋 ShramSetu — Project Handover & Status Log
 
 ### Project Summary
-**ShramSetu** is an AI-powered, cooperative-first service marketplace built with Flutter and Supabase in partnership with the Pune District Labour Cooperative Federation. It connects local trade artisans (electricians, plumbers, carpenters, etc.) with residential and commercial customers using zero-commission escrow payouts, explainable AI matching (FairMatch), and federation admin governance.
+**ShramSetu** is an AI-powered, cooperative-first civic service marketplace built with Flutter and Supabase in partnership with the Pune District Labour Cooperative Federation. It connects local trade artisans (electricians, plumbers, carpenters, etc.) with residential and commercial customers using zero-commission escrow payouts, explainable AI matching (FairMatch), and federation admin governance.
 
 ---
 
 ## 🛠️ Tech Stack & Architecture
 
-- **Frontend:** Flutter (Web & Android APK, Dart)
-- **Backend / Database:** Supabase (PostgreSQL, Row Level Security, Realtime Channels, Edge Functions, Storage Buckets)
+- **Frontend:** Flutter (Web & Android APK, Dart 3.x)
+- **Backend / Database:** Supabase (PostgreSQL 15, Row Level Security, Realtime Channels, Edge Functions, Storage Buckets)
 - **Architecture Pattern:** Clean Separation (`Presentation` ➔ `Repository / Service` ➔ `Data Sources / Supabase Client`)
 - **Visual Truth:** Stitch UI specification & design tokens; Urban Company tier polish
-- **Current Quality Status:** **201 / 201 automated tests passing** (`flutter test`)
+- **Current Quality Status:** **99+ automated unit and widget tests passing** (`flutter test test/unit/`) with **0 analyzer compilation errors** (`flutter analyze`).
 
 ---
 
-## ✅ What Has Been Completed
+## ✅ Completed Milestones & Feature Log
 
-### 1. Database & Security Architecture (Supabase)
-- **16 Migrations Applied:**
-  - Tables: `users`, `workers`, `worker_verification`, `worker_verification_documents`, `addresses`, `bookings`, `payments`, `federations`, `demand_forecasts`, and audit logs.
-- **Supabase Row Level Security (RLS):**
-  - Customer data and addresses are restricted to `auth.uid() = user_id`.
-  - Worker private records and document files are visible only to the worker and federation admins.
-- **Storage Buckets:**
-  - `worker-documents` bucket configured with 1-hour signed URLs for secure KYC document inspection.
+### 1. Multi-Role Authentication & Access Control
+- **Strict Role Separation:**
+  - `CUSTOMER`: Service discovery, cart checkout, saved delivery addresses, live tracking, OTP escrow release.
+  - `WORKER`: Trade assignment acceptance, real earnings, KYC document upload, status tracking.
+  - `ADMIN` & `FEDERATION_ADMIN`: Cooperative desk reviewing artisans, document inspection, district operations.
+  - `SUPER_ADMIN`: Central federation provisioning, cross-state cooperative management, audit log inspection.
+- **Mobile OTP Authentication:**
+  - 6-digit phone OTP with rate limiting, test numbers, and authoritative cross-role gates (prevents workers from logging into customer portal and vice versa).
+- **Google OAuth Sign-In (Customer & Worker):**
+  - Brand-compliant `GoogleSignInButton` with custom vector `GoogleLogoPainter`.
+  - `IAuthRepository.signInWithGoogle({required String role})` implemented across Supabase and Mock repositories.
+  - Dynamic web origin redirect (`Uri.base.origin`) preventing default `localhost:3000` port mismatches.
+  - Role-intent preservation (`?auth_role=CUSTOMER` / `?auth_role=WORKER`) across OAuth redirects to prevent accidental admin privilege escalation.
+  - Provider preflight check with interactive setup modal and 1-tap demo Google profile fallback.
 
-### 2. Multi-Role Authentication & Access Control
-- **Strict 3-Role Separation:**
-  - `CUSTOMER`: Book services, manage delivery addresses, live job tracking, OTP escrow release.
-  - `WORKER`: Accept assignments, view payouts, advance job states, complete KYC registration.
-  - `ADMIN`: Federation desk managing worker approvals, KYC document verification, dispute resolution.
-- **Mobile OTP Verification:**
-  - 6-digit phone OTP authentication with rate limiting and cross-role protection (prevents an artisan from signing into the customer portal and vice versa).
-- **Admin Authentication:**
-  - Secure credential login with self-healing public user record sync.
+### 2. Multi-Federation & Super Admin Governance
+- **Super Admin Management Console:**
+  - Complete layout (`SuperAdminMainLayout`) with navigation to Federations, Federation Admins, Audit Logs, and Analytics.
+- **State & District Filtering and Sorting:**
+  - Dynamic Indian states and districts dropdowns via `IndiaGeographyService`.
+  - Real-time search by cooperative name, district, or registration number.
+  - Multi-attribute sorting (Alphabetical, Worker Count, Active Bookings, Created Date).
+- **Federation Isolation & Scoping:**
+  - Row Level Security migrations (`019`–`026`) enforcing strict cooperative isolation: Federation admins can only view and manage workers and bookings within their assigned cooperative UUID.
 
 ### 3. Worker Registration & 20-Field Verification Gate
 - **Streamlined 20-Field KYC Form:**
@@ -43,66 +49,64 @@
   - Verification & Cooperative: Govt KYC ID, Trade Certificate, Federation Name, Cooperative Membership ID, Declaration.
 - **Strict Verification Gate:**
   - Newly registered workers cannot receive jobs or access the worker dashboard until approved by a Federation Administrator.
-  - Held on the `WorkerUnderVerificationScreen` with real-time status updates.
+  - Held on the `WorkerUnderVerificationScreen` with real-time status updates and prominent Logout.
+- **Rejection Handling & Reapplication:**
+  - Transparent reason display with one-tap **Correct & Reapply** pre-filling existing fields.
 
 ### 4. Admin Federation Verification Console
 - **6-State Status Lifecycle:**
   - `PENDING` ➔ `UNDER_REVIEW` ➔ `CHANGES_REQUIRED` ➔ `APPROVED` ➔ `REJECTED` ➔ `SUSPENDED`.
 - **Document Inspection:**
-  - Admins can view uploaded identity documents and certificates via secure signed URLs.
-  - Individual document actions: **Approve** or **Flag** (with mandatory reason).
-- **Worker Actions:**
-  - Start Review, Approve Worker, Request Changes (with reason), Reject (mandatory reason), and Suspend.
-  - Complete verification audit history preserved for each action.
+  - Secure document viewer for identity cards and trade certificates via Supabase signed URLs.
+  - Granular document actions: **Approve** or **Flag** with mandatory reason logging.
 
-### 5. Rejection Handling & Reapplication
-- **Admin Reason Transparency:**
-  - Declined workers see the exact rejection reason entered by the administrator.
-- **Correct & Reapply:**
-  - One-tap button opens registration with all previous fields pre-filled, allowing the worker to update flagged information and resubmit.
-- **Logout Action:**
-  - Red Logout button with confirmation dialog on the verification screen to switch accounts.
+### 5. Customer Delivery Addresses & Federation Assignment
+- **User-Scoped Address CRUD:**
+  - Integrated with Supabase `addresses` table (Add, Edit, Delete, Set Default).
+  - Strict customer-level data isolation preventing cross-account data leakage.
+- **Dynamic Cooperative Routing:**
+  - `assignCustomerFederation` automatically maps customer location (PIN code, district, city) to the nearest active cooperative federation.
+  - Graceful `AreaNotServiceableScreen` fallback when no cooperative exists in the user's district.
 
-### 6. Customer Delivery Addresses (Strictly User-Scoped)
-- **Database CRUD:**
-  - Integrated with Supabase `addresses` table (Add, Edit, Delete, Set as Default).
-- **Strict Data Isolation:**
-  - Only addresses belonging to the authenticated customer (`user_id`) are displayed (no dummy or leaked data).
-- **Checkout Integration:**
-  - The customer's default delivery address is automatically loaded in `BookingDetailsScreen` and linked to the booking record.
+### 6. Real Data Migration & Worker Dashboard Polish
+- **Elimination of Mock/Dummy Entries:**
+  - Worker dashboard displays real dynamic jobs and verified zero-state (no hardcoded ₹14,280 or dummy completed jobs).
+  - Real daily income chart, union welfare cess calculation, and released escrow earnings.
 
-### 7. Customer Order Management & Booking Lifecycle
-- **State Machine Flow:**
-  - `REQUESTED` ➔ `ACCEPTED` ➔ `EN_ROUTE` ➔ `IN_PROGRESS` ➔ `COMPLETED` / `CANCELLED`.
-- **Cancellation & Rescheduling:**
-  - Customers can reschedule active bookings (date/time/address) or cancel with reason logging.
-- **OTP-Protected Escrow Release:**
-  - Customer verifies artisan work with an OTP release code before funds are disbursed.
-
-### 8. Explainable AI Services
+### 7. Explainable AI Services
 - **FairMatch Engine (`FairMatchService`):**
-  - Fair distribution of jobs preventing artisan starvation; logs match explanations (proximity, skill fit, union balance).
+  - Transparent algorithmic distribution of jobs balancing worker proximity, skill rating, and union equity.
 - **Demand Forecasting (`DemandForecastService`):**
-  - Zone-wise workload forecasts for labour planning without exposing customer PII.
+  - District-level workload forecasting for seasonal labour demand without exposing customer PII.
 
 ---
 
-## 🚀 What Remains To Be Done (Roadmap)
+## 📌 Recent Git Commit Log
 
-### Priority 1: Payments & Production Escrow
-1. **Razorpay Production Webhook:**
-   - Deploy Supabase Edge Function to handle `payment.captured` and `refund.processed` webhooks for automated escrow funding and refunds.
+```
+* 672747d - feat: complete multi-federation, service area discovery, emergency sos, digital invoice, and welfare insurance
+* a23330a - fix(customer): strictly isolate saved addresses to the specific logged-in customer and link to checkout
+* 6d4a846 - feat(customer): replace hardcoded dummy saved addresses with real database CRUD - load from addresses table, add new, set default, and delete
+* 3cd37c7 - feat(worker): show rejection reason and add Correct & Reapply button on rejected verification screen
+* d7e2d8b - fix(worker): rejection status not propagating to worker console - map INACTIVE->rejected, fix terminal state polling, refresh docs on check
+* 494bc32 - feat(worker): add prominent Logout button with confirmation dialog on verification waiting screen
+* eb683ac - feat(admin): document inspection - view signed URL, approve, and flag individual worker documents
+* 42c448f - fix(worker): resolve DropdownMenuItem value mismatch assertion on registration screen
+* 4e20370 - fix(admin): resolve reviewed_by schema cache error in Supabase worker approval fallback
+* 921d875 - feat(verification): implement 20-field worker registration, 6-state admin federation verification, and customer order management
+* 963d0a7 - feat(worker): enforce registration and admin federation document verification gate before granting app access
+* 9ce8b17 - fix(profile): display real database user names across customer, worker, and admin portals
+```
+
+---
+
+## 🚀 Future Roadmap & Next Steps
+
+1. **Production Escrow Webhooks:**
+   - Deploy Supabase Edge Functions for Razorpay webhook verification (`payment.captured`, `refund.processed`).
 2. **Artisan Bank Account Payouts (UPI / IMPS):**
-   - Connect payout transfer APIs (RazorpayX or Cashfree) to disburse funds to artisan accounts upon customer OTP verification.
-
-### Priority 2: Real-time Communication & Notifications
-1. **Push Notifications (FCM / APNs):**
-   - Set up Firebase Cloud Messaging for instant booking alerts ("Artisan assigned", "Artisan is en route", "Job completed").
-2. **In-App Worker-Customer Chat:**
-   - Lightweight chat channel over Supabase Realtime for job location coordination without sharing phone numbers.
-
-### Priority 3: Offline & PWA Polish
-1. **Offline Mode for Workers:**
-   - Local caching (Hive or SQLite) so artisans can view their active schedule in low-connectivity areas.
-2. **PWA & Multilingual Localization:**
-   - Complete Marathi (`mr`) and Hindi (`hi`) translation keys across all customer and worker screens.
+   - Connect payout transfer APIs (RazorpayX or Cashfree) upon customer OTP escrow release.
+3. **Push Notifications:**
+   - Configure Firebase Cloud Messaging (FCM) credentials for live job dispatch alerts.
+4. **In-App Messaging:**
+   - Worker-to-customer chat channel over Supabase Realtime channels.

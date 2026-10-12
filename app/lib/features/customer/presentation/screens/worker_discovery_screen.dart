@@ -8,6 +8,7 @@ import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/config/app_config.dart';
 import 'worker_profile_screen.dart';
 import '../../../../core/localization/locale_controller.dart';
+import '../../../../shared/widgets/shramsetu_brand_mark.dart';
 
 class WorkerDiscoveryScreen extends StatefulWidget {
   final ServiceCategory? initialCategory;
@@ -230,7 +231,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       // If specific ward filter is active
                       if (_selectedWard != 'All Areas') {
                         final target = _selectedWard.toLowerCase();
-                        final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2 && s != 'pune').toList();
+                        final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2).toList();
                         final wardMatches = filtered.where((w) {
                           final loc = w.locationTag.toLowerCase();
                           final matchesTag = keywords.any((k) => loc.contains(k));
@@ -238,36 +239,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                           return matchesTag || matchesAreas;
                         }).toList();
 
-                        if (wardMatches.isNotEmpty) {
-                          filtered = wardMatches;
-                        } else if (AppConfig.useMockData) {
-                          // Express dispatch fallback in mock/demo mode
-                          filtered = filtered.map((w) => Worker(
-                            id: w.id,
-                            name: w.name,
-                            categoryId: w.categoryId,
-                            rate: w.rate,
-                            rating: w.rating,
-                            reviewCount: w.reviewCount,
-                            jobsCompleted: w.jobsCompleted,
-                            distanceKm: 3.0,
-                            experience: w.experience,
-                            availability: 'Available Today',
-                            specializations: w.specializations,
-                            locationTag: 'Serving $_selectedWard (${w.locationTag})',
-                            imageUrl: w.imageUrl,
-                            customTag: 'Cooperative Union Dispatch',
-                            bio: w.bio,
-                            federationId: w.federationId,
-                            insuranceAmount: w.insuranceAmount,
-                            languages: w.languages,
-                            serviceAreas: [...w.serviceAreas, _selectedWard],
-                            isUnionGold: w.isUnionGold,
-                            isCoopMaster: w.isCoopMaster,
-                          )).toList();
-                        } else {
-                          filtered = [];
-                        }
+                        filtered = wardMatches;
                       }
 
                       if (filtered.isEmpty) {
@@ -286,7 +258,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                                 Text(
                                   widget.isEmergency
                                       ? 'No emergency artisans available in your area right now'
-                                      : 'No union artisans found matching criteria',
+                                      : 'No registered ${_currentCategory.name} artisans found matching criteria',
                                   textAlign: TextAlign.center,
                                   style: AppTypography.titleMd.copyWith(
                                     color: widget.isEmergency ? AppColors.error : AppColors.onSurface,
@@ -297,7 +269,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                                 Text(
                                   widget.isEmergency
                                       ? 'All nearby emergency specialists are currently engaged. Try scheduling a standard service or contact our union helpline: 1800-266-9090.'
-                                      : 'Try expanding your service area or searching another trade.',
+                                      : 'Try selecting "All Areas" or searching another trade (e.g., Electrician, Carpentry).',
                                   textAlign: TextAlign.center,
                                   style: AppTypography.bodySm.copyWith(color: AppColors.outline),
                                 ),
@@ -308,7 +280,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       }
 
                       return ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 24),
+                        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 4, AppSpacing.marginMobile, 12),
                         itemCount: filtered.length,
                         separatorBuilder: (context, index) => const SizedBox(height: 12),
                         itemBuilder: (context, index) {
@@ -319,6 +291,9 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                     },
                   ),
                 ),
+
+                // 6. Escrow Guarantee Footer
+                _buildEscrowGuaranteeCard(),
               ],
             ),
           ),
@@ -328,123 +303,127 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   }
 
   Widget _buildHeader() {
-    return Container(
-      height: 56,
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: AppColors.outlineVariant)),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Row(
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const TricolorStripe(height: 3),
+        Container(
+          height: 60,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: AppColors.outlineVariant.withValues(alpha: 0.6))),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              if (Navigator.canPop(context))
-                IconButton(
-                  icon: const Icon(Icons.arrow_back, size: 20, color: AppColors.primary),
-                  onPressed: () => Navigator.pop(context),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              if (Navigator.canPop(context)) const SizedBox(width: 10),
-              Container(
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: AppRadius.radiusLg,
-                  border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
-                ),
-                padding: const EdgeInsets.all(2),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(6),
-                  child: Image.asset(
-                    'assets/images/logo.jpg',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
+              Row(
                 children: [
-                  Row(
+                  if (Navigator.canPop(context)) ...[
+                    IconButton(
+                      icon: const Icon(Icons.arrow_back, size: 20, color: AppColors.primary),
+                      onPressed: () => Navigator.pop(context),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+                  ShramSetuBrandMark(
+                    size: 32,
+                    showText: true,
+                    subtitle: '$_selectedWard क्लस्टर • DPI',
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  ListenableBuilder(
+                    listenable: LocaleController.instance,
+                    builder: (context, _) {
+                      return Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: AppRadius.radiusFull,
+                          onTap: () {
+                            LocaleController.instance.toggleNextLanguage();
+                          },
+                          child: Container(
+                            height: 32,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: AppRadius.radiusFull,
+                              border: Border.all(color: AppColors.outlineVariant),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 3,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.translate, size: 14, color: AppColors.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'अ/A',
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(width: 3),
+                                Text(
+                                  LocaleController.instance.isMarathi
+                                      ? 'मराठी'
+                                      : (LocaleController.instance.isHindi ? 'हिंदी' : 'EN'),
+                                  style: AppTypography.labelSm.copyWith(
+                                    color: AppColors.onSurfaceVariant,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  const SizedBox(width: 6),
+                  Stack(
                     children: [
-                      Text('ShramSetu', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 4),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(color: AppColors.surfaceContainerLow, borderRadius: AppRadius.radiusSm),
-                        child: Text('UNION', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontSize: 8, fontWeight: FontWeight.bold)),
+                        width: 34,
+                        height: 34,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceContainerLowest,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+                        ),
+                        child: const Icon(Icons.notifications_none, size: 18, color: AppColors.onSurfaceVariant),
+                      ),
+                      Positioned(
+                        top: 7,
+                        right: 8,
+                        child: Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: AppColors.secondary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                       ),
                     ],
-                  ),
-                  InkWell(
-                    onTap: _showAreaPickerModal,
-                    child: Row(
-                      children: [
-                        const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
-                        const SizedBox(width: 2),
-                        Text(
-                          _customerCity.isNotEmpty && _customerArea != _customerCity
-                              ? '$_customerArea, $_customerCity'
-                              : _customerArea,
-                          style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                        const Icon(Icons.arrow_drop_down, size: 14, color: AppColors.primary),
-                      ],
-                    ),
                   ),
                 ],
               ),
             ],
           ),
-          Row(
-            children: [
-              ListenableBuilder(
-                listenable: LocaleController.instance,
-                builder: (context, _) {
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: AppRadius.radiusFull,
-                      onTap: () {
-                        LocaleController.instance.toggleNextLanguage();
-                      },
-                      child: Container(
-                        height: 30,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.secondaryFixed,
-                          borderRadius: AppRadius.radiusFull,
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.translate, size: 13, color: AppColors.secondary),
-                            const SizedBox(width: 4),
-                            Text(
-                              LocaleController.instance.isMarathi
-                                  ? 'मराठी'
-                                  : (LocaleController.instance.isHindi ? 'हिंदी' : 'EN'),
-                              style: AppTypography.labelSm.copyWith(
-                                color: AppColors.secondary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -589,48 +568,6 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
     );
   }
 
-  void _showAreaPickerModal() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.all(AppSpacing.marginMobile),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Select Service Area', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _discoveryAreas.map((area) {
-                  final isSelected = _selectedWard == area;
-                  return ChoiceChip(
-                    label: Text(area),
-                    selected: isSelected,
-                    selectedColor: AppColors.primary,
-                    labelStyle: TextStyle(color: isSelected ? Colors.white : AppColors.onSurface),
-                    onSelected: (selected) {
-                      Navigator.pop(ctx);
-                      setState(() {
-                        _selectedWard = area;
-                        _customerArea = area;
-                      });
-                      _loadWorkers();
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
   Widget _buildTradeChip(
     String key,
     String label,
@@ -670,73 +607,216 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
   }
 
   Widget _buildGuildBanner() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 10, AppSpacing.marginMobile, 4),
-      child: Container(
-        padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(
-          color: widget.isEmergency ? AppColors.errorContainer.withValues(alpha: 0.15) : Colors.white,
-          borderRadius: AppRadius.radiusLg,
-          border: Border.all(color: widget.isEmergency ? AppColors.error.withValues(alpha: 0.4) : AppColors.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: widget.isEmergency ? AppColors.errorContainer : AppColors.tertiaryContainer,
-                borderRadius: AppRadius.radiusSm,
+    if (widget.isEmergency) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 8, AppSpacing.marginMobile, 4),
+        child: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.errorContainer.withValues(alpha: 0.2),
+            borderRadius: AppRadius.radiusLg,
+            border: Border.all(color: AppColors.error.withValues(alpha: 0.4)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: AppColors.error,
+                  borderRadius: AppRadius.radiusSm,
+                ),
+                child: const Icon(Icons.flash_on, size: 18, color: Colors.white),
               ),
-              child: Icon(
-                widget.isEmergency ? Icons.flash_on : Icons.verified_user,
-                size: 18,
-                color: widget.isEmergency ? AppColors.error : AppColors.onTertiaryContainer,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        widget.isEmergency ? 'Emergency Artisan Dispatch Active' : 'Certified Cooperative Union Guild',
-                        style: AppTypography.labelSm.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: widget.isEmergency ? AppColors.error : AppColors.onSurface,
-                        ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'तातडीची सेवा • Emergency Artisan Dispatch',
+                      style: AppTypography.labelSm.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.error,
                       ),
-                      const SizedBox(width: 4),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: widget.isEmergency ? AppColors.error : AppColors.tertiaryContainer,
-                          borderRadius: AppRadius.radiusSm,
-                        ),
-                        child: Text(
-                          widget.isEmergency ? 'PRIORITY' : '100% DIRECT',
-                          style: AppTypography.labelSm.copyWith(
-                            color: widget.isEmergency ? Colors.white : AppColors.onTertiaryContainer,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                    ),
+                    Text(
+                      'Rapid response artisan dispatch • Verified local specialists',
+                      style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 8, AppSpacing.marginMobile, 4),
+      child: Column(
+        children: [
+          // Live Directory Context Banner
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primaryContainer,
+              borderRadius: AppRadius.radiusXl,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primaryContainer.withValues(alpha: 0.2),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: AppRadius.radiusFull,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 5,
+                            height: 5,
+                            decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
                           ),
+                          const SizedBox(width: 4),
+                          Text(
+                            'LIVE DIRECTORY',
+                            style: AppTypography.labelSm.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 9,
+                              letterSpacing: 0.8,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      'DPI-NIC Registry v4.2',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.onPrimaryContainer,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${_selectedWard != 'All Areas' ? '$_selectedWard • ' : ''}${_currentCategory.name} कारागीर निर्देशिका',
+                  style: AppTypography.headlineSm.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  'Certified Trade Registry • Gazette Standard Pricing',
+                  style: AppTypography.labelSm.copyWith(
+                    color: AppColors.onPrimaryContainer,
+                    fontSize: 10.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: AppRadius.radiusMd,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.hub, size: 14, color: AppColors.secondaryFixed),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '$_selectedWard Cluster • Radius 3.5 km • Verified Artisans Active',
+                          style: AppTypography.labelSm.copyWith(
+                            color: Colors.white,
+                            fontSize: 10,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-                  Text(
-                    widget.isEmergency
-                        ? 'Rapid response artisan dispatch • Verified local union specialists'
-                        : 'Fixed union diagnostic rates • 0% platform deductions',
-                    style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10),
-                  ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 6),
+
+          // Fair Allocation Active Banner
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.tertiaryContainer,
+              borderRadius: AppRadius.radiusLg,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: AppColors.civicVerifiedGreen.withValues(alpha: 0.2),
+                    borderRadius: AppRadius.radiusSm,
+                  ),
+                  child: const Icon(Icons.balance, size: 16, color: AppColors.tertiaryFixed),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            'Fair Allocation Active',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.tertiaryFixed,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '• जन-समता नियम',
+                            style: AppTypography.labelSm.copyWith(
+                              color: AppColors.civicVerifiedGreen,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        'Artisans capped at max 4 jobs/day to guarantee equal civic distribution and strict punctual service.',
+                        style: AppTypography.bodySm.copyWith(
+                          color: AppColors.surfaceContainerHighest,
+                          fontSize: 10,
+                          height: 1.25,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -794,75 +874,269 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
           );
         },
         child: Container(
-      padding: const EdgeInsets.all(AppSpacing.spacingMd),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: AppRadius.radiusXl,
-        border: Border.all(color: AppColors.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 6,
-            offset: const Offset(0, 2),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceContainerLowest,
+            borderRadius: AppRadius.radiusXl,
+            border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primaryContainer.withValues(alpha: 0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: AppColors.surfaceContainerLow,
-                    backgroundImage: worker.imageUrl.isNotEmpty ? NetworkImage(worker.imageUrl) : null,
-                    child: worker.imageUrl.isEmpty ? const Icon(Icons.person, size: 28, color: AppColors.primary) : null,
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      width: 18,
-                      height: 18,
-                      decoration: BoxDecoration(
-                        color: AppColors.onTertiaryContainer,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: const Icon(Icons.check, size: 10, color: Colors.white),
-                    ),
-                  ),
-                ],
+              // Civic Accent Stripe
+              Container(
+                height: 4,
+                decoration: BoxDecoration(
+                  color: worker.isCoopMaster
+                      ? AppColors.secondaryContainer
+                      : (worker.isUnionGold ? AppColors.primaryContainer : AppColors.civicVerifiedGreen),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
+              Padding(
+                padding: const EdgeInsets.all(AppSpacing.spacingMd),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(worker.name, style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                        // Avatar with verified badge
+                        Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: worker.imageUrl.isNotEmpty
+                                  ? Image.network(
+                                      worker.imageUrl,
+                                      width: 58,
+                                      height: 58,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 58,
+                                        height: 58,
+                                        color: AppColors.surfaceContainerLow,
+                                        child: Center(
+                                          child: Text(
+                                            worker.name.isNotEmpty ? worker.name[0] : 'W',
+                                            style: AppTypography.titleMd.copyWith(
+                                              color: AppColors.primaryContainer,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      width: 58,
+                                      height: 58,
+                                      color: AppColors.surfaceContainerLow,
+                                      child: Center(
+                                        child: Text(
+                                          worker.name.isNotEmpty ? worker.name[0] : 'W',
+                                          style: AppTypography.titleMd.copyWith(
+                                            color: AppColors.primaryContainer,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                width: 18,
+                                height: 18,
+                                decoration: BoxDecoration(
+                                  color: AppColors.civicVerifiedGreen,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                                child: const Icon(Icons.check, size: 11, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      worker.name,
+                                      style: AppTypography.titleMd.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: () => _showWhyRecommendedModal(worker),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.tertiaryContainer.withValues(alpha: 0.08),
+                                        borderRadius: AppRadius.radiusSm,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Container(
+                                            width: 5,
+                                            height: 5,
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.civicVerifiedGreen,
+                                              shape: BoxShape.circle,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            worker.availability.isNotEmpty ? worker.availability : 'स्लॉट उपलब्ध',
+                                            style: AppTypography.labelSm.copyWith(
+                                              color: AppColors.civicVerifiedGreen,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 9.5,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 3),
+                                          const Icon(Icons.info_outline, size: 11, color: AppColors.civicVerifiedGreen),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                worker.specializations.isNotEmpty
+                                    ? worker.specializations.first
+                                    : 'ITI Grade-A Certified Artisan',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, size: 13, color: AppColors.secondary),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    worker.rating.toStringAsFixed(1),
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.secondary,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '(${worker.jobsCompleted > 0 ? worker.jobsCompleted : worker.reviewCount} audits)',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.near_me, size: 11, color: AppColors.surfaceTint),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    '${worker.distanceKm.toStringAsFixed(1)} km away',
+                                    style: AppTypography.labelSm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Official Trust Badges Grid
+                    Wrap(
+                      spacing: 5,
+                      runSpacing: 4,
+                      children: [
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.tertiaryContainer,
-                            borderRadius: AppRadius.radiusFull,
+                            color: AppColors.surfaceContainer,
+                            borderRadius: AppRadius.radiusSm,
                           ),
                           child: Row(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.star, size: 11, color: AppColors.onTertiaryContainer),
-                              const SizedBox(width: 2),
+                              const Icon(Icons.verified_user, size: 11, color: AppColors.civicVerifiedGreen),
+                              const SizedBox(width: 3),
                               Text(
-                                worker.rating > 0
-                                    ? '${worker.rating.toStringAsFixed(1)} (${worker.reviewCount})'
-                                    : 'New',
+                                'DigiLocker Aadhaar eKYC',
                                 style: AppTypography.labelSm.copyWith(
-                                  color: AppColors.onTertiaryContainer,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 10,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainer,
+                            borderRadius: AppRadius.radiusSm,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.shield, size: 11, color: AppColors.surfaceTint),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Police NOC Cleared',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9.5,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainer,
+                            borderRadius: AppRadius.radiusSm,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.workspace_premium, size: 11, color: AppColors.secondary),
+                              const SizedBox(width: 3),
+                              Text(
+                                'ITI NTC #${worker.federationId != null && worker.federationId!.isNotEmpty ? worker.federationId : 'MH-PU-8821'}',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 9.5,
                                 ),
                               ),
                             ],
@@ -870,65 +1144,128 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 2),
-                    Row(
-                      children: [
-                        if (worker.customTag != null) ...[
-                          GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => _showWhyRecommendedModal(worker),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: AppColors.secondaryFixed,
-                                borderRadius: AppRadius.radiusSm,
-                                border: Border.all(color: AppColors.secondary.withValues(alpha: 0.3)),
+                    const SizedBox(height: 8),
+
+                    // Gazette Tariff Rate Box
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceContainerLow,
+                        borderRadius: AppRadius.radiusMd,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'शासकीय तपासणी शुल्क (Diagnostic Tariff)',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 9.5,
+                                ),
                               ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.auto_awesome, size: 10, color: AppColors.secondary),
-                                  const SizedBox(width: 3),
-                                  Text(worker.customTag!, style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold)),
-                                  const SizedBox(width: 4),
-                                  const Icon(Icons.info_outline, size: 10, color: AppColors.secondary),
-                                ],
+                              Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                      text: '₹${worker.rate.toStringAsFixed(0)} ',
+                                      style: AppTypography.titleMd.copyWith(
+                                        color: AppColors.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    TextSpan(
+                                      text: '/ प्रथम भेट + अहवाल',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                        ] else ...[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            decoration: BoxDecoration(color: AppColors.secondaryFixed, borderRadius: AppRadius.radiusSm),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: AppRadius.radiusSm,
+                              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.5)),
+                            ),
                             child: Text(
-                              worker.isCoopMaster ? 'Coop Master' : (worker.isUnionGold ? 'Union Gold' : 'Union Master'),
-                              style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontSize: 9, fontWeight: FontWeight.bold),
+                              '₹0 Platform Cut',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.civicVerifiedGreen,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 9.5,
+                              ),
                             ),
                           ),
-                          const SizedBox(width: 6),
                         ],
-                        Text('${worker.distanceKm.toStringAsFixed(1)} km away', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11)),
-                      ],
+                      ),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
+
+                    // Action Buttons
                     Row(
                       children: [
-                        Container(width: 5, height: 5, decoration: const BoxDecoration(color: AppColors.onTertiaryContainer, shape: BoxShape.circle)),
-                        const SizedBox(width: 4),
-                        Text(
-                          worker.availability.isNotEmpty ? worker.availability : 'Available Today',
-                          style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontSize: 10, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(width: 4),
                         Expanded(
-                          child: Text(
-                            worker.specializations.isNotEmpty
-                                ? '• ${worker.specializations.take(2).join(' • ')}'
-                                : '• ITI Certified',
-                            style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          flex: 1,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: BorderSide(color: AppColors.outlineVariant),
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusMd),
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.badge, size: 14, color: AppColors.primary),
+                            label: Text(
+                              'तपशील / Dossier',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.secondary,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusMd),
+                              elevation: 0,
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                            ),
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.touch_app, size: 14, color: Colors.white),
+                            label: Text(
+                              'तारीफ दर निवडा (Book)',
+                              style: AppTypography.labelSm.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 11,
+                              ),
+                            ),
                           ),
                         ),
                       ],
@@ -938,64 +1275,69 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
               ),
             ],
           ),
-          const Divider(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Fixed Standard Diag.', style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10)),
-                  Text('₹${worker.rate.toStringAsFixed(0)}', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                ],
-              ),
-              Row(
-                children: [
-                  OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.outlineVariant),
-                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
-                        ),
-                      );
-                    },
-                    child: Text('Profile', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      elevation: 0,
-                    ),
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => WorkerProfileScreen(worker: worker, category: _currentCategory),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.arrow_forward, size: 14),
-                    label: Text('Book Service', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
-                  ),
-                ],
-              ),
-            ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEscrowGuaranteeCard() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.secondaryFixed,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.shield, color: AppColors.secondary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ShramSetu Escrow Guarantee',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Fee released to worker only upon your job sign-off',
+                  style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.tertiaryContainer,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.lock, size: 12, color: AppColors.onTertiaryContainer),
+                const SizedBox(width: 4),
+                Text(
+                  'Protected',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.onTertiaryContainer),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-    ),
-    ),
-  );
+    );
   }
 
   void _showWhyRecommendedModal(Worker worker) {
@@ -1065,7 +1407,7 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                 iconColor: AppColors.onTertiaryContainer,
                 bgColor: AppColors.tertiaryContainer,
                 title: 'Verified Trade Certification',
-                description: 'Credentials and trade background are certified by the Pune District Labour Cooperative Federation.',
+                description: 'Credentials and trade background are certified by the worker\'s assigned Cooperative Federation.',
               ),
               const SizedBox(height: 10),
               _buildReasonItem(

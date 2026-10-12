@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../config/dependency_injection.dart';
+import '../config/app_config.dart';
 import '../theme/app_colors.dart';
 
 /// Protects application routes by validating current user authentication and role permissions.
@@ -32,7 +33,16 @@ class _RoleGuardState extends State<RoleGuard> {
 
   Future<void> _checkAuthorization() async {
     try {
-      final user = await DI.authRepo.getCurrentUser();
+      var user = await DI.authRepo.getCurrentUser();
+      if (user == null && !AppConfig.useMockData) {
+        // Allow brief moment for web localStorage session recovery
+        for (int i = 0; i < 3; i++) {
+          await Future.delayed(const Duration(milliseconds: 100));
+          user = await DI.authRepo.getCurrentUser();
+          if (user != null) break;
+        }
+      }
+
       if (user == null) {
         _handleUnauthorized();
         return;
@@ -40,13 +50,54 @@ class _RoleGuardState extends State<RoleGuard> {
 
       final role = await DI.authRepo.getUserRole() ?? await DI.userRepo.getUserRole(user.id);
       final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
-      final isOwnerAdmin = widget.requiredRole == 'ADMIN' &&
-          (role == null || role.toUpperCase() == 'ADMIN') &&
-          (user.email != null && user.email!.isNotEmpty);
 
-      if ((role != null && role.toUpperCase() == widget.requiredRole.toUpperCase()) ||
-          (metaRole != null && metaRole == widget.requiredRole.toUpperCase()) ||
-          isOwnerAdmin) {
+      // Normalize required role for comparison
+      final required = widget.requiredRole.toUpperCase();
+      final roleUpper = role?.toUpperCase();
+
+      // Check direct role match
+      bool authorized = (roleUpper != null && roleUpper == required) ||
+          (metaRole != null && metaRole == required);
+
+      // ADMIN route accepts ADMIN, SUPER_ADMIN, and FEDERATION_ADMIN
+      if (!authorized && required == 'ADMIN') {
+        authorized = roleUpper == 'SUPER_ADMIN' ||
+            roleUpper == 'FEDERATION_ADMIN' ||
+            metaRole == 'SUPER_ADMIN' ||
+            metaRole == 'FEDERATION_ADMIN';
+      }
+
+      // CUSTOMER route: An authenticated user who is not explicitly a Worker or Admin
+      // is always authorized as a Customer (especially for onboarding and initial registration).
+      if (!authorized && required == 'CUSTOMER') {
+        final isOtherRole = roleUpper == 'WORKER' ||
+            roleUpper == 'ADMIN' ||
+            roleUpper == 'SUPER_ADMIN' ||
+            roleUpper == 'FEDERATION_ADMIN' ||
+            metaRole == 'WORKER' ||
+            metaRole == 'ADMIN' ||
+            metaRole == 'SUPER_ADMIN' ||
+            metaRole == 'FEDERATION_ADMIN';
+        if (!isOtherRole) {
+          authorized = true;
+        }
+      }
+
+      // WORKER route: An authenticated user registering as a worker is authorized
+      // unless they are already an Admin.
+      if (!authorized && required == 'WORKER') {
+        final isAdmin = roleUpper == 'ADMIN' ||
+            roleUpper == 'SUPER_ADMIN' ||
+            roleUpper == 'FEDERATION_ADMIN' ||
+            metaRole == 'ADMIN' ||
+            metaRole == 'SUPER_ADMIN' ||
+            metaRole == 'FEDERATION_ADMIN';
+        if (!isAdmin && (roleUpper == null || roleUpper == 'CUSTOMER')) {
+          authorized = true;
+        }
+      }
+
+      if (authorized) {
         if (mounted) {
           setState(() {
             _isLoading = false;

@@ -2,6 +2,7 @@ import 'dart:async';
 import '../../../../core/repositories/i_customer_repository.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/services/shared_booking_store.dart';
+import '../../../../core/services/registered_worker_store.dart';
 import '../models/customer_models.dart';
 
 class MockCustomerRepository implements ICustomerRepository {
@@ -353,7 +354,6 @@ class MockCustomerRepository implements ICustomerRepository {
   }
 
   @override
-  @override
   Future<List<Worker>> getAllWorkers({String? city, String? federationId}) async {
     await Future.delayed(const Duration(milliseconds: 50));
     var list = List<Worker>.from(_mockWorkers);
@@ -364,6 +364,27 @@ class MockCustomerRepository implements ICustomerRepository {
       list = list.where((w) => w.locationTag.toLowerCase().contains(city.toLowerCase()) || w.serviceAreas.any((a) => a.toLowerCase().contains(city.toLowerCase()))).toList();
     }
     return list;
+  }
+
+  @override
+  Future<bool> hasWorkersInArea({String? federationId, String? district, String? city, String? pincode}) async {
+    final all = List<Worker>.from(_mockWorkers)..addAll(RegisteredWorkerStore.getRegisteredWorkers());
+    final fedId = federationId?.trim().toLowerCase();
+    final dist = district?.trim().toLowerCase() ?? '';
+    final c = city?.trim().toLowerCase() ?? '';
+
+    for (final w in all) {
+      if (fedId != null && fedId.isNotEmpty && w.federationId?.toLowerCase() == fedId) {
+        return true;
+      }
+      final locTag = w.locationTag.toLowerCase();
+      if (dist.isNotEmpty && locTag.contains(dist)) return true;
+      if (c.isNotEmpty && locTag.contains(c)) return true;
+      if (w.serviceAreas.any((a) => (dist.isNotEmpty && a.toLowerCase().contains(dist)) || (c.isNotEmpty && a.toLowerCase().contains(c)))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   String _normalizeServiceId(String serviceId) {

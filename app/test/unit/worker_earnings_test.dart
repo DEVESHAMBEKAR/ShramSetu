@@ -148,7 +148,7 @@ void main() {
       expect(find.text('Accidental & Health Insurance'), findsOneWidget);
       expect(find.text('Welfare Cess Accrued'), findsOneWidget);
       expect(find.text('Micro-Pension (PMSYM)'), findsOneWidget);
-      expect(find.text('Tool & Equipment Loan'), findsOneWidget);
+      expect(find.text('Tool Upgrade Loan'), findsOneWidget);
     });
   });
 }

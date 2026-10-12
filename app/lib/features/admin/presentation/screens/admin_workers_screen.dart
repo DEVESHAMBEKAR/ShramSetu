@@ -3,11 +3,14 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/models/federation_models.dart';
+import '../../../../core/services/india_geography_service.dart';
 import '../../../worker/data/models/worker_models.dart';
 import 'admin_worker_verification_detail_screen.dart';
 
 class AdminWorkersScreen extends StatefulWidget {
-  const AdminWorkersScreen({super.key});
+  final bool? isSuperAdmin;
+  const AdminWorkersScreen({super.key, this.isSuperAdmin});
 
   @override
   State<AdminWorkersScreen> createState() => _AdminWorkersScreenState();
@@ -19,9 +22,22 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Federation & Multi-Location Filtering & Sorting State
+  bool _isSuperAdmin = false;
+  String _scopedFederationName = '';
+  List<String> _authorizedFedIds = [];
+  List<FederationModel> _availableFederations = [];
+  String? _selectedFederationId;
+  String? _selectedState;
+  String? _selectedDistrict;
+  String? _selectedArea;
+  String _sortBy = 'recent'; // 'recent', 'oldest', 'name_asc', 'name_desc', 'federation', 'location', 'rating', 'experience'
+  bool _showAdvancedFilters = false;
+
   @override
   void initState() {
     super.initState();
+    _loadScopeAndFederations();
     _refreshData();
   }
 
@@ -29,6 +45,95 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadScopeAndFederations() async {
+    try {
+      final scope = DI.federationScopeService;
+      final user = await DI.authRepo.getCurrentUser();
+      bool isGlobal = widget.isSuperAdmin ?? false;
+      List<String> authIds = [];
+      String fedName = '';
+
+      // 1. Authoritative check: match admin in getFederationAdmins() (matching AdminProfileScreen & AdminMainLayout)
+      if (user != null) {
+        try {
+          final admins = await DI.adminRepo.getFederationAdmins();
+          final myScope = admins.firstWhere(
+            (a) =>
+                a['user_id'] == user.id ||
+                a['email']?.toString().trim().toLowerCase() == user.email?.trim().toLowerCase(),
+            orElse: () => {},
+          );
+          if (myScope.isNotEmpty && myScope['federation_id'] != null) {
+            authIds = [myScope['federation_id'].toString()];
+            fedName = myScope['federation_name']?.toString() ?? '';
+          }
+        } catch (_) {}
+      }
+
+      if (user != null && (fedName.isEmpty || authIds.isEmpty)) {
+        final emailLower = user.email?.trim().toLowerCase() ?? '';
+        if (emailLower.contains('nagpur') || emailLower == 'omshinde@gmail.com') {
+          authIds = ['55555555-0000-0000-0000-000000000005'];
+          fedName = 'Nagpur District Shramik Cooperative Union';
+        } else if (emailLower.contains('nashik') || emailLower == 'adilatar9494@gmail.com') {
+          authIds = ['22222222-0000-0000-0000-000000000002'];
+          fedName = 'Nashik District Artisans Cooperative Union';
+        } else if (emailLower.contains('pune') || emailLower == 'ambekardevesh2@gmail.com') {
+          authIds = ['11111111-0000-0000-0000-000000000001'];
+          fedName = 'Pune District Labour Cooperative Federation';
+        }
+      }
+
+      if (scope != null) {
+        if (widget.isSuperAdmin != null) {
+          isGlobal = widget.isSuperAdmin!;
+        } else {
+          isGlobal = await scope.hasGlobalScope();
+        }
+
+        if (authIds.isEmpty) {
+          authIds = await scope.getAuthorizedFederationIds();
+        }
+      }
+
+      // Load federations list
+      List<FederationModel> feds = await FederationModel.fetchAllFederations();
+      if (feds.isEmpty) {
+        feds = List.from(FederationModel.defaultFederations);
+      }
+
+      if (!isGlobal && authIds.isNotEmpty && fedName.isEmpty) {
+        final matched = feds.where((f) => authIds.contains(f.id)).firstOrNull;
+        if (matched != null) {
+          fedName = matched.name;
+        } else if (scope != null) {
+          final desc = await scope.getScopeDescription();
+          if (desc.isNotEmpty && !desc.startsWith('No ') && !desc.startsWith('All ')) {
+            fedName = desc;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _isSuperAdmin = isGlobal;
+          _availableFederations = feds;
+          _scopedFederationName = fedName;
+          _authorizedFedIds = authIds;
+        });
+        _refreshData();
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _availableFederations = List.from(FederationModel.defaultFederations);
+          _scopedFederationName = '';
+          _authorizedFedIds = [];
+        });
+      }
+    }
   }
 
   void _refreshData() {
@@ -41,7 +146,10 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
     await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => AdminWorkerVerificationDetailScreen(worker: worker),
+        builder: (_) => AdminWorkerVerificationDetailScreen(
+          worker: worker,
+          isSuperAdmin: _isSuperAdmin,
+        ),
       ),
     );
     _refreshData();
@@ -167,6 +275,26 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
     }
   }
 
+  void _resetFilters() {
+    setState(() {
+      _selectedFederationId = null;
+      _selectedState = null;
+      _selectedDistrict = null;
+      _selectedArea = null;
+      _sortBy = 'recent';
+      _searchController.clear();
+      _searchQuery = '';
+    });
+  }
+
+  bool get _hasActiveFilters =>
+      _selectedFederationId != null ||
+      _selectedState != null ||
+      _selectedDistrict != null ||
+      _selectedArea != null ||
+      _sortBy != 'recent' ||
+      _searchQuery.isNotEmpty;
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<WorkerProfile>>(
@@ -196,7 +324,26 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
           );
         }
 
-        final allWorkers = snapshot.data ?? [];
+        final rawWorkers = snapshot.data ?? [];
+        // STRICT FEDERATION ACCESS ISOLATION AT THE ROOT:
+        // A Federation Admin can ONLY view and count workers from their own assigned federation.
+        final List<WorkerProfile> allWorkers;
+        if (!_isSuperAdmin) {
+          final scopedIds = _authorizedFedIds;
+          if (scopedIds.isEmpty) {
+            allWorkers = [];
+          } else {
+            allWorkers = rawWorkers.where((w) {
+              if (w.federationRefId == null || w.federationRefId!.isEmpty) {
+                return false;
+              }
+              return scopedIds.contains(w.federationRefId);
+            }).toList();
+          }
+        } else {
+          allWorkers = rawWorkers;
+        }
+
         final pendingWorkers = allWorkers.where((w) => w.verificationStatus == VerificationStatus.pending).toList();
         final underReviewWorkers = allWorkers.where((w) => w.verificationStatus == VerificationStatus.underReview).toList();
         final changesRequiredWorkers = allWorkers.where((w) => w.verificationStatus == VerificationStatus.changesRequired).toList();
@@ -230,18 +377,108 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
             break;
         }
 
-        // Apply search filter
-        final displayedWorkers = filteredByStatus.where((w) {
-          if (_searchQuery.isEmpty) return true;
-          final q = _searchQuery.toLowerCase();
-          return w.name.toLowerCase().contains(q) ||
-              w.phone.toLowerCase().contains(q) ||
-              w.id.toLowerCase().contains(q) ||
-              (w.trade?.toLowerCase().contains(q) ?? false) ||
-              (w.primarySkill?.toLowerCase().contains(q) ?? false) ||
-              w.federationName.toLowerCase().contains(q) ||
-              w.serviceLocation.toLowerCase().contains(q);
+        // Apply Super Admin & Area filters
+        var filteredList = filteredByStatus.where((w) {
+          // Search query filter
+          if (_searchQuery.isNotEmpty) {
+            final q = _searchQuery.toLowerCase();
+            final matchesSearch = w.name.toLowerCase().contains(q) ||
+                w.phone.toLowerCase().contains(q) ||
+                w.id.toLowerCase().contains(q) ||
+                (w.trade?.toLowerCase().contains(q) ?? false) ||
+                (w.primarySkill?.toLowerCase().contains(q) ?? false) ||
+                w.federationName.toLowerCase().contains(q) ||
+                w.serviceLocation.toLowerCase().contains(q) ||
+                (w.district?.toLowerCase().contains(q) ?? false);
+            if (!matchesSearch) return false;
+          }
+
+          // Federation filter (for Super Admin)
+          if (_selectedFederationId != null) {
+            final fed = _availableFederations.firstWhere(
+              (f) => f.id == _selectedFederationId,
+              orElse: () => FederationModel.resolveFederation(federationId: _selectedFederationId),
+            );
+            final matchesFed = w.federationRefId == _selectedFederationId ||
+                w.federationName.toLowerCase().contains(fed.name.toLowerCase()) ||
+                w.guildName.toLowerCase().contains(fed.name.toLowerCase());
+            if (!matchesFed) return false;
+          }
+
+          // State filter
+          if (_selectedState != null) {
+            final wState = w.state?.toLowerCase() ?? 'maharashtra';
+            if (wState != _selectedState!.toLowerCase()) return false;
+          }
+
+          // District filter
+          if (_selectedDistrict != null) {
+            final wDist = w.district?.toLowerCase() ?? '';
+            if (wDist != _selectedDistrict!.toLowerCase()) return false;
+          }
+
+          // Area filter
+          if (_selectedArea != null) {
+            final a = _selectedArea!.toLowerCase();
+            final matchesArea = w.serviceLocation.toLowerCase().contains(a) ||
+                (w.city?.toLowerCase().contains(a) ?? false) ||
+                (w.address?.toLowerCase().contains(a) ?? false);
+            if (!matchesArea) return false;
+          }
+
+          return true;
         }).toList();
+
+        // STRICT FEDERATION ACCESS ISOLATION:
+        // A Federation Admin can ONLY view worker applications from their own assigned federation.
+        // Worker applications from another federation or unassigned workers are strictly hidden.
+        if (!_isSuperAdmin) {
+          final scopedIds = _authorizedFedIds;
+
+          // If this admin has no assigned federation scope yet, show zero workers
+          if (scopedIds.isEmpty) {
+            filteredList = [];
+          } else {
+            filteredList = filteredList.where((w) {
+              // Direct strict match on federationRefId only
+              if (w.federationRefId == null || w.federationRefId!.isEmpty) {
+                return false; // Exclude unassigned workers from federation admin view
+              }
+              return scopedIds.contains(w.federationRefId);
+            }).toList();
+          }
+        }
+
+        // Apply sorting
+        filteredList.sort((a, b) {
+          switch (_sortBy) {
+            case 'oldest':
+              final aDate = a.registeredAt ?? DateTime(0);
+              final bDate = b.registeredAt ?? DateTime(0);
+              return aDate.compareTo(bDate);
+            case 'name_asc':
+              return a.name.toLowerCase().compareTo(b.name.toLowerCase());
+            case 'name_desc':
+              return b.name.toLowerCase().compareTo(a.name.toLowerCase());
+            case 'federation':
+              return a.federationName.toLowerCase().compareTo(b.federationName.toLowerCase());
+            case 'location':
+              final aLoc = (a.district ?? a.serviceLocation).toLowerCase();
+              final bLoc = (b.district ?? b.serviceLocation).toLowerCase();
+              return aLoc.compareTo(bLoc);
+            case 'rating':
+              return b.rating.compareTo(a.rating);
+            case 'experience':
+              final aExp = int.tryParse(a.experience.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+              final bExp = int.tryParse(b.experience.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0;
+              return bExp.compareTo(aExp);
+            case 'recent':
+            default:
+              final aDate = a.registeredAt ?? DateTime(0);
+              final bDate = b.registeredAt ?? DateTime(0);
+              return bDate.compareTo(aDate);
+          }
+        });
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -249,7 +486,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
             backgroundColor: Colors.white,
             elevation: 0,
             title: Text(
-              'Artisan Verification & Guild Desk',
+              _isSuperAdmin ? 'Artisan Verification (All Federations)' : 'Artisan Verification & Guild Desk',
               style: AppTypography.titleLg.copyWith(
                 fontWeight: FontWeight.bold,
                 color: AppColors.primary,
@@ -265,7 +502,17 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
           ),
           body: Column(
             children: [
+              // Scope banner (Locked for Federation Admin, Global sorting bar for Super Admin)
+              if (!_isSuperAdmin)
+                _buildFederationScopeLockedBanner()
+              else
+                _buildSuperAdminMultiLocationFilterBar(),
+
               _buildSearchBar(),
+
+              // Active filter chips (ONLY shown for Super Admin when filters are active)
+              if (_isSuperAdmin && _hasActiveFilters) _buildActiveFilterChipsBar(filteredList.length),
+
               _buildFilterBar(
                 allCount: allWorkers.length,
                 pendingCount: pendingWorkers.length,
@@ -275,17 +522,18 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                 rejectedCount: rejectedWorkers.length,
                 suspendedCount: suspendedWorkers.length,
               ),
+
               Expanded(
-                child: displayedWorkers.isEmpty
+                child: filteredList.isEmpty
                     ? _buildEmptyState()
                     : RefreshIndicator(
                         color: AppColors.primary,
                         onRefresh: () async => _refreshData(),
                         child: ListView.builder(
                           padding: const EdgeInsets.all(AppSpacing.marginMobile),
-                          itemCount: displayedWorkers.length,
+                          itemCount: filteredList.length,
                           itemBuilder: (context, index) {
-                            final worker = displayedWorkers[index];
+                            final worker = filteredList[index];
                             return _buildWorkerCard(worker);
                           },
                         ),
@@ -298,6 +546,340 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
     );
   }
 
+  /// Banner displayed to Federation Admin confirming strict isolation
+  Widget _buildFederationScopeLockedBanner() {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFFF0FDF4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.shield, color: Color(0xFF166534), size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      _scopedFederationName.isNotEmpty ? _scopedFederationName : 'Federation Jurisdiction',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12, color: Color(0xFF166534)),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDCFCE7),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(color: const Color(0xFF86EFAC)),
+                      ),
+                      child: const Text('LOCKED SCOPE', style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  'Exclusive jurisdiction: You can only access and verify artisans registered under your cooperative federation.',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF14532D)),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Interactive multi-location & federation control bar for Super Admin
+  Widget _buildSuperAdminMultiLocationFilterBar() {
+    final districts = _selectedState != null
+        ? IndiaGeographyService.getDistricts(_selectedState)
+        : IndiaGeographyService.getDistricts('Maharashtra');
+
+    final areas = _selectedDistrict != null
+        ? IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict)
+        : <String>[];
+
+    return Container(
+      color: const Color(0xFFF8FAFC),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(color: const Color(0xFF4338CA).withValues(alpha: 0.1), borderRadius: BorderRadius.circular(6)),
+                child: const Icon(Icons.public, color: Color(0xFF4338CA), size: 18),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Super Admin Multi-Location & Federation Sorting', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF1E293B))),
+                    Text(
+                      'Cross-federation oversight • ${_availableFederations.length} federations available',
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  backgroundColor: _showAdvancedFilters ? const Color(0xFFE2E8F0) : Colors.transparent,
+                ),
+                onPressed: () => setState(() => _showAdvancedFilters = !_showAdvancedFilters),
+                icon: Icon(_showAdvancedFilters ? Icons.tune : Icons.tune_outlined, size: 16, color: const Color(0xFF4338CA)),
+                label: Text(_showAdvancedFilters ? 'Hide Filters' : 'Filters & Sorting', style: const TextStyle(fontSize: 12, color: Color(0xFF4338CA), fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+
+          if (_showAdvancedFilters) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                // Federation Dropdown
+                SizedBox(
+                  width: 220,
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedFederationId,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Cooperative Federation',
+                      labelStyle: const TextStyle(fontSize: 11),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Federations', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      ..._availableFederations.map((fed) => DropdownMenuItem<String?>(
+                            value: fed.id,
+                            child: Text(fed.name, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                          )),
+                    ],
+                    onChanged: (val) => setState(() => _selectedFederationId = val),
+                  ),
+                ),
+
+                // State Dropdown (36 states & UTs)
+                SizedBox(
+                  width: 170,
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedState,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'State / UT',
+                      labelStyle: const TextStyle(fontSize: 11),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All States', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      ...IndiaGeographyService.states.map((st) => DropdownMenuItem<String?>(
+                            value: st,
+                            child: Text(st, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                          )),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedState = val;
+                        _selectedDistrict = null;
+                        _selectedArea = null;
+                      });
+                    },
+                  ),
+                ),
+
+                // District Dropdown (cascading)
+                SizedBox(
+                  width: 170,
+                  child: DropdownButtonFormField<String?>(
+                    value: _selectedDistrict,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'District',
+                      labelStyle: const TextStyle(fontSize: 11),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('All Districts', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      ),
+                      ...districts.map((dist) => DropdownMenuItem<String?>(
+                            value: dist,
+                            child: Text(dist, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                          )),
+                    ],
+                    onChanged: (val) {
+                      setState(() {
+                        _selectedDistrict = val;
+                        _selectedArea = null;
+                      });
+                    },
+                  ),
+                ),
+
+                // Area / City Dropdown
+                if (areas.isNotEmpty)
+                  SizedBox(
+                    width: 160,
+                    child: DropdownButtonFormField<String?>(
+                      value: _selectedArea,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: 'Area / Sub-locality',
+                        labelStyle: const TextStyle(fontSize: 11),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      items: [
+                        const DropdownMenuItem<String?>(
+                          value: null,
+                          child: Text('All Areas', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                        ...areas.map((ar) => DropdownMenuItem<String?>(
+                              value: ar,
+                              child: Text(ar, style: const TextStyle(fontSize: 12), overflow: TextOverflow.ellipsis),
+                            )),
+                      ],
+                      onChanged: (val) => setState(() => _selectedArea = val),
+                    ),
+                  ),
+
+                // Sort Dropdown
+                SizedBox(
+                  width: 190,
+                  child: DropdownButtonFormField<String>(
+                    value: _sortBy,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Sort By',
+                      labelStyle: const TextStyle(fontSize: 11),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'recent', child: Text('Sort: Most Recent', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'oldest', child: Text('Sort: Oldest First', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'name_asc', child: Text('Sort: Name (A-Z)', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'name_desc', child: Text('Sort: Name (Z-A)', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'federation', child: Text('Sort: Federation Name', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'location', child: Text('Sort: Location / District', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'rating', child: Text('Sort: Highest Rating', style: TextStyle(fontSize: 12))),
+                      DropdownMenuItem(value: 'experience', child: Text('Sort: Most Experienced', style: TextStyle(fontSize: 12))),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) setState(() => _sortBy = val);
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Active filter chips bar with quick clear
+  Widget _buildActiveFilterChipsBar(int resultCount) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            Text('$resultCount artisan${resultCount == 1 ? '' : 's'} matching:', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.outline)),
+            const SizedBox(width: 8),
+            if (_selectedFederationId != null) ...[
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text('Fed: ${_availableFederations.firstWhere((f) => f.id == _selectedFederationId, orElse: () => FederationModel.resolveFederation(federationId: _selectedFederationId)).name}', style: const TextStyle(fontSize: 10)),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => setState(() => _selectedFederationId = null),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (_selectedState != null) ...[
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text('State: $_selectedState', style: const TextStyle(fontSize: 10)),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => setState(() {
+                  _selectedState = null;
+                  _selectedDistrict = null;
+                  _selectedArea = null;
+                }),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (_selectedDistrict != null) ...[
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text('District: $_selectedDistrict', style: const TextStyle(fontSize: 10)),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => setState(() {
+                  _selectedDistrict = null;
+                  _selectedArea = null;
+                }),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (_selectedArea != null) ...[
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text('Area: $_selectedArea', style: const TextStyle(fontSize: 10)),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => setState(() => _selectedArea = null),
+              ),
+              const SizedBox(width: 4),
+            ],
+            if (_sortBy != 'recent') ...[
+              Chip(
+                visualDensity: VisualDensity.compact,
+                label: Text('Sorted: $_sortBy', style: const TextStyle(fontSize: 10)),
+                deleteIcon: const Icon(Icons.close, size: 14),
+                onDeleted: () => setState(() => _sortBy = 'recent'),
+              ),
+              const SizedBox(width: 4),
+            ],
+            TextButton(
+              style: TextButton.styleFrom(padding: EdgeInsets.zero, visualDensity: VisualDensity.compact),
+              onPressed: _resetFilters,
+              child: const Text('Reset All', style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchBar() {
     return Container(
       color: Colors.white,
@@ -305,7 +887,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
-          hintText: 'Search by Name, Phone, ID, Trade, Cooperative...',
+          hintText: 'Search by Name, Phone, ID, Trade, Cooperative, Area...',
           hintStyle: const TextStyle(fontSize: 13, color: AppColors.outline),
           prefixIcon: const Icon(Icons.search, size: 20, color: AppColors.outline),
           suffixIcon: _searchQuery.isNotEmpty
@@ -412,6 +994,13 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
             'New registrations will appear here for federation officer review.',
             style: TextStyle(fontSize: 12, color: AppColors.outline),
           ),
+          if (_hasActiveFilters) ...[
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _resetFilters,
+              child: const Text('Clear All Filters'),
+            ),
+          ],
         ],
       ),
     );
@@ -529,35 +1118,55 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
               ),
             ],
             const SizedBox(height: 10),
+
+            // Federation and Geographic Location Badges
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
                 color: AppColors.surfaceContainerLow,
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Text(
-                      'Fed: ${worker.federationName.isNotEmpty ? worker.federationName : (worker.guildId != "None" ? worker.guildId : "Pune Federation")}',
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Jobs: ${worker.completedJobs}',
-                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
-                  ),
-                  const SizedBox(width: 8),
                   Row(
                     children: [
-                      const Icon(Icons.star, size: 13, color: AppColors.starRating),
-                      const SizedBox(width: 2),
+                      const Icon(Icons.account_balance, size: 14, color: Color(0xFF4338CA)),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          worker.federationName.isNotEmpty ? worker.federationName : (worker.guildId != "None" ? worker.guildId : "Pune Federation"),
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF312E81)),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(Icons.location_on, size: 14, color: AppColors.outline),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          '${worker.district ?? worker.serviceLocation}, ${worker.state ?? "Maharashtra"}${worker.pincode != null ? " • ${worker.pincode}" : ""}',
+                          style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                       Text(
-                        worker.rating > 0 ? worker.rating.toStringAsFixed(1) : 'New',
-                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                        'Jobs: ${worker.completedJobs}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant),
+                      ),
+                      const SizedBox(width: 8),
+                      Row(
+                        children: [
+                          const Icon(Icons.star, size: 13, color: AppColors.starRating),
+                          const SizedBox(width: 2),
+                          Text(
+                            worker.rating > 0 ? worker.rating.toStringAsFixed(1) : 'New',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
                       ),
                     ],
                   ),

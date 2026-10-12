@@ -5,6 +5,9 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../worker/data/models/worker_models.dart';
+import '../../../../core/utils/phone_number_util.dart';
+import '../../../../shared/widgets/google_sign_in_button.dart';
+import '../../data/repositories/mock_auth_repository.dart';
 
 class WorkerLoginScreen extends StatefulWidget {
   const WorkerLoginScreen({super.key});
@@ -20,6 +23,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
   bool _isOtpSent = false;
   bool _isLoading = false;
+  bool _isGoogleLoading = false;
   String? _errorMessage;
 
   Timer? _countdownTimer;
@@ -54,8 +58,8 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
 
     try {
       if (!_isOtpSent) {
-        final phone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
-        if (phone.length < 10) {
+        final phone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
+        if (phone.length != 10) {
           throw Exception('Please enter a valid 10-digit mobile number.');
         }
         await DI.authRepo.sendOtp(phone);
@@ -72,7 +76,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
         if (otp.length != 6) {
           throw Exception('Please enter the 6-digit OTP code.');
         }
-        final cleanPhone = _phoneController.text.replaceAll(RegExp(r'\D'), '');
+        final cleanPhone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
         final isValid = await DI.authRepo.verifyOtp(cleanPhone, otp);
         if (isValid) {
           final user = await DI.authRepo.getCurrentUser();
@@ -96,6 +100,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           } catch (e) {
             debugPrint('[WorkerLogin] Upsert non-critical: $e');
           }
+
 
           // Check worker profile registration and document verification status
           final WorkerProfile profile = await DI.workerRepo.getWorkerProfile(userId);
@@ -134,6 +139,200 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
     _countdownTimer?.cancel();
   }
 
+  Future<void> _handleGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final success = await DI.authRepo.signInWithGoogle(role: 'WORKER');
+      if (!success) {
+        if (mounted) setState(() => _isGoogleLoading = false);
+        return;
+      }
+
+      final user = await DI.authRepo.getCurrentUser();
+      if (user != null) {
+        final userId = user.id;
+
+        // Authoritative cross-role protection:
+        final existingRole = await DI.userRepo.getUserRole(userId);
+        if (existingRole != null && existingRole.toUpperCase() != 'WORKER') {
+          await DI.authRepo.logout();
+          final roleName = existingRole.toUpperCase() == 'CUSTOMER' ? 'Customer' : 'Cooperative Administrator';
+          throw Exception('Access denied: This Google account is registered as a $roleName. Please use the Customer portal to sign in.');
+        }
+
+        final googleName = (user.userMetadata?['full_name'] ?? user.userMetadata?['name'] ?? '').toString().trim();
+        final effectiveName = googleName.isNotEmpty ? googleName : 'Worker ${userId.length >= 4 ? userId.substring(0, 4) : userId}';
+
+        try {
+          await DI.userRepo.upsertUserProfile(
+            userId: userId,
+            role: 'WORKER',
+            phone: user.phone ?? '',
+            fullName: effectiveName,
+          );
+        } catch (e) {
+          debugPrint('[WorkerLogin] Google upsert non-critical: $e');
+        }
+
+        // Check worker profile registration and document verification status
+        final WorkerProfile worker = await DI.workerRepo.getWorkerProfile(userId);
+        final docs = await DI.workerRepo.getVerificationDocuments(worker.id);
+
+        final hasCompletedRegistration = worker.name.isNotEmpty &&
+            !worker.name.startsWith('Artisan (') &&
+            !worker.name.startsWith('User ') &&
+            docs.isNotEmpty;
+
+        if (!mounted) return;
+
+        if (!hasCompletedRegistration) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil('/worker/dashboard', (route) => false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = e.toString().replaceAll('Exception: ', '');
+          _isGoogleLoading = false;
+        });
+        if (e.toString().contains('Google Sign-In is not enabled')) {
+          _showGoogleSetupDialog(context);
+        }
+      }
+    } finally {
+      if (mounted && _isGoogleLoading) {
+        setState(() => _isGoogleLoading = false);
+      }
+    }
+  }
+
+  void _showGoogleSetupDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            GoogleLogoIcon(size: 24),
+            SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Google Sign-In Setup',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFEF3C7),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFF59E0B).withOpacity(0.4)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline, color: Color(0xFFB45309), size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Google Provider is not enabled in your Supabase project yet.',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF92400E)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'To enable real Google authentication in Supabase:\n'
+              '1. Open Supabase Dashboard → Authentication → Providers → Google\n'
+              '2. Toggle "Enable Sign in with Google" to ON\n'
+              '3. Enter your Google Client ID & Secret from Google Cloud Console\n'
+              '4. Add the Supabase callback URI in Google Cloud Console.\n\n'
+              'For development and testing, you can continue with a Demo Google Profile below.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF4B5563), height: 1.45),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Use Mobile OTP'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () async {
+              Navigator.of(ctx).pop();
+              await _handleDemoGoogleSignIn();
+            },
+            child: const Text('Continue with Demo Google Profile'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleDemoGoogleSignIn() async {
+    setState(() {
+      _isGoogleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final mockAuth = MockAuthRepository();
+      await mockAuth.signInWithGoogle(role: 'WORKER');
+      final user = await mockAuth.getCurrentUser();
+      if (user != null) {
+        final userId = user.id;
+        const effectiveName = 'Ramesh Kumar';
+        try {
+          await DI.userRepo.upsertUserProfile(
+            userId: userId,
+            role: 'WORKER',
+            phone: '+91 98765 43210',
+            fullName: effectiveName,
+          );
+        } catch (_) {}
+
+        final WorkerProfile worker = await DI.workerRepo.getWorkerProfile(userId);
+        final docs = await DI.workerRepo.getVerificationDocuments(worker.id);
+
+        final hasCompletedRegistration = worker.name.isNotEmpty &&
+            !worker.name.startsWith('Artisan (') &&
+            !worker.name.startsWith('User ') &&
+            docs.isNotEmpty;
+
+        if (!mounted) return;
+
+        if (!hasCompletedRegistration) {
+          Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil('/worker/dashboard', (route) => false);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _errorMessage = e.toString().replaceAll('Exception: ', ''));
+      }
+    } finally {
+      if (mounted) setState(() => _isGoogleLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -160,7 +359,17 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     _buildUnionProtectionCallout(),
                     const SizedBox(height: 20),
                     _buildActionCta(),
-                    const SizedBox(height: 14),
+                    if (!_isOtpSent) ...[
+                      const SizedBox(height: 16),
+                      const OrDivider(),
+                      const SizedBox(height: 16),
+                      GoogleSignInButton(
+                        onPressed: _handleGoogleSignIn,
+                        isLoading: _isGoogleLoading,
+                        label: 'Sign in with Google as Partner',
+                      ),
+                    ],
+                    const SizedBox(height: 16),
                     _buildAlternativeModeSwitch(),
                     const SizedBox(height: 40),
                   ],
@@ -442,8 +651,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
                     readOnly: _isOtpSent,
                     keyboardType: TextInputType.phone,
                     inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(10),
+                      IndianPhoneNumberFormatter(),
                     ],
                     style: const TextStyle(
                       fontSize: 16,

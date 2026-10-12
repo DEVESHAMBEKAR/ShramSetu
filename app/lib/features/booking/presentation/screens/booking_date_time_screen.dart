@@ -4,6 +4,7 @@ import '../../../../core/theme/app_typography.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../data/models/booking_models.dart';
+import '../../../../shared/widgets/shramsetu_brand_mark.dart';
 import 'booking_details_screen.dart';
 
 class BookingDateTimeScreen extends StatefulWidget {
@@ -57,11 +58,58 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface.withValues(alpha: 0.9),
-        elevation: 1,
-        shadowColor: Colors.black.withValues(alpha: 0.1),
-        title: Text('Select Date & Time', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(68),
+        child: Container(
+          color: AppColors.surfaceContainerLowest,
+          child: SafeArea(
+            bottom: false,
+            child: Column(
+              children: [
+                const TricolorStripe(height: 3.5),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.arrow_back, color: AppColors.primaryContainer),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                        const ShramSetuBrandMark(compact: true, showText: false, height: 28),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Select Slot & Window',
+                                style: AppTypography.titleMd.copyWith(
+                                  color: AppColors.primaryContainer,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                'श्रम व रोजगार मंत्रालय • DPI Scheduled Dispatch',
+                                style: AppTypography.labelSm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontSize: 10,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
       body: Column(
         children: [
@@ -211,10 +259,17 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
   Widget _buildBottomBar() {
     final isReady = _selectedDate != null && _selectedTime != null;
     return Container(
-      padding: const EdgeInsets.all(AppSpacing.marginMobile),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceContainerLowest,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 4, offset: const Offset(0, -2))],
+        border: const Border(top: BorderSide(color: AppColors.surfaceContainerHigh, width: 1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
       ),
       child: SafeArea(
         child: GestureDetector(
@@ -233,11 +288,37 @@ class _BookingDateTimeScreenState extends State<BookingDateTimeScreen> {
           child: Container(
             height: 48,
             decoration: BoxDecoration(
-              color: isReady ? AppColors.primary : AppColors.surfaceContainerHighest,
-              borderRadius: AppRadius.radiusXl,
+              color: isReady ? AppColors.secondaryContainer : AppColors.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: isReady
+                  ? [
+                      BoxShadow(
+                        color: AppColors.secondaryContainer.withValues(alpha: 0.25),
+                        blurRadius: 6,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : null,
             ),
             alignment: Alignment.center,
-            child: Text('Continue', style: AppTypography.labelLg.copyWith(color: isReady ? AppColors.onPrimary : AppColors.outline, fontWeight: FontWeight.bold)),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  'Proceed to Sovereign Escrow (पुढे चला)',
+                  style: AppTypography.labelLg.copyWith(
+                    color: isReady ? AppColors.onPrimary : AppColors.outline,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Icon(
+                  Icons.arrow_forward,
+                  size: 18,
+                  color: isReady ? AppColors.onPrimary : AppColors.outline,
+                ),
+              ],
+            ),
           ),
         ),
       ),

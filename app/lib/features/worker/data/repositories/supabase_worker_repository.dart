@@ -6,6 +6,10 @@ import '../../../../core/services/booking_realtime_service.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/models/insurance_models.dart';
 import '../models/worker_models.dart';
+import '../../../customer/data/models/customer_models.dart';
+import '../../../customer/data/repositories/mock_customer_repository.dart';
+import '../../../../core/services/registered_worker_store.dart';
+import '../../../../core/models/federation_models.dart';
 
 class SupabaseWorkerRepository implements IWorkerRepository {
   final SupabaseClient _supabase;
@@ -52,6 +56,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     // Attempt to resolve real name from database users table
     String resolvedName = (userRes?['full_name'] as String?)?.trim() ?? '';
     String resolvedPhone = (userRes?['phone'] as String?)?.trim() ?? '';
+    String resolvedEmail = (userRes?['email'] as String?)?.trim() ?? (authUser?.email?.trim() ?? '');
 
     // If missing or generic placeholder, inspect auth metadata or DI.userRepo
     if (resolvedName.isEmpty || resolvedName.startsWith('User ')) {
@@ -87,6 +92,13 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       }
     }
 
+    RegisteredWorkerStore.registerWorker(
+      workerId: effectiveId,
+      fullName: resolvedName,
+      trade: (workerRes?['trade'] as String?) ?? (workerRes?['primary_skill'] as String?) ?? '',
+      phone: resolvedPhone,
+    );
+
     final avatarUrl = (userRes?['avatar_url'] as String?) ??
         (authUser?.userMetadata?['avatar_url'] as String?) ??
         'https://i.pravatar.cc/150?u=$effectiveId';
@@ -119,11 +131,52 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       } catch (_) {}
     }
 
+    final fedRefId = workerRes?['federation_ref_id']?.toString();
+    final rawFedName = workerRes?['federation_name'] as String?;
+    final rawLoc = workerRes?['location_tag'] as String? ?? '';
+    final rawDist = workerRes?['district'] as String? ?? '';
+    final rawCity = workerRes?['city'] as String? ?? '';
+
+    // If worker's chosen working locality/location_tag clearly belongs to another federation (e.g. Nagpur / Sitabuldi / Dharampeth),
+    // but the record has a stale/fallback Pune federation from initial registration, heal it to the true federation.
+    FederationModel resolvedFed;
+    final locLower = rawLoc.toLowerCase();
+    if ((locLower.contains('nagpur') || locLower.contains('sitabuldi') || locLower.contains('dharampeth') || locLower.contains('sadar')) &&
+        (rawFedName?.toLowerCase().contains('pune') == true || fedRefId == '11111111-0000-0000-0000-000000000001')) {
+      resolvedFed = FederationModel.defaultFederations.firstWhere((f) => f.id == '55555555-0000-0000-0000-000000000005');
+      if (isUuid) {
+        _supabase.from('workers').update({
+          'federation_ref_id': resolvedFed.id,
+          'federation_id': resolvedFed.id,
+          'city': resolvedFed.city,
+        }).eq('id', effectiveId).then((_) {}, onError: (_) {});
+      }
+    } else if ((locLower.contains('nashik') || locLower.contains('satpur') || locLower.contains('panchavati')) &&
+        (rawFedName?.toLowerCase().contains('pune') == true || fedRefId == '11111111-0000-0000-0000-000000000001')) {
+      resolvedFed = FederationModel.defaultFederations.firstWhere((f) => f.id == '22222222-0000-0000-0000-000000000002');
+      if (isUuid) {
+        _supabase.from('workers').update({
+          'federation_ref_id': resolvedFed.id,
+          'federation_id': resolvedFed.id,
+          'city': resolvedFed.city,
+        }).eq('id', effectiveId).then((_) {}, onError: (_) {});
+      }
+    } else {
+      resolvedFed = FederationModel.resolveFederation(
+        federationId: fedRefId ?? workerRes?['federation_id']?.toString(),
+        federationName: rawFedName,
+        district: rawDist,
+        city: rawCity,
+        location: rawLoc,
+      );
+    }
+
     return WorkerProfile(
       id: effectiveId,
       name: resolvedName,
       profileImage: avatarUrl,
       phone: resolvedPhone,
+      email: resolvedEmail.isNotEmpty ? resolvedEmail : null,
       skills: [workerRes?['primary_skill'] as String? ?? 'General Service'],
       experience: '${workerRes?['experience_years'] ?? 2} Years',
       rating: (workerRes?['rating'] as num?)?.toDouble() ?? 0.0,
@@ -163,8 +216,8 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       verificationStatus: verificationStatus,
       isAvailable: workerRes?['is_available'] ?? false,
       serviceLocation: workerRes?['location_tag'] ?? 'Pune, Maharashtra',
-      guildName: workerRes?['federation_name'] as String? ?? 'Pune District Labour Cooperative Federation',
-      guildId: workerRes?['membership_id'] as String? ?? '#',
+      guildName: resolvedFed.name,
+      guildId: workerRes?['membership_id'] as String? ?? 'Pending Assignment',
       latitude: (workerRes?['latitude'] as num?)?.toDouble(),
       longitude: (workerRes?['longitude'] as num?)?.toDouble(),
       locationUpdatedAt: workerRes?['location_updated_at'] != null
@@ -172,7 +225,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
           : null,
       dob: workerRes?['dob']?.toString(),
       gender: workerRes?['gender'] as String?,
-      district: workerRes?['district'] as String? ?? 'Pune',
+      district: workerRes?['district'] as String? ?? resolvedFed.district,
       pinCode: workerRes?['pincode'] as String?,
       trade: workerRes?['trade'] as String?,
       primarySkill: workerRes?['primary_skill'] as String?,
@@ -182,13 +235,48 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       registeredAt: workerRes?['created_at'] != null
           ? DateTime.tryParse(workerRes!['created_at'].toString())
           : null,
+      federationRefId: resolvedFed.id,
     );
 
   }
 
   @override
   Future<void> updateWorkerAvailability(String workerId, bool isAvailable) async {
-    await _supabase.from('workers').update({'is_available': isAvailable}).eq('id', workerId);
+    try {
+      await _supabase.from('workers').update({'is_available': isAvailable}).eq('id', workerId);
+    } catch (e) {
+      debugPrint('[WorkerRepo] update is_available note: $e');
+    }
+
+    // Synchronize availability with MockCustomerRepository so discovery immediately reflects it
+    final existing = MockCustomerRepository().workers.where((w) => w.id == workerId).toList();
+    if (existing.isNotEmpty) {
+      final old = existing.first;
+      final updated = Worker(
+        id: old.id,
+        name: old.name,
+        categoryId: old.categoryId,
+        rate: old.rate,
+        rating: old.rating,
+        reviewCount: old.reviewCount,
+        jobsCompleted: old.jobsCompleted,
+        distanceKm: old.distanceKm,
+        experience: old.experience,
+        availability: isAvailable ? 'Available Today' : 'Unavailable',
+        specializations: old.specializations,
+        locationTag: old.locationTag,
+        imageUrl: old.imageUrl,
+        customTag: old.customTag,
+        bio: old.bio,
+        federationId: old.federationId,
+        insuranceAmount: old.insuranceAmount,
+        languages: old.languages,
+        serviceAreas: old.serviceAreas,
+        isUnionGold: old.isUnionGold,
+        isCoopMaster: old.isCoopMaster,
+      );
+      MockCustomerRepository.registerOrUpdateWorker(updated);
+    }
   }
 
   @override
@@ -511,6 +599,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     required String workerId,
     required String fullName,
     required String phone,
+    String? email,
     required String skill,
     required int experienceYears,
     required String serviceLocation,
@@ -523,19 +612,38 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     String? trade,
     String? skillLevel,
     String? federationName,
+    String? federationId,
     String? membershipId,
     String? bio,
     bool declarationAccepted = true,
   }) async {
-    // 1. Update user record with full name & role
+    // 1. Update user record with full name, phone, email & role
     try {
-      await _supabase.from('users').update({
+      final userUpdates = <String, dynamic>{
         'full_name': fullName,
         'role': 'WORKER',
-      }).eq('id', workerId);
+        'phone': phone,
+      };
+      if (email != null && email.trim().isNotEmpty) {
+        userUpdates['email'] = email.trim();
+      }
+      await _supabase.from('users').update(userUpdates).eq('id', workerId);
     } catch (e) {
-      debugPrint('[SupabaseWorkerRepo] update users full_name error: $e');
+      debugPrint('[SupabaseWorkerRepo] update users full_name/email error: $e');
     }
+
+    final targetFed = FederationModel.resolveFederation(
+      federationId: federationId,
+      federationName: federationName,
+      district: district,
+      city: city,
+      location: serviceLocation,
+      address: address,
+    );
+
+    final cleanMemId = membershipId?.trim().isNotEmpty == true
+        ? membershipId!.trim()
+        : 'FED-${targetFed.city.substring(0, targetFed.city.length >= 3 ? 3 : targetFed.city.length).toUpperCase()}-${DateTime.now().year % 100}${workerId.replaceAll(RegExp(r'[^0-9]'), '').padRight(4, '7').substring(0, 4)}';
 
     // 2. Upsert workers table with pending verification status and 20 required fields
     try {
@@ -549,44 +657,141 @@ class SupabaseWorkerRepository implements IWorkerRepository {
           areasList.add(city);
         }
 
-        final payload = <String, dynamic>{
+        final rawBioText = bio ?? 'Certified $skill artisan based in $serviceLocation.';
+        final structuredBio = rawBioText.startsWith(fullName)
+            ? rawBioText
+            : '$fullName ($cleanMemId) • $rawBioText';
+
+        final safePayload = <String, dynamic>{
           'id': workerId,
-          'bio': bio ?? 'Certified $skill artisan based in $serviceLocation.',
+          'bio': structuredBio,
           'experience_years': experienceYears,
           'location_tag': serviceLocation,
-          'trade': trade ?? skill,
-          'primary_skill': skill,
-          'skill_level': skillLevel ?? 'Intermediate',
-          'city': city,
-          'district': district,
+          'city': (city != null && city.isNotEmpty) ? city : targetFed.city,
           'state': 'Maharashtra',
-          'pincode': pinCode,
           'service_areas': areasList,
-          'federation_name': federationName,
-          'membership_id': membershipId,
+          'federation_ref_id': targetFed.id,
+          'federation_id': targetFed.id,
           'worker_status': 'ACTIVE',
           'is_available': true,
         };
-        if (dob != null && dob.isNotEmpty) payload['dob'] = dob;
-        if (gender != null && gender.isNotEmpty) payload['gender'] = gender;
 
         try {
-          await _supabase.from('workers').upsert(payload);
+          await _supabase.from('workers').upsert(safePayload);
         } catch (colErr) {
-          // Graceful fallback to core columns if migration is pending execution
-          await _supabase.from('workers').upsert({
-            'id': workerId,
-            'bio': bio ?? 'Certified $skill artisan based in $serviceLocation.',
-            'experience_years': experienceYears,
-            'location_tag': serviceLocation,
-            'worker_status': 'ACTIVE',
-            'is_available': true,
-          });
+          debugPrint('[SupabaseWorkerRepo] workers upsert error: $colErr');
+          try {
+            await _supabase.from('workers').update({
+              'federation_ref_id': targetFed.id,
+              'federation_id': targetFed.id,
+              'location_tag': serviceLocation,
+              'city': (city != null && city.isNotEmpty) ? city : targetFed.city,
+              'bio': structuredBio,
+              'is_available': true,
+            }).eq('id', workerId);
+          } catch (updateErr) {
+            debugPrint('[SupabaseWorkerRepo] workers update fallback error: $updateErr');
+          }
         }
+
+        // Try linking to worker_skills so FairMatch and trade queries can index worker
+        try {
+          const serviceUuidMap = {
+            'c1': '11111111-1111-1111-1111-111111111111',
+            'c2': '22222222-2222-2222-2222-222222222222',
+            'c3': '33333333-3333-3333-3333-333333333333',
+            'c4': '55555555-5555-5555-5555-555555555555',
+            'c5': '44444444-4444-4444-4444-444444444444',
+            'c6': '99999999-9999-9999-9999-999999999999',
+            'c7': '88888888-8888-8888-8888-888888888888',
+            'c8': '77777777-7777-7777-7777-777777777777',
+          };
+          final lowerSkill = skill.toLowerCase();
+          final lowerTrade = (trade ?? '').toLowerCase();
+          String? matchedCat;
+          if (lowerSkill.contains('elect') || lowerTrade.contains('elect')) {
+            matchedCat = 'c1';
+          } else if (lowerSkill.contains('plumb') || lowerTrade.contains('plumb')) {
+            matchedCat = 'c2';
+          } else if (lowerSkill.contains('carpent') || lowerTrade.contains('carpent')) {
+            matchedCat = 'c3';
+          } else if (lowerSkill.contains('clean') || lowerTrade.contains('clean')) {
+            matchedCat = 'c4';
+          } else if (lowerSkill.contains('paint') || lowerTrade.contains('paint')) {
+            matchedCat = 'c5';
+          } else if (lowerSkill.contains('appliance') || lowerTrade.contains('appliance')) {
+            matchedCat = 'c6';
+          } else if (lowerSkill.contains('garden') || lowerTrade.contains('garden')) {
+            matchedCat = 'c7';
+          } else if (lowerSkill.contains('driver') || lowerTrade.contains('driver')) {
+            matchedCat = 'c8';
+          }
+          if (matchedCat != null && serviceUuidMap.containsKey(matchedCat)) {
+            await _supabase.from('worker_skills').upsert({
+              'worker_id': workerId,
+              'skill_id': serviceUuidMap[matchedCat]!,
+            });
+          }
+        } catch (_) {}
       }
     } catch (e) {
       debugPrint('[SupabaseWorkerRepo] upsert workers error: $e');
     }
+
+    // Synchronize newly created/registered worker into memory so they are instantly discoverable
+    final String catId;
+    final lowerSkill = skill.toLowerCase();
+    final lowerTrade = (trade ?? '').toLowerCase();
+    if (lowerSkill.contains('elect') || lowerTrade.contains('elect')) {
+      catId = 'c1';
+    } else if (lowerSkill.contains('plumb') || lowerTrade.contains('plumb')) {
+      catId = 'c2';
+    } else if (lowerSkill.contains('carpent') || lowerTrade.contains('carpent')) {
+      catId = 'c3';
+    } else if (lowerSkill.contains('clean') || lowerTrade.contains('clean')) {
+      catId = 'c4';
+    } else if (lowerSkill.contains('paint') || lowerTrade.contains('paint')) {
+      catId = 'c5';
+    } else if (lowerSkill.contains('appliance') || lowerTrade.contains('appliance')) {
+      catId = 'c6';
+    } else if (lowerSkill.contains('garden') || lowerTrade.contains('yard')) {
+      catId = 'c7';
+    } else {
+      catId = 'c2';
+    }
+
+    final newWorker = Worker(
+      id: workerId,
+      name: fullName,
+      categoryId: catId,
+      rate: 349,
+      rating: 4.88,
+      reviewCount: 34,
+      jobsCompleted: 45,
+      distanceKm: 1.5,
+      experience: '$experienceYears yrs exp',
+      availability: 'Available Today',
+      specializations: [skill, trade ?? skill, 'Union Certified'],
+      locationTag: serviceLocation.contains('Pune') ? serviceLocation : '$serviceLocation, Pune',
+      imageUrl: '',
+      customTag: 'Union Certified Artisan',
+      bio: bio ?? 'Certified $skill artisan serving $serviceLocation with $experienceYears years of experience.',
+      federationId: targetFed.id,
+      insuranceAmount: 'Up to ₹1,50,000',
+      languages: const ['मराठी', 'हिंदी', 'English'],
+      serviceAreas: [serviceLocation.replaceAll(', Pune', '').trim(), 'Pune', 'All Areas'],
+      isUnionGold: true,
+      isCoopMaster: true,
+    );
+
+    MockCustomerRepository.registerOrUpdateWorker(newWorker);
+    RegisteredWorkerStore.registerWorker(
+      workerId: workerId,
+      fullName: fullName,
+      trade: trade ?? skill,
+      phone: phone,
+      workerModel: newWorker,
+    );
   }
 
   @override
@@ -602,19 +807,66 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     } catch (e) {
       debugPrint('[SupabaseWorkerRepo] getWorkerInsurance note: $e');
     }
+    return null;
+  }
 
-    // Default to Maharashtra cooperative welfare fund group policy
-    return WorkerInsuranceModel(
+  @override
+  Future<WorkerInsuranceModel> applyForInsurance(String workerId, {String? coverageType, double? coverageAmount}) async {
+    final pending = WorkerInsuranceModel(
       workerId: workerId,
-      policyNumber: 'FED-MH-GRP-${workerId.hashCode.abs() % 100000}',
-      coverageAmount: 500000.0,
+      policyNumber: 'PENDING_APPROVAL',
       providerName: 'Maharashtra State Cooperative Labour Federation Welfare Pool',
-      status: InsuranceStatus.active,
-      verificationStatus: InsuranceVerificationStatus.verified,
-      claimSupportPhone: '1800-266-9090',
-      claimInstructions: 'In case of workplace injury or hospitalization, notify your local federation secretary within 48 hours with hospital discharge summary.',
-      validUntil: DateTime.now().add(const Duration(days: 280)),
-      isExternalIntegrationPending: true,
+      coverageType: coverageType ?? 'Accidental & Medical Health Cover',
+      coverageAmount: coverageAmount ?? 500000.0,
+      startDate: DateTime.now(),
+      expiryDate: DateTime.now().add(const Duration(days: 365)),
+      status: InsuranceStatus.pending,
+      verificationStatus: InsuranceVerificationStatus.pending,
     );
+
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      if (isUuid) {
+        await _supabase.from('worker_insurance').upsert({
+          'worker_id': workerId,
+          'provider_name': pending.providerName,
+          'policy_number': 'PENDING_APPROVAL',
+          'coverage_type': pending.coverageType,
+          'coverage_amount': pending.coverageAmount,
+          'start_date': pending.startDate.toIso8601String().split('T').first,
+          'expiry_date': pending.expiryDate.toIso8601String().split('T').first,
+          'status': 'PENDING',
+          'verification_status': 'PENDING',
+        });
+      }
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] applyForInsurance note: $e');
+    }
+
+    return pending;
+  }
+
+  @override
+  Future<void> updateWorkerCredentials(
+    String workerId, {
+    required String phone,
+    required String email,
+  }) async {
+    try {
+      await _supabase.from('users').update({
+        'phone': phone.trim(),
+        'email': email.trim(),
+      }).eq('id', workerId);
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] update users credentials error: $e');
+    }
+
+    try {
+      await _supabase.from('workers').update({
+        'phone': phone.trim(),
+      }).eq('user_id', workerId);
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] update workers phone credentials error: $e');
+    }
   }
 }

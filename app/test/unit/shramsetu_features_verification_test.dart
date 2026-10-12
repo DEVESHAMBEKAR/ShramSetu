@@ -45,6 +45,7 @@ void main() {
       final model = FederationModel(
         id: 'fed-test-01',
         name: 'Test Labour Cooperative Federation',
+        state: 'Maharashtra',
         district: 'Thane',
         city: 'Thane',
         registrationNo: 'MH-THN-COOP-2024',
@@ -197,6 +198,7 @@ void main() {
         workerId: 'worker-xyz',
         policyNumber: 'NIC-GRP-2026-8941',
         coverageAmount: 500000.0,
+        status: InsuranceStatus.active,
       );
 
       expect(insurance.maskedPolicyNumber, equals('POL-••••-8941'));

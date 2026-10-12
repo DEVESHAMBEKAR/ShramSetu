@@ -19,6 +19,7 @@ class AdminMainLayout extends StatefulWidget {
 class _AdminMainLayoutState extends State<AdminMainLayout> {
   int _currentIndex = 2; // Default to Coop Hub (Dashboard)
   String _adminName = 'Federation Admin';
+  String _federationName = '';
   String _adminEmail = 'admin@shramsetu.in';
 
   @override
@@ -32,6 +33,25 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
       final user = await DI.authRepo.getCurrentUser();
       if (user != null) {
         final dbUser = await DI.userRepo.getUserProfile(user.id);
+
+        try {
+          final admins = await DI.adminRepo.getFederationAdmins();
+          final myScope = admins.firstWhere(
+            (a) =>
+                a['user_id'] == user.id ||
+                a['email']?.toString().trim().toLowerCase() == user.email?.trim().toLowerCase(),
+            orElse: () => {},
+          );
+          if (myScope.isNotEmpty && myScope['federation_name'] != null) {
+            _federationName = myScope['federation_name'];
+          } else if (DI.federationScopeService != null) {
+            final desc = await DI.federationScopeService!.getScopeDescription();
+            if (desc.isNotEmpty && !desc.startsWith('No ') && !desc.startsWith('All ')) {
+              _federationName = desc;
+            }
+          }
+        } catch (_) {}
+
         if (mounted) {
           setState(() {
             final name = (dbUser?['full_name'] as String?)?.trim() ??
@@ -143,8 +163,10 @@ class _AdminMainLayoutState extends State<AdminMainLayout> {
                         ),
                       ),
                       Text(
-                        'Coop Administration',
-                        style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                        _federationName,
+                        style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 10, fontWeight: FontWeight.bold),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),

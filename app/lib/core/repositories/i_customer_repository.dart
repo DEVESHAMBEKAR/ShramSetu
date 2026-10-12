@@ -16,6 +16,9 @@ abstract class ICustomerRepository {
   /// Fetch all active, verified registered workers across regions
   Future<List<Worker>> getAllWorkers({String? city, String? federationId});
 
+  /// Check if there are available verified artisans/workers in the given area or federation
+  Future<bool> hasWorkersInArea({String? federationId, String? district, String? city, String? pincode});
+
   /// Create a booking and return the created booking ID
   Future<String?> createBooking({
     required String workerId,

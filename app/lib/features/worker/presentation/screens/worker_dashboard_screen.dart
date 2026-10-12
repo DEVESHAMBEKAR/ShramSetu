@@ -121,7 +121,11 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     _buildUrgentJobAlertCard(activeRequests.first),
                     const SizedBox(height: AppSpacing.spacingMd),
                   ],
-                  _buildPerformanceGrid(worker),
+                  _buildPerformanceGrid(
+                    worker,
+                    completedJobsCount: completedJobs.length,
+                    activeQueueCount: activeRequests.length,
+                  ),
                   const SizedBox(height: AppSpacing.spacingMd),
                   _buildCompletedSchedule(completedJobs),
                   const SizedBox(height: AppSpacing.spacingMd),
@@ -785,7 +789,11 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     );
   }
 
-  Widget _buildPerformanceGrid(WorkerProfile worker) {
+  Widget _buildPerformanceGrid(
+    WorkerProfile worker, {
+    int completedJobsCount = 0,
+    int activeQueueCount = 0,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -825,7 +833,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               icon: Icons.payments_outlined,
               iconColor: AppColors.onTertiaryContainer,
               mainValue: '₹${worker.earnings.toInt()}',
-              badgeText: '+6% vs y\'day',
+              badgeText: worker.earnings > 0 ? '+6% vs y\'day' : null,
               badgeColor: AppColors.onTertiaryContainer,
               badgeBg: AppColors.tertiaryContainer,
               footer: 'Direct Escrow Payout',
@@ -834,9 +842,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               title: 'Jobs Completed'.tr(),
               icon: Icons.engineering_outlined,
               iconColor: AppColors.primary,
-              mainValue: '${worker.completedJobs} / ${worker.completedJobs + 1}',
-              showProgress: true,
-              footer: '1 in queue for today',
+              mainValue: activeQueueCount > 0
+                  ? '$completedJobsCount / ${completedJobsCount + activeQueueCount}'
+                  : '$completedJobsCount',
+              showProgress: activeQueueCount > 0,
+              footer: activeQueueCount > 0
+                  ? '$activeQueueCount in queue for today'.tr()
+                  : 'All shifts clear'.tr(),
             ),
             _buildMetricCard(
               title: 'Partner Rating'.tr(),
@@ -855,7 +867,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               mainValue: 'Top 5%',
               badgeText: 'Gold Badge Tier',
               badgeColor: AppColors.primary,
-              footer: 'Kothrud Cluster',
+              footer: worker.serviceLocation.isNotEmpty ? '${worker.serviceLocation} Cluster' : 'Service Cluster',
             ),
           ],
         ),
@@ -1018,7 +1030,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    completedJobs.isNotEmpty ? completedJobs.length.toString() : '2',
+                    completedJobs.length.toString(),
                     style: const TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
@@ -1039,21 +1051,50 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        if (completedJobs.isEmpty) ...[
-          _buildCompletedRow(
-            customerName: 'Rajesh Deshmukh',
-            time: '9:15 AM',
-            service: 'Kitchen Sink Clog • Pratik Nagar',
-            amount: '650',
-          ),
-          const SizedBox(height: 8),
-          _buildCompletedRow(
-            customerName: 'Meera Kulkarni',
-            time: 'Yesterday',
-            service: 'Shower Head Replacement • Mayur Colony',
-            amount: '420',
-          ),
-        ] else
+        if (completedJobs.isEmpty)
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.outlineVariant),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.02),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                Icon(
+                  Icons.assignment_turned_in_outlined,
+                  size: 32,
+                  color: AppColors.onSurfaceVariant.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'No completed jobs yet today'.tr(),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Completed customer bookings will appear here'.tr(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppColors.onSurfaceVariant.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
           ...completedJobs.map(
             (job) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -1192,8 +1233,9 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.spacingMd),
       decoration: BoxDecoration(
-        color: AppColors.primary,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE5E5EA)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1207,12 +1249,13 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.12),
+                      color: const Color(0xFFF8F9FA),
                       borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE5E5EA)),
                     ),
                     child: const Icon(
                       Icons.health_and_safety,
-                      color: AppColors.tertiaryFixed,
+                      color: AppColors.primary,
                       size: 18,
                     ),
                   ),
@@ -1225,14 +1268,14 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white,
+                          color: AppColors.primary,
                         ),
                       ),
                       Text(
                         'Pune District Trade Union Trust',
                         style: TextStyle(
                           fontSize: 11,
-                          color: AppColors.outline,
+                          color: AppColors.onSurfaceVariant,
                         ),
                       ),
                     ],
@@ -1242,7 +1285,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: AppColors.onTertiaryContainer,
+                  color: AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: const Text(
@@ -1250,7 +1293,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   style: TextStyle(
                     fontSize: 10,
                     fontWeight: FontWeight.w800,
-                    color: Colors.white,
+                    color: AppColors.onTertiaryContainer,
                   ),
                 ),
               ),
@@ -1261,7 +1304,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             'Insurance cover up to ₹50,000 active for today\'s shifts covering workplace injury, transit, and tool damages.',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.outlineVariant,
+              color: AppColors.onSurfaceVariant,
               height: 1.4,
             ),
           ),
@@ -1269,22 +1312,23 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
+              color: const Color(0xFFF8F9FA),
               borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFE5E5EA)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Row(
                   children: [
-                    Icon(Icons.call, size: 16, color: AppColors.starRating),
+                    Icon(Icons.call, size: 16, color: AppColors.onSurfaceVariant),
                     SizedBox(width: 6),
                     Text(
                       'Union Helpline: 1800-209-4092',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.w500,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
@@ -1292,7 +1336,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: const Text(
@@ -1300,7 +1344,7 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: Colors.white,
                     ),
                   ),
                 ),

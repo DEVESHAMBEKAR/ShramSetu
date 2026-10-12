@@ -51,8 +51,8 @@ class MockAuthRepository implements IAuthRepository {
         'id': userId,
         'phone': phone,
         'aud': 'authenticated',
-        'app_metadata': <String, dynamic>{},
-        'user_metadata': <String, dynamic>{},
+        'app_metadata': <String, dynamic>{'role': 'CUSTOMER'},
+        'user_metadata': <String, dynamic>{'role': 'CUSTOMER'},
         'created_at': DateTime.now().toIso8601String(),
       });
 
@@ -72,25 +72,27 @@ class MockAuthRepository implements IAuthRepository {
       return false;
     }
 
+    final isSuper = cleanEmail.contains('super');
+    final role = isSuper ? 'SUPER_ADMIN' : 'ADMIN';
     _isLoggedIn = true;
-    _mockRole = 'ADMIN';
+    _mockRole = role;
     final adminId = 'admin_${cleanEmail.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '_')}';
 
     _currentUser = User.fromJson(<String, dynamic>{
       'id': adminId,
       'email': cleanEmail,
       'aud': 'authenticated',
-      'app_metadata': <String, dynamic>{},
-      'user_metadata': <String, dynamic>{'role': 'ADMIN'},
+      'app_metadata': <String, dynamic>{'role': role},
+      'user_metadata': <String, dynamic>{'role': role},
       'created_at': DateTime.now().toIso8601String(),
     });
 
     try {
       await DI.userRepo.upsertUserProfile(
         userId: adminId,
-        role: 'ADMIN',
+        role: role,
         phone: '+91 98765 00000',
-        fullName: 'Admin (${cleanEmail.split('@').first})',
+        fullName: isSuper ? 'Super Administrator' : 'Admin (${cleanEmail.split('@').first})',
       );
     } catch (_) {}
 
@@ -98,6 +100,51 @@ class MockAuthRepository implements IAuthRepository {
       await DI.notificationService.registerDeviceToken(userId: adminId);
     } catch (_) {}
     return true;
+  }
+
+  @override
+  Future<bool> signInWithGoogle({required String role}) async {
+    await Future.delayed(const Duration(milliseconds: 300));
+    _isLoggedIn = true;
+    _mockRole = role.toUpperCase();
+    final isWorker = role.toUpperCase() == 'WORKER';
+    final mockEmail = isWorker ? 'ramesh.worker@gmail.com' : 'rajesh.customer@gmail.com';
+    final mockName = isWorker ? 'Ramesh Kumar' : 'Rajesh Deshmukh';
+    final userId = isWorker ? 'mock_worker_01' : 'mock_customer_01';
+
+    _currentUser = User.fromJson(<String, dynamic>{
+      'id': userId,
+      'email': mockEmail,
+      'aud': 'authenticated',
+      'app_metadata': <String, dynamic>{'role': _mockRole, 'provider': 'google'},
+      'user_metadata': <String, dynamic>{
+        'role': _mockRole,
+        'full_name': mockName,
+        'email': mockEmail,
+        'avatar_url': 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=256',
+      },
+      'created_at': DateTime.now().toIso8601String(),
+    });
+
+    try {
+      await DI.userRepo.upsertUserProfile(
+        userId: userId,
+        role: _mockRole,
+        phone: isWorker ? '+91 98765 43210' : '+91 98220 12345',
+        fullName: mockName,
+      );
+    } catch (_) {}
+
+    try {
+      await DI.notificationService.registerDeviceToken(userId: userId);
+    } catch (_) {}
+
+    return true;
+  }
+
+  @override
+  Future<void> updatePassword(String newPassword) async {
+    // Mock password update
   }
 
   @override

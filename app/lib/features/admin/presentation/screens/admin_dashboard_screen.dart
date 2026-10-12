@@ -25,11 +25,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   int _currentNavIndex = 0;
   bool _disputeResolved = false;
   String _adminInitials = 'AD';
+  String _federationName = 'Cooperative Federation';
+  String _federationRegion = 'District Jurisdiction';
+  String _clusterId = '#CD-01';
 
   @override
   void initState() {
     super.initState();
-    _loadAdminInitials();
+    _loadAdminAndFederationInfo();
     _refreshData();
     _bookingsSub = DI.adminRepo.watchBookings().listen(
       (_) {
@@ -55,7 +58,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     });
   }
 
-  Future<void> _loadAdminInitials() async {
+  Future<void> _loadAdminAndFederationInfo() async {
     try {
       final user = await DI.authRepo.getCurrentUser();
       if (user != null) {
@@ -63,12 +66,61 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         final name = (dbUser?['full_name'] as String?)?.trim() ??
             (user.userMetadata?['full_name'] as String?)?.trim() ??
             (user.email != null ? user.email!.split('@').first : '');
-        if (mounted && name.isNotEmpty) {
+        String initials = 'AD';
+        if (name.isNotEmpty) {
           final parts = name.split(' ').where((s) => s.isNotEmpty).toList();
-          final initials = parts.map((s) => s[0]).take(2).join().toUpperCase();
-          if (initials.isNotEmpty) {
-            setState(() => _adminInitials = initials);
+          final inits = parts.map((s) => s[0]).take(2).join().toUpperCase();
+          if (inits.isNotEmpty) initials = inits;
+        }
+
+        String fedName = '';
+        String fedRegion = '';
+        String cluster = '#CD-01';
+
+        try {
+          final admins = await DI.adminRepo.getFederationAdmins();
+          final myScope = admins.firstWhere(
+            (a) =>
+                a['user_id'] == user.id ||
+                a['email']?.toString().trim().toLowerCase() == user.email?.trim().toLowerCase(),
+            orElse: () => {},
+          );
+          if (myScope.isNotEmpty && myScope['federation_name'] != null) {
+            fedName = myScope['federation_name'].toString();
           }
+        } catch (_) {}
+
+        final emailLower = user.email?.trim().toLowerCase() ?? '';
+        if (emailLower.contains('nagpur') || emailLower == 'omshinde@gmail.com') {
+          fedName = 'Nagpur District Shramik Cooperative Union';
+          fedRegion = 'Nagpur, Maharashtra';
+          cluster = '#NG-05';
+        } else if (emailLower.contains('nashik') || emailLower == 'adilatar9494@gmail.com') {
+          fedName = 'Nashik District Artisans Cooperative Union';
+          fedRegion = 'Nashik, Maharashtra';
+          cluster = '#NS-02';
+        } else if (emailLower.contains('pune') || emailLower == 'ambekardevesh2@gmail.com') {
+          fedName = 'Pune District Labour Cooperative Federation';
+          fedRegion = 'Pune, Maharashtra';
+          cluster = '#PN-12';
+        } else if (emailLower == 'deveshambekar@gmail.com') {
+          fedName = 'National Cooperative Federation Pool';
+          fedRegion = 'All India Jurisdictions';
+          cluster = '#NAT-01';
+        }
+
+        if (fedName.isEmpty) {
+          fedName = 'Cooperative Federation';
+          fedRegion = 'District Operations Node';
+        }
+
+        if (mounted) {
+          setState(() {
+            _adminInitials = initials;
+            _federationName = fedName;
+            _federationRegion = fedRegion;
+            _clusterId = cluster;
+          });
         }
       }
     } catch (_) {}
@@ -195,9 +247,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 children: [
                   const Icon(Icons.location_on, size: 12, color: AppColors.secondary),
                   const SizedBox(width: 3),
-                  const Text(
-                    'Kothrud Ward #12 (Pune)',
-                    style: TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w500),
+                  Text(
+                    _federationRegion,
+                    style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, fontWeight: FontWeight.w500),
                   ),
                   const Icon(Icons.expand_more, size: 14, color: AppColors.onSurfaceVariant),
                 ],
@@ -288,9 +340,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   color: AppColors.surfaceContainerLow,
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text(
-                  'Cluster ID: #PN-12',
-                  style: TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant),
+                child: Text(
+                  'Cluster ID: $_clusterId',
+                  style: const TextStyle(fontSize: 10, fontFamily: 'monospace', fontWeight: FontWeight.w700, color: AppColors.onSurfaceVariant),
                 ),
               ),
             ],
@@ -299,16 +351,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           const Text(
             'Operations Command Console',
             style: TextStyle(
-              fontSize: 20,
+               fontSize: 20,
               fontWeight: FontWeight.w900,
               color: AppColors.primary,
               letterSpacing: -0.5,
             ),
           ),
           const SizedBox(height: 2),
-          const Text(
-            'Pune District Trades Federation • Real-time dispatch & governance ledger',
-            style: TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+          Text(
+            '$_federationName • Real-time dispatch & governance ledger',
+            style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
           ),
         ],
       ),
@@ -331,7 +383,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           badgeText: 'Verified',
           badgeColor: AppColors.onTertiaryContainer,
           badgeBg: AppColors.tertiaryContainer,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen())),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen(isSuperAdmin: false))),
         ),
         _buildMetricCard(
           title: 'Escrow Locked Value',
@@ -349,7 +401,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           badgeText: stats.pendingVerifications > 0 ? 'Action Needed' : 'All Clear',
           badgeColor: stats.pendingVerifications > 0 ? AppColors.onWarningContainer : AppColors.onTertiaryContainer,
           badgeBg: stats.pendingVerifications > 0 ? AppColors.warningContainer : AppColors.tertiaryContainer,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen())),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen(isSuperAdmin: false))),
         ),
         _buildMetricCard(
           title: 'Active Bookings',
@@ -800,7 +852,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   height: 40,
                   child: OutlinedButton.icon(
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen()));
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen(isSuperAdmin: false)));
                     },
                     icon: const Icon(Icons.visibility_outlined, size: 15, color: AppColors.primary),
                     label: const Text(
@@ -1062,7 +1114,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       onTap: () {
         setState(() => _currentNavIndex = index);
         if (index == 1) {
-          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen()));
+          Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminWorkersScreen(isSuperAdmin: false)));
         } else if (index == 2) {
           Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminPaymentsScreen()));
         } else if (index == 3) {

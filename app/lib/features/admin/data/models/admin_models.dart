@@ -99,6 +99,14 @@ class AdminCustomerProfile {
   final int totalBookings;
   final DateTime lastBooking;
   final String status;
+  final String? email;
+  final String? state;
+  final String? district;
+  final String? city;
+  final String? area;
+  final String? federationId;
+  final String? federationName;
+  final DateTime? createdAt;
 
   AdminCustomerProfile({
     required this.id,
@@ -107,7 +115,21 @@ class AdminCustomerProfile {
     required this.totalBookings,
     required this.lastBooking,
     required this.status,
+    this.email,
+    this.state,
+    this.district,
+    this.city,
+    this.area,
+    this.federationId,
+    this.federationName,
+    this.createdAt,
   });
+
+  String get locationSummary {
+    final parts = [city, district, state].where((p) => p != null && p.isNotEmpty).toSet().toList();
+    if (parts.isEmpty) return 'India';
+    return parts.join(', ');
+  }
 }
 
 class AdminService {

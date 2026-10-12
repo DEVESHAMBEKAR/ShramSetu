@@ -16,6 +16,7 @@ abstract class IWorkerRepository {
     required String workerId,
     required String fullName,
     required String phone,
+    String? email,
     required String skill,
     required int experienceYears,
     required String serviceLocation,
@@ -28,9 +29,17 @@ abstract class IWorkerRepository {
     String? trade,
     String? skillLevel,
     String? federationName,
+    String? federationId,
     String? membershipId,
     String? bio,
     bool declarationAccepted = true,
+  });
+
+  /// Update worker credentials (mobile and email)
+  Future<void> updateWorkerCredentials(
+    String workerId, {
+    required String phone,
+    required String email,
   });
 
   /// Resubmit worker application after changes requested (transitions CHANGES_REQUIRED -> UNDER_REVIEW)
@@ -59,4 +68,7 @@ abstract class IWorkerRepository {
 
   /// Fetch the worker's cooperative group insurance & welfare fund record
   Future<WorkerInsuranceModel?> getWorkerInsurance(String workerId);
+
+  /// Submit application for worker welfare & group insurance coverage
+  Future<WorkerInsuranceModel> applyForInsurance(String workerId, {String? coverageType, double? coverageAmount});
 }

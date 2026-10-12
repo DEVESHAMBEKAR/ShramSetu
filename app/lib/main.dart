@@ -11,6 +11,7 @@ import 'features/customer/presentation/screens/customer_main_layout.dart';
 import 'features/worker/presentation/screens/worker_main_layout.dart';
 import 'features/admin/presentation/screens/admin_login_screen.dart';
 import 'features/admin/presentation/screens/admin_main_layout.dart';
+import 'features/admin/presentation/screens/super_admin_main_layout.dart';
 import 'features/auth/presentation/screens/worker_login_screen.dart';
 import 'features/worker/presentation/screens/worker_registration_screen.dart';
 import 'features/worker/presentation/screens/worker_under_verification_screen.dart';
@@ -76,6 +77,11 @@ class ShramSetuApp extends StatelessWidget {
               requiredRole: 'ADMIN',
               fallbackRoute: '/login/admin',
               child: AdminMainLayout(),
+            ),
+        '/super-admin/home': (context) => const RoleGuard(
+              requiredRole: 'ADMIN',
+              fallbackRoute: '/login/admin',
+              child: SuperAdminMainLayout(),
             ),
       },
         );
