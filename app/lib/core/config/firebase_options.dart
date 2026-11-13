@@ -16,13 +16,19 @@ class DefaultFirebaseOptions {
 
   static FirebaseOptions? get currentPlatform {
     if (kIsWeb) {
-      final apiKey = (dotenv.isInitialized ? dotenv.env['FIREBASE_API_KEY'] : null) ?? webApiKey;
-      final projectId = (dotenv.isInitialized ? dotenv.env['FIREBASE_PROJECT_ID'] : null) ?? webProjectId;
-      final appId = (dotenv.isInitialized ? dotenv.env['FIREBASE_APP_ID'] : null) ?? webAppId;
-      final messagingSenderId = (dotenv.isInitialized ? dotenv.env['FIREBASE_MESSAGING_SENDER_ID'] : null) ?? webMessagingSenderId;
-      final authDomain = (dotenv.isInitialized ? dotenv.env['FIREBASE_AUTH_DOMAIN'] : null) ?? webAuthDomain;
-      final storageBucket = (dotenv.isInitialized ? dotenv.env['FIREBASE_STORAGE_BUCKET'] : null) ?? webStorageBucket;
-      final measurementId = (dotenv.isInitialized ? dotenv.env['FIREBASE_MEASUREMENT_ID'] : null) ?? webMeasurementId;
+      String getVal(String key, String fallback) {
+        if (!dotenv.isInitialized) return fallback;
+        final v = dotenv.env[key]?.trim();
+        return (v != null && v.isNotEmpty) ? v : fallback;
+      }
+
+      final apiKey = getVal('FIREBASE_API_KEY', webApiKey);
+      final projectId = getVal('FIREBASE_PROJECT_ID', webProjectId);
+      final appId = getVal('FIREBASE_APP_ID', webAppId);
+      final messagingSenderId = getVal('FIREBASE_MESSAGING_SENDER_ID', webMessagingSenderId);
+      final authDomain = getVal('FIREBASE_AUTH_DOMAIN', webAuthDomain);
+      final storageBucket = getVal('FIREBASE_STORAGE_BUCKET', webStorageBucket);
+      final measurementId = getVal('FIREBASE_MEASUREMENT_ID', webMeasurementId);
 
       return FirebaseOptions(
         apiKey: apiKey,
