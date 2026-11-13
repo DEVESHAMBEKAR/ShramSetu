@@ -84,12 +84,11 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           final userId = user?.id ?? 'worker_$cleanPhone';
 
           // Authoritative cross-role protection:
-          // Check if this account is already registered with a different role (CUSTOMER or ADMIN).
-          final existingRole = await DI.userRepo.getUserRole(userId);
-          if (existingRole != null && existingRole.toUpperCase() != 'WORKER') {
+          // Check if this account is registered as an Administrator.
+          final existingRole = await DI.authRepo.getUserRole() ?? await DI.userRepo.getUserRole(userId);
+          if (existingRole != null && (existingRole.toUpperCase() == 'ADMIN' || existingRole.toUpperCase() == 'SUPER_ADMIN' || existingRole.toUpperCase() == 'FEDERATION_ADMIN')) {
             await DI.authRepo.logout();
-            final roleName = existingRole.toUpperCase() == 'CUSTOMER' ? 'Customer' : 'Cooperative Administrator';
-            throw Exception('Access denied: This phone number is registered as a $roleName. Please use the Customer portal to sign in.');
+            throw Exception('Access denied: This phone number is registered as a Cooperative Administrator. Please use the Administrator portal to sign in.');
           }
 
           try {

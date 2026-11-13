@@ -9,6 +9,8 @@ import '../../../../core/utils/phone_number_util.dart';
 
 class SupabaseAuthRepository implements IAuthRepository {
   final SupabaseClient _client;
+  User? _cachedBridgeUser;
+  String? _cachedBridgePhone;
 
   SupabaseAuthRepository(this._client);
 
@@ -25,14 +27,46 @@ class SupabaseAuthRepository implements IAuthRepository {
         final fbUser = FirebasePhoneAuthService.instance.auth.currentUser;
         if (fbUser != null) {
           final phone = fbUser.phoneNumber ?? FirebasePhoneAuthService.instance.activePhoneNumber ?? '';
-          return User(
-            id: fbUser.uid,
-            appMetadata: const {'provider': 'phone', 'role': 'WORKER'},
-            userMetadata: {'phone': phone},
+          if (_cachedBridgeUser != null && _cachedBridgePhone == phone) {
+            return _cachedBridgeUser;
+          }
+
+          String effectiveId = fbUser.uid;
+          String? resolvedRole;
+
+          // Resolve Supabase user ID and role from public.users using all phone formats
+          final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+          if (clean.isNotEmpty) {
+            try {
+              final userRow = await _client
+                  .from('users')
+                  .select('id, role')
+                  .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                  .maybeSingle();
+              if (userRow != null && userRow['id'] != null) {
+                effectiveId = userRow['id'] as String;
+                resolvedRole = userRow['role']?.toString().trim().toUpperCase();
+              }
+            } catch (_) {}
+          }
+
+          final bridgeUser = User(
+            id: effectiveId,
+            appMetadata: {
+              'provider': 'phone',
+              if (resolvedRole != null && resolvedRole.isNotEmpty) 'role': resolvedRole,
+            },
+            userMetadata: {
+              'phone': phone,
+              if (resolvedRole != null && resolvedRole.isNotEmpty) 'role': resolvedRole,
+            },
             aud: 'authenticated',
             phone: phone,
             createdAt: DateTime.now().toIso8601String(),
           );
+          _cachedBridgeUser = bridgeUser;
+          _cachedBridgePhone = phone;
+          return bridgeUser;
         }
       } catch (e) {
         debugPrint('[AuthRepo] Firebase getCurrentUser bridge note: $e');
@@ -60,18 +94,20 @@ class SupabaseAuthRepository implements IAuthRepository {
       }
     } catch (_) {}
 
-    // 2. Authoritative check in public.users table by phone number
+    // 2. Authoritative check in public.users table by phone number (all Indian phone formats)
     if (user.phone != null && user.phone!.isNotEmpty) {
       try {
         final clean = PhoneNumberUtil.cleanIndianPhone(user.phone!);
-        final data = await _client
-            .from('users')
-            .select('role')
-            .or('phone.eq.$clean,phone.eq.+91$clean')
-            .maybeSingle();
-        if (data != null && data['role'] != null) {
-          final dbRole = data['role'].toString().trim().toUpperCase();
-          if (dbRole.isNotEmpty) return dbRole;
+        if (clean.isNotEmpty) {
+          final data = await _client
+              .from('users')
+              .select('role')
+              .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+              .maybeSingle();
+          if (data != null && data['role'] != null) {
+            final dbRole = data['role'].toString().trim().toUpperCase();
+            if (dbRole.isNotEmpty) return dbRole;
+          }
         }
       } catch (_) {}
     }
@@ -115,6 +151,8 @@ class SupabaseAuthRepository implements IAuthRepository {
 
     if (AppConfig.isFirebaseOtpEnabled && FirebasePhoneAuthService.instance.isAvailable) {
       debugPrint('[AuthRepo] Verifying OTP via Firebase Phone Auth...');
+      _cachedBridgeUser = null;
+      _cachedBridgePhone = null;
       final fbResult = await FirebasePhoneAuthService.instance.verifyOtp(formattedPhone, otp);
       if (!fbResult.isSuccess) {
         throw Exception(fbResult.errorMessage ?? 'Invalid OTP code.');
@@ -289,6 +327,8 @@ class SupabaseAuthRepository implements IAuthRepository {
 
   @override
   Future<void> logout() async {
+    _cachedBridgeUser = null;
+    _cachedBridgePhone = null;
     DI.federationScopeService?.clearCache();
     try {
       await DI.notificationService.deactivateCurrentToken();

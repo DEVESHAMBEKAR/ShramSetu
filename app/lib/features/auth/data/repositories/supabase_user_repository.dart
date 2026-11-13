@@ -4,17 +4,30 @@ import '../../../../core/repositories/i_user_repository.dart';
 import '../../../../core/models/federation_models.dart';
 import '../../../../features/customer/data/models/customer_profile.dart';
 import '../../../../core/utils/phone_number_util.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
 
 class SupabaseUserRepository implements IUserRepository {
   final SupabaseClient _client;
 
   SupabaseUserRepository(this._client);
 
+  String? _getActiveUserPhone() {
+    final sbPhone = _client.auth.currentUser?.phone;
+    if (sbPhone != null && sbPhone.isNotEmpty) return sbPhone;
+    if (FirebasePhoneAuthService.instance.isAvailable) {
+      try {
+        final fbUser = FirebasePhoneAuthService.instance.auth.currentUser;
+        return fbUser?.phoneNumber ?? FirebasePhoneAuthService.instance.activePhoneNumber;
+      } catch (_) {}
+    }
+    return null;
+  }
+
   // ─────────────────────── Core Auth Methods ───────────────────────
 
   @override
   Future<String?> getUserRole(String userId) async {
-    // 1. Authoritative check in public.users table first
+    // 1. Authoritative check in public.users table first by ID
     try {
       final response = await _client
           .from('users')
@@ -26,10 +39,29 @@ class SupabaseUserRepository implements IUserRepository {
         if (dbRole.isNotEmpty) return dbRole;
       }
     } catch (_) {
-      // If database query fails, fallback to session metadata
+      // If database query fails, fallback
     }
 
-    // 2. Auth session metadata fallback
+    // 2. Authoritative check in public.users table by active user phone
+    try {
+      final phone = _getActiveUserPhone();
+      if (phone != null && phone.isNotEmpty) {
+        final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+        if (clean.isNotEmpty) {
+          final response = await _client
+              .from('users')
+              .select('role')
+              .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+              .maybeSingle();
+          if (response != null && response['role'] != null) {
+            final dbRole = response['role'].toString().trim().toUpperCase();
+            if (dbRole.isNotEmpty) return dbRole;
+          }
+        }
+      }
+    } catch (_) {}
+
+    // 3. Auth session metadata fallback
     final currentUser = _client.auth.currentUser;
     if (currentUser != null && currentUser.id == userId) {
       final metaRole = (currentUser.appMetadata['role'] ?? currentUser.userMetadata?['role'])?.toString().toUpperCase();
@@ -54,6 +86,24 @@ class SupabaseUserRepository implements IUserRepository {
           .maybeSingle();
       if (response != null) {
         return response;
+      }
+    } catch (_) {}
+
+    // Check by active user phone if id didn't match directly
+    try {
+      final phone = _getActiveUserPhone();
+      if (phone != null && phone.isNotEmpty) {
+        final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+        if (clean.isNotEmpty) {
+          final response = await _client
+              .from('users')
+              .select('id, full_name, phone, email, role, avatar_url')
+              .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+              .maybeSingle();
+          if (response != null) {
+            return response;
+          }
+        }
       }
     } catch (_) {}
 
@@ -200,14 +250,32 @@ class SupabaseUserRepository implements IUserRepository {
   @override
   Future<CustomerProfile?> getCustomerProfile(String userId) async {
     try {
-      final userRow = await _client
+      var userRow = await _client
           .from('users')
-          .select('id, full_name, phone, email, avatar_url')
+          .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
           .eq('id', userId)
           .maybeSingle();
 
+      // If not found by ID, attempt resolution via active user phone
+      if (userRow == null) {
+        try {
+          final phone = _getActiveUserPhone();
+          if (phone != null && phone.isNotEmpty) {
+            final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+            if (clean.isNotEmpty) {
+              userRow = await _client
+                  .from('users')
+                  .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
+                  .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                  .maybeSingle();
+            }
+          }
+        } catch (_) {}
+      }
+
       if (userRow != null) {
-        final defaultAddr = await getDefaultAddress(userId);
+        final effectiveUserId = userRow['id'] as String;
+        final defaultAddr = await getDefaultAddress(effectiveUserId);
         String? fedId;
         String? fedName;
 
@@ -229,7 +297,7 @@ class SupabaseUserRepository implements IUserRepository {
                 'federation_id': fedId,
                 'federation_ref_id': fedId,
                 'updated_at': DateTime.now().toIso8601String(),
-              }).eq('id', userId);
+              }).eq('id', effectiveUserId);
             } catch (_) {}
           }
         } else {
@@ -313,12 +381,13 @@ class SupabaseUserRepository implements IUserRepository {
   @override
   Future<CustomerProfile?> getCustomerProfileByPhone(String phone) async {
     try {
-      final cleanPhone = phone.replaceAll(RegExp(r'\D'), '');
-      // Check phone in multiple formats (+91, plain 10-digit)
+      final cleanPhone = PhoneNumberUtil.cleanIndianPhone(phone);
+      if (cleanPhone.isEmpty) return null;
+      // Check phone in all Indian formats (+91, plain 10-digit, 91 without plus)
       final userRow = await _client
           .from('users')
-          .select('id, full_name, phone, email, avatar_url')
-          .or('phone.eq.$phone,phone.eq.+91$cleanPhone,phone.eq.$cleanPhone')
+          .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
+          .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
           .maybeSingle();
 
       if (userRow == null) return null;
@@ -502,13 +571,30 @@ class SupabaseUserRepository implements IUserRepository {
 
       // Resilient fallback: verify directly if users table has a real name
       // and addresses table has at least 1 saved address for this customer
-      final userRow = await _client
+      var userRow = await _client
           .from('users')
-          .select('full_name')
+          .select('id, full_name')
           .eq('id', userId)
           .maybeSingle();
 
+      if (userRow == null) {
+        try {
+          final phone = _getActiveUserPhone();
+          if (phone != null && phone.isNotEmpty) {
+            final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+            if (clean.isNotEmpty) {
+              userRow = await _client
+                  .from('users')
+                  .select('id, full_name')
+                  .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                  .maybeSingle();
+            }
+          }
+        } catch (_) {}
+      }
+
       if (userRow != null) {
+        final effectiveId = userRow['id'] as String;
         final name = (userRow['full_name'] as String?)?.trim() ?? '';
         final isRealName = name.isNotEmpty &&
             !name.toLowerCase().startsWith('user ') &&
@@ -519,7 +605,7 @@ class SupabaseUserRepository implements IUserRepository {
           final addrs = await _client
               .from('addresses')
               .select('id')
-              .eq('user_id', userId)
+              .eq('user_id', effectiveId)
               .limit(1);
           if ((addrs as List).isNotEmpty) {
             return true;
@@ -670,6 +756,34 @@ class SupabaseUserRepository implements IUserRepository {
       if ((rows as List).isNotEmpty) {
         return CustomerAddress.fromMap(rows.first);
       }
+
+      // If no address found by userId, try resolving real DB user id via active user phone
+      try {
+        final phone = _getActiveUserPhone();
+        if (phone != null && phone.isNotEmpty) {
+          final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+          if (clean.isNotEmpty) {
+            final userRow = await _client
+                .from('users')
+                .select('id')
+                .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                .maybeSingle();
+            if (userRow != null && userRow['id'] != null && userRow['id'] != userId) {
+              final altRows = await _client
+                  .from('addresses')
+                  .select()
+                  .eq('user_id', userRow['id'] as String)
+                  .order('is_default', ascending: false)
+                  .order('created_at', ascending: false)
+                  .limit(1);
+              if ((altRows as List).isNotEmpty) {
+                return CustomerAddress.fromMap(altRows.first);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
       return null;
     } catch (e) {
       debugPrint('[SupabaseUserRepo] getDefaultAddress error: $e');
@@ -686,7 +800,37 @@ class SupabaseUserRepository implements IUserRepository {
           .eq('user_id', userId)
           .order('is_default', ascending: false)
           .order('created_at', ascending: false);
-      return (rows as List).map((r) => CustomerAddress.fromMap(r as Map<String, dynamic>)).toList();
+      if ((rows as List).isNotEmpty) {
+        return (rows as List).map((r) => CustomerAddress.fromMap(r as Map<String, dynamic>)).toList();
+      }
+
+      // Check by active user phone if userId had no addresses
+      try {
+        final phone = _getActiveUserPhone();
+        if (phone != null && phone.isNotEmpty) {
+          final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+          if (clean.isNotEmpty) {
+            final userRow = await _client
+                .from('users')
+                .select('id')
+                .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                .maybeSingle();
+            if (userRow != null && userRow['id'] != null && userRow['id'] != userId) {
+              final altRows = await _client
+                  .from('addresses')
+                  .select()
+                  .eq('user_id', userRow['id'] as String)
+                  .order('is_default', ascending: false)
+                  .order('created_at', ascending: false);
+              if ((altRows as List).isNotEmpty) {
+                return (altRows as List).map((r) => CustomerAddress.fromMap(r as Map<String, dynamic>)).toList();
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      return [];
     } catch (e) {
       return [];
     }

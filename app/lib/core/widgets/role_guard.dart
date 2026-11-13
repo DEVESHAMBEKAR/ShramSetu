@@ -67,18 +67,16 @@ class _RoleGuardState extends State<RoleGuard> {
             metaRole == 'FEDERATION_ADMIN';
       }
 
-      // CUSTOMER route: An authenticated user who is not explicitly a Worker or Admin
-      // is always authorized as a Customer (especially for onboarding and initial registration).
+      // CUSTOMER route: An authenticated user who is not explicitly an Admin is authorized for Customer
+      // (especially for onboarding and initial registration).
       if (!authorized && required == 'CUSTOMER') {
-        final isOtherRole = roleUpper == 'WORKER' ||
-            roleUpper == 'ADMIN' ||
+        final isAdmin = roleUpper == 'ADMIN' ||
             roleUpper == 'SUPER_ADMIN' ||
             roleUpper == 'FEDERATION_ADMIN' ||
-            metaRole == 'WORKER' ||
             metaRole == 'ADMIN' ||
             metaRole == 'SUPER_ADMIN' ||
             metaRole == 'FEDERATION_ADMIN';
-        if (!isOtherRole) {
+        if (!isAdmin && (roleUpper == null || roleUpper == 'CUSTOMER')) {
           authorized = true;
         }
       }
@@ -92,7 +90,7 @@ class _RoleGuardState extends State<RoleGuard> {
             metaRole == 'ADMIN' ||
             metaRole == 'SUPER_ADMIN' ||
             metaRole == 'FEDERATION_ADMIN';
-        if (!isAdmin && (roleUpper == null || roleUpper == 'CUSTOMER')) {
+        if (!isAdmin && (roleUpper == null || roleUpper == 'CUSTOMER' || roleUpper == 'WORKER')) {
           authorized = true;
         }
       }
