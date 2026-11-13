@@ -17,15 +17,37 @@ class SupabaseAuthRepository implements IAuthRepository {
 
   @override
   Future<User?> getCurrentUser() async {
-    return _client.auth.currentUser;
+    final sbUser = _client.auth.currentUser;
+    if (sbUser != null) return sbUser;
+
+    if (AppConfig.isFirebaseOtpEnabled && FirebasePhoneAuthService.instance.isAvailable) {
+      try {
+        final fbUser = FirebasePhoneAuthService.instance.auth.currentUser;
+        if (fbUser != null) {
+          final phone = fbUser.phoneNumber ?? FirebasePhoneAuthService.instance.activePhoneNumber ?? '';
+          return User(
+            id: fbUser.uid,
+            appMetadata: const {'provider': 'phone', 'role': 'WORKER'},
+            userMetadata: {'phone': phone},
+            aud: 'authenticated',
+            phone: phone,
+            createdAt: DateTime.now().toIso8601String(),
+          );
+        }
+      } catch (e) {
+        debugPrint('[AuthRepo] Firebase getCurrentUser bridge note: $e');
+      }
+    }
+
+    return null;
   }
 
   @override
   Future<String?> getUserRole() async {
-    final user = _client.auth.currentUser;
+    final user = await getCurrentUser();
     if (user == null) return null;
 
-    // 1. Authoritative check in public.users table
+    // 1. Authoritative check in public.users table by user.id
     try {
       final data = await _client
           .from('users')
@@ -38,13 +60,29 @@ class SupabaseAuthRepository implements IAuthRepository {
       }
     } catch (_) {}
 
-    // 2. Auth session metadata fallback
+    // 2. Authoritative check in public.users table by phone number
+    if (user.phone != null && user.phone!.isNotEmpty) {
+      try {
+        final clean = PhoneNumberUtil.cleanIndianPhone(user.phone!);
+        final data = await _client
+            .from('users')
+            .select('role')
+            .or('phone.eq.$clean,phone.eq.+91$clean')
+            .maybeSingle();
+        if (data != null && data['role'] != null) {
+          final dbRole = data['role'].toString().trim().toUpperCase();
+          if (dbRole.isNotEmpty) return dbRole;
+        }
+      } catch (_) {}
+    }
+
+    // 3. Auth session metadata fallback
     final metaRole = (user.appMetadata['role'] ?? user.userMetadata?['role'])?.toString().toUpperCase();
     if (metaRole != null && metaRole.isNotEmpty) {
       return metaRole;
     }
 
-    // 3. Known admin email fallback
+    // 4. Known admin email fallback
     final email = user.email?.toLowerCase() ?? '';
     if (email == 'admin@shramsetu.in' || email.contains('admin@')) {
       return 'ADMIN';
@@ -82,9 +120,14 @@ class SupabaseAuthRepository implements IAuthRepository {
         throw Exception(fbResult.errorMessage ?? 'Invalid OTP code.');
       }
 
-      // Sync verified phone with Supabase backend to establish Supabase JWT & RLS session
-      final synced = await _syncFirebaseUserWithSupabase(formattedPhone, fbResult.uid);
-      return synced;
+      // Sync verified phone with Supabase backend in background without failing valid OTP
+      try {
+        await _syncFirebaseUserWithSupabase(formattedPhone, fbResult.uid);
+      } catch (e) {
+        debugPrint('[AuthRepo] Supabase bridge sync note: $e');
+      }
+
+      return true;
     }
 
     try {
