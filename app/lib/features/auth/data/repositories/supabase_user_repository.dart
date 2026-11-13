@@ -1,15 +1,110 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/repositories/i_user_repository.dart';
 import '../../../../core/models/federation_models.dart';
 import '../../../../features/customer/data/models/customer_profile.dart';
 import '../../../../core/utils/phone_number_util.dart';
+import '../../../../core/utils/uuid_util.dart';
 import '../../../../core/services/firebase_phone_auth_service.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 class SupabaseUserRepository implements IUserRepository {
   final SupabaseClient _client;
 
   SupabaseUserRepository(this._client);
+
+  void _cacheCustomerProfile(CustomerProfile profile) {
+    try {
+      final jsonStr = jsonEncode(profile.toMap());
+      if (profile.id.isNotEmpty) {
+        LocalStorageService.setString('customer_profile_${profile.id}', jsonStr);
+      }
+      final clean = PhoneNumberUtil.cleanIndianPhone(profile.phone);
+      if (clean.isNotEmpty) {
+        LocalStorageService.setString('customer_profile_$clean', jsonStr);
+        if (profile.isComplete) {
+          LocalStorageService.setBool('customer_is_complete_$clean', true);
+        }
+      }
+      if (profile.isComplete && profile.id.isNotEmpty) {
+        LocalStorageService.setBool('customer_is_complete_${profile.id}', true);
+      }
+    } catch (_) {}
+  }
+
+  CustomerProfile? _getCachedCustomerProfile(String? id, [String? phone]) {
+    try {
+      String? jsonStr;
+      if (id != null && id.isNotEmpty) {
+        jsonStr = LocalStorageService.getString('customer_profile_$id');
+      }
+      if (jsonStr == null && phone != null && phone.isNotEmpty) {
+        final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+        if (clean.isNotEmpty) {
+          jsonStr = LocalStorageService.getString('customer_profile_$clean');
+        }
+      }
+      if (jsonStr == null) {
+        final activePhone = _getActiveUserPhone();
+        if (activePhone != null && activePhone.isNotEmpty) {
+          final clean = PhoneNumberUtil.cleanIndianPhone(activePhone);
+          if (clean.isNotEmpty) {
+            jsonStr = LocalStorageService.getString('customer_profile_$clean');
+          }
+        }
+      }
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+        return CustomerProfile.fromMap(map);
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  void _cacheCustomerAddress(String userId, String? phone, CustomerAddress address) {
+    try {
+      final jsonStr = jsonEncode(address.toMap());
+      if (userId.isNotEmpty) {
+        LocalStorageService.setString('customer_address_$userId', jsonStr);
+      }
+      if (phone != null && phone.isNotEmpty) {
+        final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+        if (clean.isNotEmpty) {
+          LocalStorageService.setString('customer_address_$clean', jsonStr);
+        }
+      }
+    } catch (_) {}
+  }
+
+  CustomerAddress? _getCachedCustomerAddress(String? userId, [String? phone]) {
+    try {
+      String? jsonStr;
+      if (userId != null && userId.isNotEmpty) {
+        jsonStr = LocalStorageService.getString('customer_address_$userId');
+      }
+      if (jsonStr == null && phone != null && phone.isNotEmpty) {
+        final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+        if (clean.isNotEmpty) {
+          jsonStr = LocalStorageService.getString('customer_address_$clean');
+        }
+      }
+      if (jsonStr == null) {
+        final activePhone = _getActiveUserPhone();
+        if (activePhone != null && activePhone.isNotEmpty) {
+          final clean = PhoneNumberUtil.cleanIndianPhone(activePhone);
+          if (clean.isNotEmpty) {
+            jsonStr = LocalStorageService.getString('customer_address_$clean');
+          }
+        }
+      }
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final map = jsonDecode(jsonStr) as Map<String, dynamic>;
+        return CustomerAddress.fromMap(map);
+      }
+    } catch (_) {}
+    return null;
+  }
 
   String? _getActiveUserPhone() {
     final sbPhone = _client.auth.currentUser?.phone;
@@ -130,6 +225,7 @@ class SupabaseUserRepository implements IUserRepository {
     String? fullName,
     String? federationId,
   }) async {
+    final safeUserId = UuidUtil.isValidUuid(userId) ? userId : UuidUtil.toDeterministicUuid(userId);
     final currentUser = _client.auth.currentUser;
     final effectiveEmail = currentUser?.email;
     final effectiveAvatar = currentUser?.userMetadata?['avatar_url'] ?? currentUser?.userMetadata?['picture'];
@@ -140,7 +236,7 @@ class SupabaseUserRepository implements IUserRepository {
       final existing = await _client
           .from('users')
           .select('id, full_name, role, phone, email, avatar_url')
-          .eq('id', userId)
+          .eq('id', safeUserId)
           .maybeSingle();
 
       if (existing != null) {
@@ -170,7 +266,7 @@ class SupabaseUserRepository implements IUserRepository {
               : (effectiveEmail != null ? effectiveEmail.split('@').first : 'User');
         }
 
-        await _client.from('users').update(updates).eq('id', userId);
+        await _client.from('users').update(updates).eq('id', safeUserId);
       } else {
         final effectiveName = (fullName != null && fullName.isNotEmpty)
             ? fullName
@@ -179,7 +275,7 @@ class SupabaseUserRepository implements IUserRepository {
                 : (effectiveEmail != null ? effectiveEmail.split('@').first : 'User'));
 
         final insertData = <String, dynamic>{
-          'id': userId,
+          'id': safeUserId,
           'role': role,
           'full_name': effectiveName,
           'created_at': DateTime.now().toIso8601String(),
@@ -202,7 +298,7 @@ class SupabaseUserRepository implements IUserRepository {
       // Try updating federation_id separately if provided
       if (federationId != null && federationId.isNotEmpty) {
         try {
-          await _client.from('users').update({'federation_id': federationId}).eq('id', userId);
+          await _client.from('users').update({'federation_id': federationId}).eq('id', safeUserId);
         } catch (_) {}
       }
 
@@ -211,12 +307,12 @@ class SupabaseUserRepository implements IUserRepository {
         final workerExists = await _client
             .from('workers')
             .select('id')
-            .eq('id', userId)
+            .eq('id', safeUserId)
             .maybeSingle();
 
         if (workerExists == null) {
           await _client.from('workers').insert({
-            'id': userId,
+            'id': safeUserId,
             'worker_status': 'PENDING_VERIFICATION',
             if (federationId != null) 'federation_ref_id': federationId,
           });
@@ -227,7 +323,7 @@ class SupabaseUserRepository implements IUserRepository {
       // Resilient fallback: upsert with base columns
       try {
         final fallbackData = <String, dynamic>{
-          'id': userId,
+          'id': safeUserId,
           'role': role,
           'full_name': (fullName != null && fullName.isNotEmpty)
               ? fullName
@@ -335,11 +431,13 @@ class SupabaseUserRepository implements IUserRepository {
           ..['federation_id'] = fedId
           ..['federation_ref_id'] = fedId;
 
-        return CustomerProfile.fromMap(
+        final prof = CustomerProfile.fromMap(
           patchedMap,
           defaultAddress: defaultAddr,
           federationName: fedName,
         );
+        _cacheCustomerProfile(prof);
+        return prof;
       }
     } catch (e) {
       // Fall through to auth session check
@@ -364,7 +462,7 @@ class SupabaseUserRepository implements IUserRepository {
       }
       final metaName = (currentUser.userMetadata?['full_name'] ?? currentUser.userMetadata?['name'] ?? '').toString().trim();
       final metaEmail = (currentUser.userMetadata?['email'] as String?) ?? currentUser.email;
-      return CustomerProfile(
+      final prof = CustomerProfile(
         id: currentUser.id,
         fullName: metaName,
         phone: currentUser.phone ?? '',
@@ -374,8 +472,10 @@ class SupabaseUserRepository implements IUserRepository {
         federationId: fedId,
         federationName: fedName,
       );
+      _cacheCustomerProfile(prof);
+      return prof;
     }
-    return null;
+    return _getCachedCustomerProfile(userId, _getActiveUserPhone());
   }
 
   @override
@@ -390,7 +490,9 @@ class SupabaseUserRepository implements IUserRepository {
           .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
           .maybeSingle();
 
-      if (userRow == null) return null;
+      if (userRow == null) {
+        return _getCachedCustomerProfile(null, cleanPhone);
+      }
 
       final userId = userRow['id'] as String;
       final defaultAddr = await getDefaultAddress(userId);
@@ -421,13 +523,15 @@ class SupabaseUserRepository implements IUserRepository {
         ..['federation_id'] = fedId
         ..['federation_ref_id'] = fedId;
 
-      return CustomerProfile.fromMap(
+      final prof = CustomerProfile.fromMap(
         patchedMap,
         defaultAddress: defaultAddr,
         federationName: fedName,
       );
+      _cacheCustomerProfile(prof);
+      return prof;
     } catch (e) {
-      return null;
+      return _getCachedCustomerProfile(null, phone);
     }
   }
 
@@ -469,9 +573,10 @@ class SupabaseUserRepository implements IUserRepository {
     }
 
     // 2. Synchronize public.users database row
-    final effectiveUserId = (_client.auth.currentUser?.id != null && _client.auth.currentUser!.id.isNotEmpty)
+    final rawUserId = (_client.auth.currentUser?.id != null && _client.auth.currentUser!.id.isNotEmpty)
         ? _client.auth.currentUser!.id
         : userId;
+    final effectiveUserId = UuidUtil.isValidUuid(rawUserId) ? rawUserId : UuidUtil.toDeterministicUuid(rawUserId);
 
     final updates = <String, dynamic>{
       'full_name': cleanName,
@@ -527,6 +632,21 @@ class SupabaseUserRepository implements IUserRepository {
         }).eq('id', effectiveUserId);
       } catch (_) {}
     }
+
+    // Cache updated profile locally so it survives sessions
+    final activePhone = phone ?? _getActiveUserPhone();
+    final cleanPhone = activePhone != null ? PhoneNumberUtil.cleanIndianPhone(activePhone) : '';
+    final existingAddr = _getCachedCustomerAddress(effectiveUserId, cleanPhone);
+    final cachedProf = CustomerProfile(
+      id: effectiveUserId,
+      fullName: cleanName,
+      phone: cleanPhone.isNotEmpty ? cleanPhone : (phone ?? ''),
+      email: cleanEmail,
+      avatarUrl: avatarUrl,
+      defaultAddress: existingAddr,
+      federationId: fid,
+    );
+    _cacheCustomerProfile(cachedProf);
   }
 
   @override
@@ -563,9 +683,20 @@ class SupabaseUserRepository implements IUserRepository {
 
   @override
   Future<bool> isProfileComplete(String userId) async {
+    // 1. Fast check in persistent local cache
+    final activePhone = _getActiveUserPhone();
+    final cleanPhone = activePhone != null ? PhoneNumberUtil.cleanIndianPhone(activePhone) : '';
+    if (cleanPhone.isNotEmpty && LocalStorageService.getBool('customer_is_complete_$cleanPhone') == true) {
+      return true;
+    }
+    if (userId.isNotEmpty && LocalStorageService.getBool('customer_is_complete_$userId') == true) {
+      return true;
+    }
+
     try {
       final profile = await getCustomerProfile(userId);
       if (profile != null && profile.isComplete) {
+        _cacheCustomerProfile(profile);
         return true;
       }
 
@@ -577,19 +708,13 @@ class SupabaseUserRepository implements IUserRepository {
           .eq('id', userId)
           .maybeSingle();
 
-      if (userRow == null) {
+      if (userRow == null && cleanPhone.isNotEmpty) {
         try {
-          final phone = _getActiveUserPhone();
-          if (phone != null && phone.isNotEmpty) {
-            final clean = PhoneNumberUtil.cleanIndianPhone(phone);
-            if (clean.isNotEmpty) {
-              userRow = await _client
-                  .from('users')
-                  .select('id, full_name')
-                  .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
-                  .maybeSingle();
-            }
-          }
+          userRow = await _client
+              .from('users')
+              .select('id, full_name')
+              .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
+              .maybeSingle();
         } catch (_) {}
       }
 
@@ -608,13 +733,29 @@ class SupabaseUserRepository implements IUserRepository {
               .eq('user_id', effectiveId)
               .limit(1);
           if ((addrs as List).isNotEmpty) {
+            if (cleanPhone.isNotEmpty) LocalStorageService.setBool('customer_is_complete_$cleanPhone', true);
+            LocalStorageService.setBool('customer_is_complete_$effectiveId', true);
             return true;
           }
+        }
+      }
+
+      // Check cached address and profile
+      if (cleanPhone.isNotEmpty) {
+        final cached = _getCachedCustomerProfile(userId, cleanPhone);
+        if (cached != null && cached.isComplete) {
+          return true;
         }
       }
       return false;
     } catch (e) {
       debugPrint('[SupabaseUserRepo] isProfileComplete error: $e');
+      if (cleanPhone.isNotEmpty) {
+        final cached = _getCachedCustomerProfile(userId, cleanPhone);
+        if (cached != null && cached.isComplete) {
+          return true;
+        }
+      }
       return false;
     }
   }
@@ -633,9 +774,10 @@ class SupabaseUserRepository implements IUserRepository {
     double? latitude,
     double? longitude,
   }) async {
-    final effectiveUserId = (_client.auth.currentUser?.id != null && _client.auth.currentUser!.id.isNotEmpty)
+    final rawUserId = (_client.auth.currentUser?.id != null && _client.auth.currentUser!.id.isNotEmpty)
         ? _client.auth.currentUser!.id
         : userId;
+    final effectiveUserId = UuidUtil.isValidUuid(rawUserId) ? rawUserId : UuidUtil.toDeterministicUuid(rawUserId);
 
     // Ensure the customer record exists in public.users to satisfy foreign key constraint
     try {
@@ -719,42 +861,54 @@ class SupabaseUserRepository implements IUserRepository {
       } catch (_) {}
     }
 
+    CustomerAddress finalAddr;
     if (row != null) {
       final patchedRow = Map<String, dynamic>.from(row)
         ..putIfAbsent('district', () => effectiveDistrict)
         ..putIfAbsent('federation_id', () => resolvedFed?.id);
-      return CustomerAddress.fromMap(patchedRow);
+      finalAddr = CustomerAddress.fromMap(patchedRow);
+    } else {
+      // Reliable fallback: Return complete CustomerAddress model
+      finalAddr = CustomerAddress(
+        id: DateTime.now().millisecondsSinceEpoch.toString(),
+        addressLine: addressLine.trim(),
+        area: area.trim(),
+        city: city.trim(),
+        state: state.trim(),
+        postalCode: postalCode.trim(),
+        isDefault: isFirst,
+        district: effectiveDistrict,
+        federationId: resolvedFed?.id,
+        latitude: latitude,
+        longitude: longitude,
+      );
     }
 
-    // Reliable fallback: Return complete CustomerAddress model
-    return CustomerAddress(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      addressLine: addressLine.trim(),
-      area: area.trim(),
-      city: city.trim(),
-      state: state.trim(),
-      postalCode: postalCode.trim(),
-      isDefault: isFirst,
-      district: effectiveDistrict,
-      federationId: resolvedFed?.id,
-      latitude: latitude,
-      longitude: longitude,
-    );
+    // Persist to local cache so user never has to re-enter
+    _cacheCustomerAddress(effectiveUserId, _getActiveUserPhone(), finalAddr);
+    if (cleanPhone.isNotEmpty) {
+      LocalStorageService.setBool('customer_is_complete_$cleanPhone', true);
+    }
+    LocalStorageService.setBool('customer_is_complete_$effectiveUserId', true);
+    return finalAddr;
   }
 
   @override
   Future<CustomerAddress?> getDefaultAddress(String userId) async {
+    final safeUserId = UuidUtil.isValidUuid(userId) ? userId : UuidUtil.toDeterministicUuid(userId);
     try {
       final rows = await _client
           .from('addresses')
           .select()
-          .eq('user_id', userId)
+          .eq('user_id', safeUserId)
           .order('is_default', ascending: false)
           .order('created_at', ascending: false)
           .limit(1);
 
       if ((rows as List).isNotEmpty) {
-        return CustomerAddress.fromMap(rows.first);
+        final addr = CustomerAddress.fromMap(rows.first);
+        _cacheCustomerAddress(safeUserId, _getActiveUserPhone(), addr);
+        return addr;
       }
 
       // If no address found by userId, try resolving real DB user id via active user phone
@@ -768,7 +922,7 @@ class SupabaseUserRepository implements IUserRepository {
                 .select('id')
                 .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
                 .maybeSingle();
-            if (userRow != null && userRow['id'] != null && userRow['id'] != userId) {
+            if (userRow != null && userRow['id'] != null && userRow['id'] != safeUserId) {
               final altRows = await _client
                   .from('addresses')
                   .select()
@@ -777,17 +931,19 @@ class SupabaseUserRepository implements IUserRepository {
                   .order('created_at', ascending: false)
                   .limit(1);
               if ((altRows as List).isNotEmpty) {
-                return CustomerAddress.fromMap(altRows.first);
+                final addr = CustomerAddress.fromMap(altRows.first);
+                _cacheCustomerAddress(safeUserId, clean, addr);
+                return addr;
               }
             }
           }
         }
       } catch (_) {}
 
-      return null;
+      return _getCachedCustomerAddress(safeUserId, _getActiveUserPhone());
     } catch (e) {
       debugPrint('[SupabaseUserRepo] getDefaultAddress error: $e');
-      return null;
+      return _getCachedCustomerAddress(safeUserId, _getActiveUserPhone());
     }
   }
 

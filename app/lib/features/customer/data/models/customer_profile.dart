@@ -56,19 +56,36 @@ class CustomerProfile {
     );
   }
 
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'full_name': fullName,
+    'phone': phone,
+    if (email != null) 'email': email,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    if (defaultAddress != null) 'default_address': defaultAddress!.toMap(),
+    if (federationId != null) 'federation_id': federationId,
+    if (federationName != null) 'federation_name': federationName,
+  };
+
   factory CustomerProfile.fromMap(
     Map<String, dynamic> map, {
     CustomerAddress? defaultAddress,
     String? federationName,
   }) {
     final fedId = (map['federation_id'] ?? map['federation_ref_id']) as String?;
+    CustomerAddress? resolvedAddress = defaultAddress;
+    if (resolvedAddress == null && map['default_address'] is Map) {
+      try {
+        resolvedAddress = CustomerAddress.fromMap(Map<String, dynamic>.from(map['default_address'] as Map));
+      } catch (_) {}
+    }
     return CustomerProfile(
       id: map['id'] as String,
       fullName: map['full_name'] as String? ?? '',
       phone: map['phone'] as String? ?? '',
       email: map['email'] as String?,
       avatarUrl: map['avatar_url'] as String?,
-      defaultAddress: defaultAddress,
+      defaultAddress: resolvedAddress,
       federationId: fedId,
       federationName: federationName ?? map['federation_name'] as String?,
     );

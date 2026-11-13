@@ -7,6 +7,7 @@ import '../../../../core/config/dependency_injection.dart';
 import '../../../worker/data/models/worker_models.dart';
 import '../../../worker/presentation/screens/worker_registration_screen.dart';
 import '../../../../core/utils/phone_number_util.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../../../shared/widgets/google_sign_in_button.dart';
 import '../../data/repositories/mock_auth_repository.dart';
 
@@ -106,7 +107,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           final WorkerProfile profile = await DI.workerRepo.getWorkerProfile(userId);
           final docs = await DI.workerRepo.getVerificationDocuments(profile.id);
 
-          _routeWorkerAfterAuth(profile, docs);
+          _routeWorkerAfterAuth(profile, docs, cleanPhone);
         } else {
           throw Exception('Invalid OTP. Please check the code sent to your number.');
         }
@@ -119,13 +120,16 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
     }
   }
 
-  void _routeWorkerAfterAuth(WorkerProfile profile, List<dynamic> docs) {
+  void _routeWorkerAfterAuth(WorkerProfile profile, List<dynamic> docs, [String? cleanPhone]) {
     if (!mounted) return;
 
-    final hasCompletedRegistration = profile.name.isNotEmpty &&
+    final phone = cleanPhone ?? PhoneNumberUtil.cleanIndianPhone(profile.phone);
+    final hasCompletedRegistration = (profile.name.isNotEmpty &&
         !profile.name.startsWith('Artisan (') &&
         !profile.name.startsWith('User ') &&
-        docs.isNotEmpty;
+        docs.isNotEmpty) ||
+        (phone.isNotEmpty && LocalStorageService.getBool('worker_registered_$phone') == true) ||
+        (profile.id.isNotEmpty && LocalStorageService.getBool('worker_registered_${profile.id}') == true);
 
     if (!hasCompletedRegistration) {
       Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);

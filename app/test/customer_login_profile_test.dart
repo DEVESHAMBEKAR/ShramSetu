@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:app/features/auth/data/repositories/mock_user_repository.dart';
 import 'package:app/features/auth/data/repositories/mock_auth_repository.dart';
+import 'package:app/core/utils/uuid_util.dart';
+import 'package:app/core/services/local_storage_service.dart';
 
 void main() {
   group('Customer Login & Profile Fetch Verification', () {
@@ -10,6 +12,7 @@ void main() {
     setUp(() {
       userRepo = MockUserRepository();
       authRepo = MockAuthRepository();
+      LocalStorageService.clear();
     });
 
     test('1. Existing customer (9876543210 - Priya Sharma) profile is complete and has details', () async {
@@ -152,6 +155,39 @@ void main() {
       expect(profile!.fullName, 'Sneha Kulkarni');
       expect(profile.defaultAddress?.area, 'Baner');
       expect(profile.defaultAddress?.latitude, 18.5590);
+    });
+
+    test('6. UuidUtil generates valid deterministic RFC4122 UUIDs from non-UUID inputs', () {
+      const validUuid = 'c4574839-1736-4261-808b-f09a7883e2ca';
+      expect(UuidUtil.isValidUuid(validUuid), isTrue);
+      expect(UuidUtil.toDeterministicUuid(validUuid), validUuid);
+
+      const phoneId = 'customer_9975811244';
+      expect(UuidUtil.isValidUuid(phoneId), isFalse);
+      final generated = UuidUtil.toDeterministicUuid(phoneId);
+      expect(UuidUtil.isValidUuid(generated), isTrue);
+      // Deterministic: multiple calls generate identical UUID
+      expect(UuidUtil.toDeterministicUuid(phoneId), generated);
+    });
+
+    test('7. LocalStorageService persists customer onboarding and complete flag', () {
+      const cleanPhone = '9975811244';
+      expect(LocalStorageService.getBool('customer_is_complete_$cleanPhone'), isNull);
+
+      LocalStorageService.setBool('customer_is_complete_$cleanPhone', true);
+      expect(LocalStorageService.getBool('customer_is_complete_$cleanPhone'), isTrue);
+
+      LocalStorageService.setString('customer_profile_$cleanPhone', '{"id":"c4574839-1736-4261-808b-f09a7883e2ca","full_name":"Devesh","phone":"9975811244"}');
+      final fetched = LocalStorageService.getString('customer_profile_$cleanPhone');
+      expect(fetched, contains('Devesh'));
+    });
+
+    test('8. LocalStorageService persists worker registration flag', () {
+      const workerPhone = '8421296499';
+      expect(LocalStorageService.getBool('worker_registered_$workerPhone'), isNull);
+
+      LocalStorageService.setBool('worker_registered_$workerPhone', true);
+      expect(LocalStorageService.getBool('worker_registered_$workerPhone'), isTrue);
     });
   });
 }

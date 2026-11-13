@@ -11,6 +11,7 @@ import '../../data/models/customer_profile.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/localization/app_strings.dart';
 import '../../../../core/services/india_geography_service.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
 
 class CustomerMainLayout extends StatefulWidget {
   const CustomerMainLayout({super.key});
@@ -54,7 +55,13 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
       _currentUserId = userId;
 
       if (userId != null) {
-        final profile = await DI.userRepo.getCustomerProfile(userId);
+        var profile = await DI.userRepo.getCustomerProfile(userId);
+        if (profile == null) {
+          final phone = user?.phone ?? FirebasePhoneAuthService.instance.activePhoneNumber;
+          if (phone != null && phone.isNotEmpty) {
+            profile = await DI.userRepo.getCustomerProfileByPhone(phone);
+          }
+        }
         final userData = await DI.userRepo.getUserProfile(userId);
 
           setState(() {

@@ -12,6 +12,8 @@ import '../../../../core/services/registered_worker_store.dart';
 import '../../../../core/services/shared_booking_store.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/models/federation_models.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
+import '../../../../core/utils/phone_number_util.dart';
 import 'mock_worker_repository.dart';
 
 class SupabaseWorkerRepository implements IWorkerRepository {
@@ -54,6 +56,26 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       } catch (e) {
         debugPrint('[WorkerRepo] workers select note: $e');
       }
+    }
+
+    if (userRes == null) {
+      try {
+        final phone = authUser?.phone ?? FirebasePhoneAuthService.instance.activePhoneNumber;
+        if (phone != null && phone.isNotEmpty) {
+          final clean = PhoneNumberUtil.cleanIndianPhone(phone);
+          if (clean.isNotEmpty) {
+            userRes = await _supabase
+                .from('users')
+                .select()
+                .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
+                .maybeSingle();
+            if (userRes != null && userRes['id'] != null) {
+              final dbId = userRes['id'] as String;
+              workerRes ??= await _supabase.from('workers').select().eq('id', dbId).maybeSingle();
+            }
+          }
+        }
+      } catch (_) {}
     }
 
     // Attempt to resolve real name from database users table

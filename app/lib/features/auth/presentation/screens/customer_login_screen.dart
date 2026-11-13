@@ -99,9 +99,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           // 2. If profile does not exist yet, initialize initial record.
           // If profile exists, ensure user profile record is maintained without wiping out their name.
           try {
+            final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name'])?.toString().trim();
             final existingRealName = (profile != null && profile.fullName.isNotEmpty && !profile.fullName.startsWith('User '))
                 ? profile.fullName
-                : null;
+                : (metaName != null && metaName.isNotEmpty && !metaName.startsWith('User ') ? metaName : null);
             await DI.userRepo.upsertUserProfile(
               userId: effectiveUserId,
               role: 'CUSTOMER',
@@ -120,9 +121,10 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
             debugPrint('[CustomerLogin] Upsert non-critical: $e');
           }
 
-
           // 3. Determine if profile is already complete (has real name and address)
-          final isComplete = (profile?.isComplete == true) || await DI.userRepo.isProfileComplete(effectiveUserId);
+          final isComplete = (profile?.isComplete == true) ||
+              await DI.userRepo.isProfileComplete(effectiveUserId) ||
+              await DI.userRepo.isProfileComplete(userId);
 
           if (mounted) {
             if (isComplete) {

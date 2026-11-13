@@ -21,6 +21,7 @@ import '../../../../shared/widgets/state_views.dart';
 import '../../../../shared/widgets/shramsetu_brand_mark.dart';
 import '../../../booking/data/models/booking_models.dart' hide BookingStatus;
 import '../../../booking/presentation/screens/booking_date_time_screen.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -153,6 +154,12 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     if (userId != null) {
       try {
         var profile = await DI.userRepo.getCustomerProfile(userId);
+        if (profile == null) {
+          final phone = user?.phone ?? FirebasePhoneAuthService.instance.activePhoneNumber;
+          if (phone != null && phone.isNotEmpty) {
+            profile = await DI.userRepo.getCustomerProfileByPhone(phone);
+          }
+        }
         if (profile == null || profile.fullName.trim().isEmpty || profile.fullName.startsWith('User ')) {
           final userData = await DI.userRepo.getUserProfile(userId);
           final dbName = userData?['full_name'] as String?;
@@ -160,6 +167,13 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
             profile = profile != null
                 ? profile.copyWith(fullName: dbName)
                 : CustomerProfile(id: userId, fullName: dbName, phone: (userData?['phone'] as String?) ?? user?.phone ?? '');
+          } else {
+            final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
+            if (metaName != null && metaName.trim().isNotEmpty && !metaName.startsWith('User ')) {
+              profile = profile != null
+                  ? profile.copyWith(fullName: metaName.trim())
+                  : CustomerProfile(id: userId, fullName: metaName.trim(), phone: user?.phone ?? '');
+            }
           }
         }
         if (mounted) {

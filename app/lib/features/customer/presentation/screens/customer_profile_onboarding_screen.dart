@@ -179,6 +179,10 @@ class _CustomerProfileOnboardingScreenState
       }
 
       final resolvedProfile = profile;
+      if (resolvedProfile != null && resolvedProfile.isComplete && mounted) {
+        Navigator.of(context).pushReplacementNamed('/customer/home');
+        return;
+      }
       if (resolvedProfile != null && mounted) {
         setState(() {
           if (resolvedProfile.fullName.isNotEmpty && _nameController.text.isEmpty) {

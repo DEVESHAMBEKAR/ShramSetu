@@ -103,58 +103,6 @@ class _SplashScreenState extends State<SplashScreen> {
           final isComplete = await DI.userRepo.isProfileComplete(user.id);
           if (mounted) {
             if (isComplete) {
-              try {
-                final profile = await DI.userRepo.getCustomerProfile(user.id);
-                final addr = profile?.defaultAddress;
-                if (addr != null) {
-                  final fed = FederationModel.findFederationForLocation(
-                    district: addr.district,
-                    city: addr.city,
-                    state: addr.state,
-                    location: addr.area,
-                    address: addr.addressLine,
-                    pincode: addr.postalCode,
-                  );
-                  if (fed == null) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => AreaNotServiceableScreen(
-                          userRole: 'CUSTOMER',
-                          reason: ServiceUnavailableReason.noFederation,
-                          district: addr.district,
-                          city: addr.city,
-                          area: addr.area,
-                          state: addr.state,
-                          pincode: addr.postalCode,
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                  final hasWorkers = await DI.customerRepo.hasWorkersInArea(
-                    federationId: fed.id,
-                    district: addr.district,
-                    city: addr.city,
-                    pincode: addr.postalCode,
-                  );
-                  if (!hasWorkers) {
-                    Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(
-                        builder: (_) => AreaNotServiceableScreen(
-                          userRole: 'CUSTOMER',
-                          reason: ServiceUnavailableReason.noWorkers,
-                          district: addr.district,
-                          city: addr.city,
-                          area: addr.area,
-                          state: addr.state,
-                          pincode: addr.postalCode,
-                        ),
-                      ),
-                    );
-                    return;
-                  }
-                }
-              } catch (_) {}
               Navigator.of(context).pushReplacementNamed('/customer/home');
             } else {
               Navigator.of(context).pushReplacementNamed('/customer/onboarding');

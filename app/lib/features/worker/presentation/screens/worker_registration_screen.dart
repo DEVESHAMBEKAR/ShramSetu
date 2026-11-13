@@ -15,6 +15,7 @@ import 'worker_under_verification_screen.dart';
 import '../../../../shared/widgets/area_not_serviceable_screen.dart';
 import '../../../../core/utils/phone_number_util.dart';
 import '../../../../core/utils/distance_calculator.dart';
+import '../../../../core/services/local_storage_service.dart';
 
 class AreaSuggestionItem {
   final String name;
@@ -1343,6 +1344,14 @@ class _WorkerRegistrationScreenState extends State<WorkerRegistrationScreen> {
       } else {
         await DI.workerRepo.submitForVerification(userId);
       }
+
+      try {
+        final cleanPhone = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
+        if (cleanPhone.isNotEmpty) {
+          LocalStorageService.setBool('worker_registered_$cleanPhone', true);
+        }
+        LocalStorageService.setBool('worker_registered_$userId', true);
+      } catch (_) {}
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

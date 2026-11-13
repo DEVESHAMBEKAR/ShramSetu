@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -5,7 +6,9 @@ import '../../../../core/config/app_config.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/services/firebase_phone_auth_service.dart';
+import '../../../../core/services/local_storage_service.dart';
 import '../../../../core/utils/phone_number_util.dart';
+import '../../../../core/utils/uuid_util.dart';
 
 class SupabaseAuthRepository implements IAuthRepository {
   final SupabaseClient _client;
@@ -33,21 +36,48 @@ class SupabaseAuthRepository implements IAuthRepository {
 
           String effectiveId = fbUser.uid;
           String? resolvedRole;
+          String? resolvedName;
+          String? resolvedEmail;
 
-          // Resolve Supabase user ID and role from public.users using all phone formats
+          // Resolve Supabase user ID, role, and name from public.users using all phone formats
           final clean = PhoneNumberUtil.cleanIndianPhone(phone);
           if (clean.isNotEmpty) {
             try {
               final userRow = await _client
                   .from('users')
-                  .select('id, role')
+                  .select('id, role, full_name, email')
                   .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
                   .maybeSingle();
               if (userRow != null && userRow['id'] != null) {
                 effectiveId = userRow['id'] as String;
                 resolvedRole = userRow['role']?.toString().trim().toUpperCase();
+                resolvedName = (userRow['full_name'] as String?)?.trim();
+                resolvedEmail = (userRow['email'] as String?)?.trim();
               }
             } catch (_) {}
+
+            // Fallback to local persistent cache if database read was blocked or empty
+            if (resolvedName == null || resolvedName.isEmpty || resolvedName.startsWith('User ')) {
+              final cachedJson = LocalStorageService.getString('customer_profile_$clean');
+              if (cachedJson != null && cachedJson.isNotEmpty) {
+                try {
+                  final map = jsonDecode(cachedJson) as Map<String, dynamic>;
+                  final cName = (map['full_name'] as String?)?.trim();
+                  if (cName != null && cName.isNotEmpty && !cName.startsWith('User ')) {
+                    resolvedName = cName;
+                  }
+                  resolvedEmail ??= (map['email'] as String?)?.trim();
+                  if (map['id'] != null && UuidUtil.isValidUuid(map['id'].toString())) {
+                    effectiveId = map['id'].toString();
+                  }
+                } catch (_) {}
+              }
+            }
+          }
+
+          // Ensure effectiveId is always a valid RFC4122 UUID for Postgres compatibility
+          if (!UuidUtil.isValidUuid(effectiveId)) {
+            effectiveId = UuidUtil.toDeterministicUuid(clean.isNotEmpty ? 'phone_$clean' : fbUser.uid);
           }
 
           final bridgeUser = User(
@@ -59,6 +89,9 @@ class SupabaseAuthRepository implements IAuthRepository {
             userMetadata: {
               'phone': phone,
               if (resolvedRole != null && resolvedRole.isNotEmpty) 'role': resolvedRole,
+              if (resolvedName != null && resolvedName.isNotEmpty) 'full_name': resolvedName,
+              if (resolvedName != null && resolvedName.isNotEmpty) 'name': resolvedName,
+              if (resolvedEmail != null && resolvedEmail.isNotEmpty) 'email': resolvedEmail,
             },
             aud: 'authenticated',
             phone: phone,
