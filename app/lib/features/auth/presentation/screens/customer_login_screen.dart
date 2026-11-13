@@ -99,20 +99,21 @@ class _CustomerLoginScreenState extends State<CustomerLoginScreen> {
           // 2. If profile does not exist yet, initialize initial record.
           // If profile exists, ensure user profile record is maintained without wiping out their name.
           try {
-            final defaultName = 'User ${phone.length >= 4 ? phone.substring(phone.length - 4) : phone}';
-            final effectiveName = (profile != null && profile.fullName.isNotEmpty) ? profile.fullName : defaultName;
+            final existingRealName = (profile != null && profile.fullName.isNotEmpty && !profile.fullName.startsWith('User '))
+                ? profile.fullName
+                : null;
             await DI.userRepo.upsertUserProfile(
               userId: effectiveUserId,
               role: 'CUSTOMER',
               phone: phone,
-              fullName: effectiveName,
+              fullName: existingRealName,
             );
             if (user != null && user.id != effectiveUserId) {
               await DI.userRepo.upsertUserProfile(
                 userId: user.id,
                 role: 'CUSTOMER',
                 phone: phone,
-                fullName: effectiveName,
+                fullName: existingRealName,
               );
             }
           } catch (e) {

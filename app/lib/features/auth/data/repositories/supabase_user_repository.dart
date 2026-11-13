@@ -252,7 +252,7 @@ class SupabaseUserRepository implements IUserRepository {
     try {
       var userRow = await _client
           .from('users')
-          .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
+          .select('id, full_name, phone, email, avatar_url')
           .eq('id', userId)
           .maybeSingle();
 
@@ -265,7 +265,7 @@ class SupabaseUserRepository implements IUserRepository {
             if (clean.isNotEmpty) {
               userRow = await _client
                   .from('users')
-                  .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
+                  .select('id, full_name, phone, email, avatar_url')
                   .or('phone.eq.$clean,phone.eq.+91$clean,phone.eq.91$clean')
                   .maybeSingle();
             }
@@ -386,7 +386,7 @@ class SupabaseUserRepository implements IUserRepository {
       // Check phone in all Indian formats (+91, plain 10-digit, 91 without plus)
       final userRow = await _client
           .from('users')
-          .select('id, full_name, phone, email, avatar_url, federation_id, federation_ref_id')
+          .select('id, full_name, phone, email, avatar_url')
           .or('phone.eq.$cleanPhone,phone.eq.+91$cleanPhone,phone.eq.91$cleanPhone')
           .maybeSingle();
 

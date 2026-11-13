@@ -12,8 +12,9 @@ import '../../../../core/services/india_geography_service.dart';
 import '../../../../core/models/federation_models.dart';
 import '../../../../shared/widgets/map_location_picker_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../../../../shared/widgets/area_not_serviceable_screen.dart';
 import '../../../../core/utils/phone_number_util.dart';
+import '../../data/models/customer_profile.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
 
 class CustomerProfileOnboardingScreen extends StatefulWidget {
   const CustomerProfileOnboardingScreen({super.key});
@@ -149,79 +150,88 @@ class _CustomerProfileOnboardingScreenState
   Future<void> _loadExistingProfile() async {
     try {
       final user = await DI.authRepo.getCurrentUser().timeout(const Duration(seconds: 3));
+
+      // 1. Immediately pre-fill phone number from active user
+      final rawPhone = user?.phone ?? FirebasePhoneAuthService.instance.activePhoneNumber ?? '';
+      final cleanedPhone = PhoneNumberUtil.cleanIndianPhone(rawPhone);
+      if (mounted && cleanedPhone.isNotEmpty && _phoneController.text.isEmpty) {
+        setState(() {
+          _phoneController.text = cleanedPhone;
+        });
+      }
+
+      // 2. Pre-fill name or email from active auth user metadata if available
+      final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name'] ?? user?.userMetadata?['displayName'])?.toString().trim();
+      if (mounted && metaName != null && metaName.isNotEmpty && _nameController.text.isEmpty && !metaName.toLowerCase().startsWith('user ')) {
+        setState(() {
+          _nameController.text = metaName;
+        });
+      }
+
+      // 3. Resolve profile from user repository (first by ID, then by phone)
       final userId = user?.id ?? (AppConfig.useMockData ? 'mock_customer_01' : null);
+      CustomerProfile? profile;
       if (userId != null) {
-        final profile = await DI.userRepo.getCustomerProfile(userId).timeout(const Duration(seconds: 3));
-        if (profile != null && mounted) {
-          setState(() {
-            if (profile.fullName.isNotEmpty && _nameController.text.isEmpty) {
-              final cleanName = profile.fullName.trim();
-              final isPhone = RegExp(r'^\+?\d{10,13}$').hasMatch(cleanName);
-              if (!cleanName.toLowerCase().startsWith('user ') &&
-                  !isPhone &&
-                  cleanName.toLowerCase() != 'ananya' &&
-                  cleanName.toLowerCase() != 'demo user' &&
-                  cleanName.toLowerCase() != 'test user') {
-                _nameController.text = cleanName;
-              } else {
-                final metaName = (user?.userMetadata?['full_name'] ?? user?.userMetadata?['name']) as String?;
-                if (metaName != null &&
-                    metaName.trim().isNotEmpty &&
-                    !RegExp(r'^\+?\d{10,13}$').hasMatch(metaName.trim())) {
-                  _nameController.text = metaName.trim();
-                }
-              }
+        profile = await DI.userRepo.getCustomerProfile(userId).timeout(const Duration(seconds: 3));
+      }
+      if (profile == null && cleanedPhone.isNotEmpty) {
+        profile = await DI.userRepo.getCustomerProfileByPhone(cleanedPhone).timeout(const Duration(seconds: 3));
+      }
+
+      final resolvedProfile = profile;
+      if (resolvedProfile != null && mounted) {
+        setState(() {
+          if (resolvedProfile.fullName.isNotEmpty && _nameController.text.isEmpty) {
+            final cleanName = resolvedProfile.fullName.trim();
+            final isPhone = RegExp(r'^\+?\d{10,13}$').hasMatch(cleanName);
+            if (!cleanName.toLowerCase().startsWith('user ') &&
+                !isPhone &&
+                cleanName.toLowerCase() != 'ananya' &&
+                cleanName.toLowerCase() != 'demo user' &&
+                cleanName.toLowerCase() != 'test user') {
+              _nameController.text = cleanName;
             }
-            final rawPhone = profile.phone.isNotEmpty ? profile.phone : (user?.phone ?? '');
-            final cleanedPhone = PhoneNumberUtil.cleanIndianPhone(rawPhone);
-            if (cleanedPhone.isNotEmpty) {
-              _phoneController.text = cleanedPhone;
-            } else if (_phoneController.text.isNotEmpty) {
-              _phoneController.text = PhoneNumberUtil.cleanIndianPhone(_phoneController.text);
+          }
+          final pPhone = PhoneNumberUtil.cleanIndianPhone(resolvedProfile.phone);
+          if (pPhone.isNotEmpty) {
+            _phoneController.text = pPhone;
+          }
+          if (_emailController.text.isEmpty && resolvedProfile.email != null && resolvedProfile.email!.isNotEmpty) {
+            _emailController.text = resolvedProfile.email!;
+          }
+          final addr = resolvedProfile.defaultAddress;
+          if (addr != null) {
+            if (_addressLineController.text.isEmpty && addr.addressLine.isNotEmpty) {
+              _addressLineController.text = addr.addressLine;
             }
-            if (_emailController.text.isEmpty) {
-              final metaEmail = user?.userMetadata?['email'] as String?;
-              final e = (profile.email != null && profile.email!.isNotEmpty)
-                  ? profile.email!
-                  : ((user?.email != null && user!.email!.isNotEmpty)
-                      ? user.email!
-                      : (metaEmail ?? ''));
-              _emailController.text = e;
+            if (addr.state.isNotEmpty) {
+              final matched = IndiaGeographyService.matchState(addr.state) ?? addr.state;
+              _selectedState = matched;
+              _stateController.text = matched;
+              _availableDistricts = IndiaGeographyService.getDistricts(matched);
             }
-            final addr = profile.defaultAddress;
-            if (addr != null) {
-              if (_addressLineController.text.isEmpty && addr.addressLine.isNotEmpty) {
-                _addressLineController.text = addr.addressLine;
-              }
-              if (addr.state.isNotEmpty) {
-                final matched = IndiaGeographyService.matchState(addr.state) ?? addr.state;
-                _selectedState = matched;
-                _stateController.text = matched;
-                _availableDistricts = IndiaGeographyService.getDistricts(matched);
-              }
-              if (addr.city.isNotEmpty) {
-                final matchedDist = IndiaGeographyService.matchDistrict(_selectedState, addr.city);
-                _selectedDistrict = matchedDist;
-                _cityController.text = matchedDist;
-                _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
-              }
-              if (addr.area.isNotEmpty) {
-                _selectedArea = addr.area;
-                _areaController.text = addr.area;
-              }
-              if (_postalCodeController.text.isEmpty && addr.postalCode.isNotEmpty) {
-                _postalCodeController.text = addr.postalCode;
-              }
-              if (_latitude == null && addr.latitude != null) {
-                _latitude = addr.latitude;
-              }
-              if (_longitude == null && addr.longitude != null) {
-                _longitude = addr.longitude;
-              }
+            if (addr.city.isNotEmpty) {
+              final matchedDist = IndiaGeographyService.matchDistrict(_selectedState, addr.city);
+              _selectedDistrict = matchedDist;
+              _cityController.text = matchedDist;
+              _availableAreas = IndiaGeographyService.getAreasForDistrict(_selectedState, _selectedDistrict);
             }
-            _updateAssignedFederation();
-          });
-        }
+            if (addr.area.isNotEmpty) {
+              _selectedArea = addr.area;
+              _areaController.text = addr.area;
+            }
+            if (_postalCodeController.text.isEmpty && addr.postalCode.isNotEmpty) {
+              _postalCodeController.text = addr.postalCode;
+            }
+            if (_latitude == null && addr.latitude != null) {
+              _latitude = addr.latitude;
+            }
+            if (_longitude == null && addr.longitude != null) {
+              _longitude = addr.longitude;
+            }
+          }
+          _updateAssignedFederation();
+        });
       }
     } catch (_) {}
   }
@@ -465,61 +475,9 @@ class _CustomerProfileOnboardingScreenState
         // Proceed cleanly to Step 4 so the citizen is never trapped on onboarding.
       }
 
-      // Step 4: Check if federation exists AND workers exist in the area
-      final hasFederation = _assignedFederation != null;
-      bool hasWorkers = false;
-      if (hasFederation) {
-        try {
-          hasWorkers = await DI.customerRepo.hasWorkersInArea(
-            federationId: _assignedFederation!.id,
-            district: _selectedDistrict,
-            city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
-            pincode: _postalCodeController.text.trim(),
-          ).timeout(const Duration(seconds: 6));
-        } catch (_) {
-          hasWorkers = true; // resilient fallback
-        }
-      }
-
       if (!mounted) return;
 
-      if (!hasFederation) {
-        // Customer profile is saved, but area is not serviceable yet due to no federation
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => AreaNotServiceableScreen(
-              userRole: 'CUSTOMER',
-              reason: ServiceUnavailableReason.noFederation,
-              district: _selectedDistrict,
-              area: _selectedArea,
-              city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
-              state: _selectedState,
-              pincode: _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
-            ),
-          ),
-        );
-        return;
-      }
-
-      if (!hasWorkers) {
-        // Customer profile is saved, federation exists, but no active workers/artisans currently in this area
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(
-            builder: (_) => AreaNotServiceableScreen(
-              userRole: 'CUSTOMER',
-              reason: ServiceUnavailableReason.noWorkers,
-              district: _selectedDistrict,
-              area: _selectedArea,
-              city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : _selectedDistrict,
-              state: _selectedState,
-              pincode: _postalCodeController.text.trim().isNotEmpty ? _postalCodeController.text.trim() : null,
-            ),
-          ),
-        );
-        return;
-      }
-
-      // All good: Both federation exists AND workers are available in the area
+      // Profile and address successfully saved — navigate customer directly to their dashboard
       Navigator.of(context).pushReplacementNamed('/customer/home');
     } catch (e) {
       if (mounted) {
