@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth_platform_interface/firebase_auth_platform_interface.dart' show FirebaseAuthPlatform;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import '../config/app_config.dart';
@@ -84,18 +85,42 @@ class FirebasePhoneAuthService {
     // 1. Web Flow (Chrome / Edge / Safari on Web)
     if (kIsWeb) {
       debugPrint('[FirebasePhoneAuth] Initiating Web Phone Auth for $formattedPhone...');
+
+      // Step A: If testing bypass is enabled, attempt without reCAPTCHA first (for pre-configured test numbers)
       if (AppConfig.disableFirebaseRecaptcha) {
-        debugPrint('[FirebasePhoneAuth] Disabling reCAPTCHA app verification for testing mode...');
+        debugPrint('[FirebasePhoneAuth] Attempting test phone auth without reCAPTCHA...');
         try {
           await auth.setSettings(appVerificationDisabledForTesting: true);
-        } catch (e) {
-          debugPrint('[FirebasePhoneAuth] Could not set appVerificationDisabledForTesting: $e');
+          _webConfirmationResult = await auth.signInWithPhoneNumber(formattedPhone);
+          debugPrint('[FirebasePhoneAuth] Test verification succeeded without reCAPTCHA.');
+          return;
+        } catch (testErr) {
+          debugPrint('[FirebasePhoneAuth] Test bypass not applicable ($testErr). Re-enabling reCAPTCHA for real SMS delivery...');
+          try {
+            await auth.setSettings(appVerificationDisabledForTesting: false);
+          } catch (_) {}
         }
       }
 
+      // Step B: Real SMS flow with explicit RecaptchaVerifier
       try {
-        _webConfirmationResult = await auth.signInWithPhoneNumber(formattedPhone);
-        debugPrint('[FirebasePhoneAuth] Web ConfirmationResult acquired. SMS OTP sent successfully.');
+        RecaptchaVerifier? verifier;
+        try {
+          verifier = RecaptchaVerifier(
+            auth: FirebaseAuthPlatform.instance,
+            container: 'recaptcha-container',
+            size: RecaptchaVerifierSize.normal,
+          );
+        } catch (verErr) {
+          debugPrint('[FirebasePhoneAuth] Could not create explicit RecaptchaVerifier: $verErr');
+        }
+
+        if (verifier != null) {
+          _webConfirmationResult = await auth.signInWithPhoneNumber(formattedPhone, verifier);
+        } else {
+          _webConfirmationResult = await auth.signInWithPhoneNumber(formattedPhone);
+        }
+        debugPrint('[FirebasePhoneAuth] Web ConfirmationResult acquired. Real SMS OTP sent successfully.');
         return;
       } on FirebaseAuthException catch (e) {
         debugPrint('[FirebasePhoneAuth] Web sendOtp error: [${e.code}] ${e.message}');
@@ -268,10 +293,12 @@ class FirebasePhoneAuthService {
         return 'Network connection issue. Please check your internet connection.';
       case 'app-not-authorized':
         return 'Firebase App not authorized. Ensure SHA-1 fingerprint / SafetyNet is configured in Firebase Console.';
+      case 'unauthorized-domain':
+        return 'Domain is not authorized in Firebase Console. Please add "${kIsWeb ? Uri.base.host : 'this domain'}" under Firebase Console > Authentication > Settings > Authorized domains.';
       case 'captcha-check-failed':
-        return 'To test on localhost with reCAPTCHA disabled, please register this number in Firebase Console: Authentication > Sign-in method > Phone > "Phone numbers for testing" with code 123456.';
+        return 'reCAPTCHA verification failed. Please complete the reCAPTCHA checkbox or add "${kIsWeb ? Uri.base.host : 'this domain'}" to Authorized domains in Firebase Console.';
       case 'invalid-app-credential':
-        return 'reCAPTCHA verification could not be completed on this browser. For development on localhost, please add this number under Firebase Console > Authentication > Sign-in method > Phone > "Phone numbers for testing" with code 123456.';
+        return 'Verification credential issue. Please ensure "${kIsWeb ? Uri.base.host : 'this domain'}" is in Authorized domains (Firebase Console > Authentication > Settings) and Phone sign-in is enabled.';
       case 'operation-not-allowed':
         return 'Phone authentication is not enabled. Please enable Phone provider in Firebase Console under Authentication > Sign-in method.';
       default:
