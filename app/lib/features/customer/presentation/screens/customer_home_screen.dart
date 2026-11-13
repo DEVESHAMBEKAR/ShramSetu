@@ -15,7 +15,12 @@ import 'worker_profile_screen.dart';
 import 'customer_live_tracking_screen.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../core/models/booking_status.dart';
+import '../../../../shared/widgets/booking_status_badge.dart';
+import '../../../../shared/widgets/state_views.dart';
 import '../../../../shared/widgets/shramsetu_brand_mark.dart';
+import '../../../booking/data/models/booking_models.dart' hide BookingStatus;
+import '../../../booking/presentation/screens/booking_date_time_screen.dart';
 
 class CustomerHomeScreen extends StatefulWidget {
   final void Function(int tabIndex)? onSelectTab;
@@ -35,9 +40,11 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   String _searchQuery = '';
   String _selectedArea = 'All Areas';
   String _activeQuickFilter = 'all';
+  String _selectedTradeFilter = 'all';
 
   List<String> _serviceAreas = [
     'All Areas',
+    'Vadgaon Budruk',
     'Kothrud',
     'Baner & Balewadi',
     'Hinjewadi',
@@ -53,6 +60,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   ];
 
   static const Map<String, (double, double)> _regionCoordinates = {
+    'Vadgaon Budruk': (18.4682, 73.8368),
     'Kothrud': (18.5074, 73.8077),
     'Baner & Balewadi': (18.5590, 73.7868),
     'Hinjewadi': (18.5913, 73.7389),
@@ -81,7 +89,19 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   };
 
   void _syncServiceAreas() {
-    final set = <String>{'All Areas'};
+    final set = <String>{
+      'All Areas',
+      'Vadgaon Budruk',
+      'Kothrud',
+      'Baner & Balewadi',
+      'Hinjewadi',
+      'Shivajinagar',
+      'Hadapsar',
+      'Viman Nagar',
+      'Wakad',
+      'Katraj',
+      'Swargate',
+    };
     final custArea = _profile?.defaultAddress?.area;
     if (custArea != null && custArea.trim().isNotEmpty) {
       set.add(custArea.trim());
@@ -105,12 +125,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           set.add(clean);
         }
       }
-    }
-    if (set.length <= 3) {
-      set.addAll([
-        'Kothrud', 'Baner & Balewadi', 'Hinjewadi', 'Shivajinagar',
-        'Hadapsar', 'Viman Nagar', 'Wakad', 'Aundh', 'Katraj', 'Swargate'
-      ]);
     }
     _serviceAreas = set.toList();
   }
@@ -223,37 +237,6 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
     return '$areaPart, ${addr.city}';
   }
 
-  IconData _mapCategoryIcon(String? iconName) {
-    switch (iconName?.toLowerCase()) {
-      case 'power':
-      case 'bolt':
-      case 'electrical':
-        return Icons.bolt;
-      case 'plumbing':
-      case 'water_drop':
-        return Icons.plumbing;
-      case 'carpenter':
-      case 'carpentry':
-        return Icons.carpenter;
-      case 'cleaning':
-      case 'cleaning_services':
-        return Icons.cleaning_services;
-      case 'painting':
-      case 'format_paint':
-        return Icons.format_paint;
-      case 'appliance':
-      case 'home_repair_service':
-        return Icons.home_repair_service;
-      case 'gardening':
-      case 'yard':
-        return Icons.yard;
-      case 'driver':
-      case 'directions_car':
-        return Icons.directions_car;
-      default:
-        return Icons.handyman;
-    }
-  }
 
   void _navigateToCategory(ServiceCategory category, {String? searchQuery}) {
     Navigator.push(
@@ -1520,6 +1503,8 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
 
     final isLive = status != 'completed' && status != 'cancelled';
 
+    final bookingStatus = BookingStatus.fromDbString(status);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: 6),
       child: Container(
@@ -1544,25 +1529,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               children: [
                 Row(
                   children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppColors.secondary,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                    const SizedBox(width: 6),
+                    BookingStatusBadge(status: bookingStatus, isCompact: true),
+                    const SizedBox(width: 8),
                     Text(
-                      isLive ? 'ACTIVE BOOKING' : 'RECENT SERVICE',
+                      isLive ? 'Active Live Order' : 'Completed Order',
                       style: AppTypography.labelSm.copyWith(
-                        color: AppColors.secondary,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 0.5,
+                        color: AppColors.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 4),
-                    Text('• ${status.toUpperCase()}', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant)),
                   ],
                 ),
                 Container(
@@ -1588,7 +1563,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         borderRadius: AppRadius.radiusLg,
                         border: Border.all(color: AppColors.outlineVariant),
                       ),
-                      child: const Icon(Icons.person, size: 24, color: AppColors.primary),
+                      child: const Icon(Icons.person, size: 24, color: AppColors.deepTeal),
                     ),
                     Positioned(
                       bottom: 0,
@@ -1597,7 +1572,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 1),
                         decoration: const BoxDecoration(
-                          color: AppColors.primary,
+                          color: AppColors.deepTeal,
                           borderRadius: BorderRadius.vertical(bottom: Radius.circular(8)),
                         ),
                         child: Text(
@@ -1614,7 +1589,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(serviceName, style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                      Text(serviceName, style: AppTypography.labelLg.copyWith(color: AppColors.deepTeal, fontWeight: FontWeight.bold)),
                       Text('$workerName • Pune Central Co-op', style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant, fontSize: 11)),
                       const SizedBox(height: 2),
                       Container(
@@ -1632,7 +1607,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.call_outlined, color: AppColors.primary),
+                  icon: const Icon(Icons.call_outlined, color: AppColors.deepTeal),
                   onPressed: () => _showHelplineDialer(),
                 ),
               ],
@@ -1655,15 +1630,15 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.receipt_long, size: 15, color: AppColors.primary),
-                    label: Text('Details', style: AppTypography.labelSm.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
+                    icon: const Icon(Icons.receipt_long, size: 15, color: AppColors.deepTeal),
+                    label: Text('Details', style: AppTypography.labelSm.copyWith(color: AppColors.deepTeal, fontWeight: FontWeight.bold)),
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
+                      backgroundColor: AppColors.deepTeal,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
                       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -1677,7 +1652,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                         ),
                       );
                     },
-                    icon: const Icon(Icons.navigation, size: 15, color: AppColors.tertiaryFixed),
+                    icon: const Icon(Icons.navigation, size: 15, color: AppColors.warmAmber),
                     label: Text('Track Partner', style: AppTypography.labelSm.copyWith(fontWeight: FontWeight.bold)),
                   ),
                 ),
@@ -1690,68 +1665,378 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
   }
 
   Widget _buildCategoriesSection() {
-    final defaultTradeSpecs = [
-      (
-        'c2',
-        'Plumbing',
-        'नळ व स्वच्छता',
-        'Plumbing & Sanitary',
-        'plumbing',
-        '१२८ प्रमाणित कारागीर',
-        true
+    final tradeSpecs = [
+      _UcTradeSpec(
+        id: 'c2',
+        tradeKey: 'plumbing',
+        name: 'Plumbing',
+        marathiName: 'नळ व स्वच्छता',
+        englishSubtitle: 'Plumbing & Sanitary',
+        iconName: 'plumbing',
+        iconData: Icons.plumbing,
+        accentColor: AppColors.primaryContainer,
+        startingRate: 199,
+        rating: 4.88,
+        jobsCount: 128,
+        tags: ['नळ व मिक्सर', 'गळती दुरुस्ती', 'पाण्याची टाकी', 'बेसिन व ड्रेन', 'जेट स्प्रे'],
+        subServices: const [
+          _UcSubService(
+            title: 'नळ व मिक्सर दुरुस्ती / बदली (Tap & Mixer Repair)',
+            description: 'गळती बंद करणे, नवीन वॉशर बसवणे, मिक्सर हँडल दुरुस्ती आणि पाण्याचा वेग तपासणे.',
+            rate: 199,
+            durationMinutes: 25,
+            badge: 'सर्वात लोकप्रिय • Most Booked',
+          ),
+          _UcSubService(
+            title: 'पाईप लीकेज व ड्रेनेज ब्लॉकेज (Pipe Leak & Drain Unclog)',
+            description: 'बेसिन पाईप, सिंक खालील गळती व ड्रेनेज कचरा ब्लॉकेज त्वरित काढणे.',
+            rate: 299,
+            durationMinutes: 40,
+            badge: 'तातडीची सेवा • Express Fix',
+          ),
+          _UcSubService(
+            title: 'पाण्याच्या टाकीची सखोल स्वच्छता (Water Tank Deep Cleaning)',
+            description: 'ओव्हरहेड / अंडरग्राउंड टाकीचे गाळ काढणे व सॅनिटायझेशन प्रक्रिया.',
+            rate: 499,
+            durationMinutes: 60,
+            badge: 'सहकारी हमी • Certified Hygiene',
+          ),
+          _UcSubService(
+            title: 'टॉयलेट जेट स्प्रे व अँगुलर कॉक (Jet Spray & Angle Valve)',
+            description: 'नवीन जेट स्प्रे, पीव्हीसी कनेक्शन पाईप व व्हॉल्व्ह सुरक्षित बसवणे.',
+            rate: 199,
+            durationMinutes: 20,
+            badge: 'निश्चित दर • Fixed Tariff',
+          ),
+          _UcSubService(
+            title: 'संपूर्ण घरगुती प्लंबिंग तपासणी (Full Plumbing Diagnostic)',
+            description: 'सर्व नळ, टाकी फ्लोट व्हॉल्व्ह, ड्रेनेज व प्रेशरचे सखोल परीक्षण.',
+            rate: 149,
+            durationMinutes: 20,
+            badge: 'प्राथमिक निदान • Diagnostic',
+          ),
+        ],
       ),
-      (
-        'c1',
-        'Electrical',
-        'वीज व वायरिंग',
-        'Licensed Electricians',
-        'bolt',
-        '९४ परवानाधारक',
-        true
+      _UcTradeSpec(
+        id: 'c1',
+        tradeKey: 'electrical',
+        name: 'Electrical',
+        marathiName: 'वीज व वायरिंग',
+        englishSubtitle: 'Licensed Electricians',
+        iconName: 'power',
+        iconData: Icons.bolt,
+        accentColor: AppColors.secondary,
+        startingRate: 149,
+        rating: 4.90,
+        jobsCount: 94,
+        tags: ['स्विच व सॉकेट', 'फॅन व लाईट', 'MCB व फ्युज', 'इन्व्हर्टर वायरिंग', 'शॉर्ट सर्किट'],
+        subServices: const [
+          _UcSubService(
+            title: 'स्विच व सॉकेट दुरुस्ती / बदली (Switch & Socket Repair)',
+            description: 'बर्न झालेले स्विच, १६A हेवी पॉवर पॉईंट व नवीन मॉड्यूलर बोर्ड फिटिंग.',
+            rate: 149,
+            durationMinutes: 20,
+            badge: 'सर्वात लोकप्रिय • Most Booked',
+          ),
+          _UcSubService(
+            title: 'सिलिंग फॅन बसवणे व दुरुस्ती (Ceiling Fan Install & Repair)',
+            description: 'फॅन मोटर ब्लेड बॅलन्स, कॅपेसिटर बदली व नवीन फॅन सुरक्षित इन्स्टॉलेशन.',
+            rate: 199,
+            durationMinutes: 30,
+            badge: 'परवानाधारक • Licensed',
+          ),
+          _UcSubService(
+            title: 'MCB ट्रिपिंग व फ्युज बॉक्स तपासणी (MCB Tripping & Fuse)',
+            description: 'वारंवार ट्रिप होणारा MCB, ओव्हरलोड व शॉर्ट सर्किट शोधून तात्काळ दुरुस्त करणे.',
+            rate: 299,
+            durationMinutes: 35,
+            badge: 'सुरक्षा हमी • Safety Certified',
+          ),
+          _UcSubService(
+            title: 'इन्व्हर्टर लाईन व सेंट्रल वायरिंग (Inverter Line & Wiring)',
+            description: 'इन्व्हर्टर बायपास, बॅटरी कनेक्शन व मुख्य वायरिंग फॉल्ट शोधणे.',
+            rate: 399,
+            durationMinutes: 60,
+            badge: 'तांत्रिक तज्ज्ञ • Master Wireman',
+          ),
+          _UcSubService(
+            title: 'डेकोरेटिव्ह लाईट्स व झूमर फिटिंग (Decorative Lighting)',
+            description: 'एलईडी बॅटन, प्रोफाइल लाईट, सीलिंग झूमर व वॉल लॅम्प सुरक्षित बसवणे.',
+            rate: 249,
+            durationMinutes: 35,
+            badge: 'निश्चित दर • Fixed Tariff',
+          ),
+        ],
       ),
-      (
-        'c3',
-        'Carpentry',
-        'सुतारकाम व लाकूडकाम',
-        'Carpentry & Craft',
-        'carpenter',
-        '६७ कुशल कारागीर',
-        true
+      _UcTradeSpec(
+        id: 'c3',
+        tradeKey: 'carpentry',
+        name: 'Carpentry',
+        marathiName: 'सुतारकाम व लाकूडकाम',
+        englishSubtitle: 'Carpentry & Craft',
+        iconName: 'carpenter',
+        iconData: Icons.carpenter,
+        accentColor: const Color(0xFF8D5B4C),
+        startingRate: 199,
+        rating: 4.85,
+        jobsCount: 67,
+        tags: ['दरवाजा लॉक', 'कपाट बिजागऱ्या', 'ड्रील व हँग', 'फर्निचर दुरुस्ती', 'पडदे रॉड'],
+        subServices: const [
+          _UcSubService(
+            title: 'दरवाजा लॉक व हँडल बसवणे (Door Lock & Handle Fitting)',
+            description: 'अडकलेले लॉक, टॉवर बोल्ट, लॅच व नवीन मुख्य सुरक्षा कुलूप बसवणे.',
+            rate: 249,
+            durationMinutes: 30,
+            badge: 'सुरक्षित कुलूप • High Security',
+          ),
+          _UcSubService(
+            title: 'कपाटाच्या हायड्रॉलिक बिजागऱ्या (Cupboard Hinges & Channels)',
+            description: 'कपाटाचे दरवाजे ॲडजस्ट करणे, हायड्रॉलिक हिंज व ड्रॉवर चॅनेल बदलणे.',
+            rate: 299,
+            durationMinutes: 40,
+            badge: 'कुशल कारागीर • Precision Fit',
+          ),
+          _UcSubService(
+            title: 'ड्रील व वॉल हँगिंग (Drill & Wall Hang Service)',
+            description: 'टीव्ही माउंट, आरसा, फोटो फ्रेम, पडदा रॉड व वॉल शेल्फ मजबूत फिटिंग.',
+            rate: 199,
+            durationMinutes: 25,
+            badge: 'धुळमुक्त ड्रील • Dust Free',
+          ),
+          _UcSubService(
+            title: 'लाकडी फर्निचर दुरुस्ती (Bed, Table & Chair Repair)',
+            description: 'हळणारे पलंग, टेबल, खुर्च्या घट्ट करणे, लाकडी भाग जोडणे व लेव्हलिंग.',
+            rate: 399,
+            durationMinutes: 60,
+            badge: 'मजबूत जोड • Durable Craft',
+          ),
+        ],
       ),
-      (
-        'c6',
-        'Appliance',
-        'उपकरणे दुरुस्ती',
-        'Appliance Tech',
-        'home_repair_service',
-        '८५ प्रमाणित तंत्रज्ञ',
-        true
+      _UcTradeSpec(
+        id: 'c6',
+        tradeKey: 'appliance',
+        name: 'Appliance',
+        marathiName: 'उपकरणे दुरुस्ती',
+        englishSubtitle: 'Appliance Care Tech',
+        iconName: 'home_repair_service',
+        iconData: Icons.home_repair_service,
+        accentColor: const Color(0xFF0284C7),
+        startingRate: 299,
+        rating: 4.87,
+        jobsCount: 85,
+        tags: ['गिझर सर्व्हिस', 'वॉशिंग मशीन', 'फ्रिज दुरुस्ती', 'एसी सर्व्हिस', 'वॉटर प्युरिफायर'],
+        subServices: const [
+          _UcSubService(
+            title: 'गिझर व वॉटर हीटर सर्व्हिस (Geyser Repair & Descaling)',
+            description: 'पाणी गरम न होणे, कॉईल स्केलिंग काढणे व थर्मोस्टॅट तपासणी.',
+            rate: 349,
+            durationMinutes: 45,
+            badge: 'शॉर्ट-प्रूफ • Shock Proof',
+          ),
+          _UcSubService(
+            title: 'वॉशिंग मशीन दुरुस्ती व ड्रम चेक (Washing Machine Service)',
+            description: 'ड्रेन एरर, स्पिन न होणे, मोठा आवाज व मोटर बेल्ट तपासणी.',
+            rate: 399,
+            durationMinutes: 45,
+            badge: 'मूळ सुटे भाग • Genuine Spares',
+          ),
+          _UcSubService(
+            title: 'रेफ्रिजरेटर कुलिंग व गॅस चेक (Refrigerator Cooling & Gas)',
+            description: 'कुलिंग न होणे, कॉम्प्रेशर रिले व कुलिंग कॉईल गळती सखोल तपासणी.',
+            rate: 449,
+            durationMinutes: 50,
+            badge: 'कूलिंग हमी • Chilling Guarantee',
+          ),
+          _UcSubService(
+            title: 'एअर कंडिशनर फोम सर्व्हिस (AC Foam Jet Deep Clean)',
+            description: 'हाय-प्रेशर वॉटर जेटने फिल्टर, कॉईल धुणे व गॅस प्रेशर चेक.',
+            rate: 499,
+            durationMinutes: 60,
+            badge: 'पॉवर सेव्हर • Power Saver',
+          ),
+        ],
       ),
-      (
-        'c7',
-        'Masonry',
-        'बांधकाम व गवंडी',
-        'Civil & Masonry',
-        'foundation',
-        '११० कुशल गवंडी',
-        false
+      _UcTradeSpec(
+        id: 'c4',
+        tradeKey: 'cleaning',
+        name: 'Cleaning',
+        marathiName: 'सखोल स्वच्छता',
+        englishSubtitle: 'Deep Cleaning & Sanitize',
+        iconName: 'cleaning_services',
+        iconData: Icons.cleaning_services,
+        accentColor: const Color(0xFF059669),
+        startingRate: 399,
+        rating: 4.92,
+        jobsCount: 112,
+        tags: ['बाथरूम स्क्रबिंग', 'किचन डीग्रेसिंग', 'संपूर्ण घर स्वच्छता', 'सोफा वॉश'],
+        subServices: const [
+          _UcSubService(
+            title: 'बाथरूम इंटेंसिव्ह स्क्रबिंग (Bathroom Deep Scrubbing)',
+            description: 'फरशीवरील क्षार डाग काढणे, टाइल्स व कमोड ॲसिड-मुक्त डीप क्लीन.',
+            rate: 399,
+            durationMinutes: 60,
+            badge: 'चकाचक हमी • Stain Free',
+          ),
+          _UcSubService(
+            title: 'किचन चिमणी व ओटा डीग्रेसिंग (Kitchen Degreasing)',
+            description: 'तेलकट डाग, चिमणी फिल्टर व गॅस शेगडीची संपूर्ण निर्जंतुक स्वच्छता.',
+            rate: 499,
+            durationMinutes: 75,
+            badge: 'तेलकटमुक्त • Zero Grease',
+          ),
+          _UcSubService(
+            title: 'संपूर्ण घर सखोल स्वच्छता पॅकेज (Full Home Deep Clean)',
+            description: 'सर्व रूम्सच्या फरशा मशीनने घासणे, पंखे, खिडक्या व कोपरे चकचकीत.',
+            rate: 1299,
+            durationMinutes: 180,
+            badge: 'मशीन स्क्रबिंग • Pro Clean',
+          ),
+          _UcSubService(
+            title: 'फॅब्रिक सोफा व कुशन सॅनिटायझेशन (Sofa Steam Wash)',
+            description: 'धुळीचे डाग काढणे व ॲन्टी-बॅक्टेरियल फोम ड्राय क्लिनिंग.',
+            rate: 599,
+            durationMinutes: 60,
+            badge: 'जंतुनाशक • Germ Free',
+          ),
+        ],
       ),
-      (
-        'c5',
-        'Painting',
-        'रंगकाम व पॉलिश',
-        'Painting & Polish',
-        'format_paint',
-        '४५ कारागीर',
-        false
+      _UcTradeSpec(
+        id: 'c5',
+        tradeKey: 'painting',
+        name: 'Painting',
+        marathiName: 'रंगकाम व वॉटरप्रूफिंग',
+        englishSubtitle: 'Painting & Waterproofing',
+        iconName: 'format_paint',
+        iconData: Icons.format_paint,
+        accentColor: const Color(0xFF7C3AED),
+        startingRate: 449,
+        rating: 4.82,
+        jobsCount: 45,
+        tags: ['वॉल टच-अप', 'वॉटरप्रूफिंग', 'खोली रंगकाम', 'लाकूड पॉलिश'],
+        subServices: const [
+          _UcSubService(
+            title: 'वॉल पॅच टच-अप व पुट्टी (Wall Patch Putty & Touch-up)',
+            description: 'ओलसर पडलेले पोपडे काढणे, पुट्टी भरणे व मूळ शेड जुळवून कलर करणे.',
+            rate: 449,
+            durationMinutes: 60,
+            badge: 'अचूक शेड मॅच • Perfect Match',
+          ),
+          _UcSubService(
+            title: 'पॉलिमर वॉटरप्रूफिंग लीकेज सील (Waterproofing Damp Seal)',
+            description: 'भिंतीवरील पाण्याचे पाझर व डाग विशेष केमिकल कोटिंगने बंद करणे.',
+            rate: 699,
+            durationMinutes: 90,
+            badge: '५ वर्षे हमी • Anti Leak',
+          ),
+          _UcSubService(
+            title: 'एका रूमचे संपूर्ण रंगकाम (Single Room Repaint)',
+            description: 'प्रिमियम इमल्शन कलर, प्राइमर व रोलर फिनिशने नवीन लूक.',
+            rate: 1499,
+            durationMinutes: 360,
+            badge: 'रोलर फिनिश • Smooth Wall',
+          ),
+        ],
+      ),
+      _UcTradeSpec(
+        id: 'c7',
+        tradeKey: 'masonry',
+        name: 'Masonry',
+        marathiName: 'बांधकाम व गवंडी',
+        englishSubtitle: 'Civil & Masonry Guild',
+        iconName: 'foundation',
+        iconData: Icons.foundation,
+        accentColor: const Color(0xFF475569),
+        startingRate: 349,
+        rating: 4.86,
+        jobsCount: 110,
+        tags: ['फरशी दुरुस्ती', 'प्लास्टर काम', 'इपॉक्सी ग्राउटिंग', 'भिंत भेगा भरणे'],
+        subServices: const [
+          _UcSubService(
+            title: 'तुटलेली फरशी व इपॉक्सी ग्राउट (Tile Repair & Grout)',
+            description: 'हलणाऱ्या टाइल्स पुन्हा बसवणे, वॉटरप्रूफ इपॉक्सी ग्राउट भरणे.',
+            rate: 349,
+            durationMinutes: 45,
+            badge: 'वॉटरप्रूफ • Non Crack',
+          ),
+          _UcSubService(
+            title: 'भिंत प्लास्टर व सिमेंट पॅच (Plaster & Crack Filling)',
+            description: 'भिंतीवरील पडलेले प्लास्टर सिमेंटने पुन्हा मजबूत करणे.',
+            rate: 449,
+            durationMinutes: 60,
+            badge: 'मजबूत पॅच • Solid Bind',
+          ),
+          _UcSubService(
+            title: 'दरवाजा उंबरा व खिडकी सिमेंटिंग (Threshold Masonry)',
+            description: 'उंबऱ्याजवळील मोकळी जागा, खिडकी फ्रेम पॅकिंग व फिनिशिंग.',
+            rate: 399,
+            durationMinutes: 50,
+            badge: 'लेव्हल फिनिश • Level Fit',
+          ),
+        ],
+      ),
+      _UcTradeSpec(
+        id: 'c8',
+        tradeKey: 'gardening',
+        name: 'Gardening',
+        marathiName: 'बागकाम व देखभाल',
+        englishSubtitle: 'Garden & Greenery Care',
+        iconName: 'yard',
+        iconData: Icons.yard,
+        accentColor: const Color(0xFF15803D),
+        startingRate: 299,
+        rating: 4.89,
+        jobsCount: 58,
+        tags: ['झाडांची छाटणी', 'गवत कापणे', 'सेंद्रिय खत', 'कुंडी बदलणे'],
+        subServices: const [
+          _UcSubService(
+            title: 'गॅलरी गार्डन झाडांची छाटणी (Balcony Garden Pruning)',
+            description: 'वाळलेल्या फांद्या कापणे, सेंद्रिय खत मिसळणे व झाडांना आकार देणे.',
+            rate: 299,
+            durationMinutes: 45,
+            badge: 'हिरवेगार हमी • Lush Green',
+          ),
+          _UcSubService(
+            title: 'लॉन कटिंग व कडा ट्रिमिंग (Lawn Mowing & Hedge Trim)',
+            description: 'मशीनने गवत एकसमान कापणे व कचरा गोळा करून स्वच्छ करणे.',
+            rate: 499,
+            durationMinutes: 60,
+            badge: 'एकसमान लेव्हल • Neat Edge',
+          ),
+          _UcSubService(
+            title: 'नवीन कुंड्या भरणे व माती मिश्रण (Repotting & Soil Mix)',
+            description: 'लाल माती, कोकोपीट व गांडूळ खत भरून नवीन झाडे लावणे.',
+            rate: 399,
+            durationMinutes: 50,
+            badge: 'सेंद्रिय पोषण • Organic Care',
+          ),
+        ],
       ),
     ];
+
+    // Filter trade specs by selected trade pill
+    final filteredSpecs = tradeSpecs.where((spec) {
+      if (_selectedTradeFilter != 'all' && spec.tradeKey != _selectedTradeFilter) {
+        return false;
+      }
+      if (_searchQuery.trim().isNotEmpty) {
+        final query = _searchQuery.toLowerCase();
+        final matchesName = spec.name.toLowerCase().contains(query) ||
+            spec.marathiName.toLowerCase().contains(query) ||
+            spec.englishSubtitle.toLowerCase().contains(query);
+        final matchesTags = spec.tags.any((t) => t.toLowerCase().contains(query));
+        return matchesName || matchesTags;
+      }
+      return true;
+    }).toList();
+
+    final totalArtisansInArea = _getTotalArtisansInArea(_selectedArea);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, 14, AppSpacing.marginMobile, 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 1. Header with Title & All Services Navigation
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.end,
@@ -1760,7 +2045,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'प्रमाणित सेवा प्रवर्ग'.toUpperCase(),
+                    'प्रमाणित सेवा सूची • URBAN CO-OP CATALOG'.toUpperCase(),
                     style: AppTypography.labelSm.copyWith(
                       color: AppColors.secondary,
                       fontWeight: FontWeight.bold,
@@ -1769,7 +2054,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'अत्यावश्यक व्यवसाय सूची',
+                    'अत्यावश्यक व्यवसाय सूची व थेट निवड',
                     style: AppTypography.titleMd.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w800,
@@ -1787,7 +2072,7 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
                   }
                 },
                 child: Text(
-                  '६ प्रमुख सेवा • सर्व पहा >',
+                  'सर्व सेवा (${tradeSpecs.length}) >',
                   style: AppTypography.labelSm.copyWith(
                     color: AppColors.onSurfaceVariant,
                     fontWeight: FontWeight.bold,
@@ -1796,144 +2081,1174 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+
+          // 2. Urban Company Area Selector Bar & Live Status
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceContainerLowest,
+              borderRadius: AppRadius.radiusLg,
+              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on, color: AppColors.secondary, size: 18),
+                        const SizedBox(width: 6),
+                        Text(
+                          _selectedArea == 'All Areas' ? 'सर्व पुणे प्रभाग' : _selectedArea,
+                          style: AppTypography.labelMd.copyWith(
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        InkWell(
+                          onTap: _showLocationPickerSheet,
+                          child: const Icon(Icons.arrow_drop_down, color: AppColors.secondary, size: 20),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: totalArtisansInArea > 0
+                            ? const Color(0xFFF0FDF4)
+                            : const Color(0xFFFFFBEB),
+                        borderRadius: AppRadius.radiusFull,
+                        border: Border.all(
+                          color: totalArtisansInArea > 0
+                              ? const Color(0xFFBBF7D0)
+                              : const Color(0xFFFDE68A),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            totalArtisansInArea > 0 ? Icons.verified : Icons.bolt,
+                            size: 12,
+                            color: totalArtisansInArea > 0
+                                ? const Color(0xFF16A34A)
+                                : const Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            totalArtisansInArea > 0
+                                ? '⚡ $totalArtisansInArea कारागीर सज्ज'
+                                : '⚡ महासंघ एक्सप्रेस',
+                            style: AppTypography.labelSm.copyWith(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: totalArtisansInArea > 0
+                                  ? const Color(0xFF15803D)
+                                  : const Color(0xFFB45309),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+
+                // Area Switcher Quick Chips
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: _serviceAreas.take(9).map((area) {
+                      final isSelected = _selectedArea == area;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 6),
+                        child: ChoiceChip(
+                          label: Text(area == 'All Areas' ? 'सर्व भाग' : area),
+                          selected: isSelected,
+                          selectedColor: AppColors.primaryContainer,
+                          backgroundColor: AppColors.surfaceContainerLow,
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                          labelStyle: TextStyle(
+                            color: isSelected ? Colors.white : AppColors.onSurface,
+                            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                            fontSize: 11,
+                          ),
+                          onSelected: (selected) {
+                            if (selected) {
+                              setState(() {
+                                _selectedArea = area;
+                              });
+                              _syncServiceAreas();
+                            }
+                          },
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // 3. Trade Category Filter Pills
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildTradePill('all', 'सर्व सेवा (All)', Icons.apps),
+                const SizedBox(width: 6),
+                _buildTradePill('plumbing', 'नळकाम (Plumbing)', Icons.plumbing),
+                const SizedBox(width: 6),
+                _buildTradePill('electrical', 'विद्युत (Electrical)', Icons.bolt),
+                const SizedBox(width: 6),
+                _buildTradePill('carpentry', 'सुतारकाम (Carpentry)', Icons.carpenter),
+                const SizedBox(width: 6),
+                _buildTradePill('appliance', 'उपकरणे (Appliance)', Icons.home_repair_service),
+                const SizedBox(width: 6),
+                _buildTradePill('cleaning', 'स्वच्छता (Cleaning)', Icons.cleaning_services),
+                const SizedBox(width: 6),
+                _buildTradePill('painting', 'रंगकाम (Painting)', Icons.format_paint),
+                const SizedBox(width: 6),
+                _buildTradePill('masonry', 'गवंडीकाम (Civil)', Icons.foundation),
+                const SizedBox(width: 6),
+                _buildTradePill('gardening', 'बागकाम (Garden)', Icons.yard),
+              ],
+            ),
+          ),
           const SizedBox(height: 12),
 
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final crossAxisCount = w >= 960 ? 4 : 2;
-              final aspectRatio = w >= 960 ? 1.6 : 1.35;
+          // 4. Urban Company Service Catalog Grid
+          if (filteredSpecs.isEmpty)
+            Container(
+              padding: const EdgeInsets.all(24),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.surfaceContainerLowest,
+                borderRadius: AppRadius.radiusLg,
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.search_off, size: 36, color: AppColors.outline),
+                  const SizedBox(height: 8),
+                  Text('कोणतीही सेवा आढळली नाही', style: AppTypography.titleMd.copyWith(color: AppColors.onSurfaceVariant)),
+                  const SizedBox(height: 4),
+                  Text('कृपया इतर प्रवर्ग किंवा भाग निवडा', style: AppTypography.bodySm.copyWith(color: AppColors.outline)),
+                ],
+              ),
+            )
+          else
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final crossAxisCount = w >= 960 ? 4 : 2;
+                final aspectRatio = w >= 960 ? 1.45 : 1.05;
 
-              return GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  mainAxisSpacing: 10,
-                  crossAxisSpacing: 10,
-                  childAspectRatio: aspectRatio,
-                ),
-                itemCount: defaultTradeSpecs.length,
-                itemBuilder: (context, index) {
-                  final spec = defaultTradeSpecs[index];
-                  final matchedCategory = _categories.firstWhere(
-                    (c) => c.id == spec.$1 || c.name.toLowerCase().contains(spec.$2.toLowerCase()),
-                    orElse: () => ServiceCategory(id: spec.$1, name: spec.$2, iconData: spec.$5),
-                  );
+                return GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: crossAxisCount,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: aspectRatio,
+                  ),
+                  itemCount: filteredSpecs.length,
+                  itemBuilder: (context, index) {
+                    final spec = filteredSpecs[index];
+                    final matchedCategory = _categories.firstWhere(
+                      (c) => c.id == spec.id || c.name.toLowerCase().contains(spec.name.toLowerCase()),
+                      orElse: () => ServiceCategory(id: spec.id, name: spec.name, iconData: spec.iconName),
+                    );
+                    final workerCount = _getWorkerCountForTrade(spec.id, spec.name, _selectedArea);
+                    final hasDirectWorkers = workerCount > 0;
+                    final availableArtisans = _getArtisansForTrade(spec.id, spec.name, _selectedArea);
 
-                  return Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      borderRadius: AppRadius.radiusXl,
-                      onTap: () => _navigateToCategory(matchedCategory),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceContainerLowest,
-                          borderRadius: AppRadius.radiusXl,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.04),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: AppRadius.radiusXl,
+                        onTap: () => _showUrbanCompanyServiceSheet(spec, matchedCategory, availableArtisans),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceContainerLowest,
+                            borderRadius: AppRadius.radiusXl,
+                            border: Border.all(
+                              color: hasDirectWorkers
+                                  ? AppColors.outlineVariant.withValues(alpha: 0.8)
+                                  : AppColors.outlineVariant.withValues(alpha: 0.5),
                             ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Container(
-                                  width: 40,
-                                  height: 40,
-                                  decoration: BoxDecoration(
-                                    color: spec.$2 == 'Electrical'
-                                        ? AppColors.secondaryFixed.withValues(alpha: 0.4)
-                                        : AppColors.surfaceContainerLow,
-                                    borderRadius: AppRadius.radiusLg,
-                                  ),
-                                  child: Icon(
-                                    _mapCategoryIcon(spec.$5),
-                                    size: 22,
-                                    color: spec.$2 == 'Electrical' ? AppColors.secondary : AppColors.primaryContainer,
-                                  ),
-                                ),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: spec.$7
-                                        ? AppColors.tertiaryFixed.withValues(alpha: 0.3)
-                                        : AppColors.surfaceContainer,
-                                    borderRadius: AppRadius.radiusSm,
-                                  ),
-                                  child: Text(
-                                    spec.$7 ? 'सक्रिय' : 'उपलब्ध',
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: spec.$7 ? AppColors.onTertiaryContainer : AppColors.onSurfaceVariant,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.04),
+                                blurRadius: 4,
+                                offset: const Offset(0, 1),
+                              ),
+                            ],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              // Top Row: Icon + Live Area Worker Availability Pill
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: spec.accentColor.withValues(alpha: 0.12),
+                                      borderRadius: AppRadius.radiusLg,
+                                      border: Border.all(color: spec.accentColor.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Icon(
+                                      spec.iconData,
+                                      size: 22,
+                                      color: spec.accentColor,
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  spec.$3,
-                                  style: AppTypography.titleMd.copyWith(
-                                    color: AppColors.onSurface,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    height: 1.1,
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: hasDirectWorkers
+                                          ? const Color(0xFFF0FDF4)
+                                          : const Color(0xFFFFFBEB),
+                                      borderRadius: AppRadius.radiusSm,
+                                      border: Border.all(
+                                        color: hasDirectWorkers
+                                            ? const Color(0xFFBBF7D0)
+                                            : const Color(0xFFFDE68A),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          hasDirectWorkers
+                                              ? '⚡ $workerCount सज्ज'
+                                              : '⚡ महासंघ डिस्पॅच',
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: hasDirectWorkers
+                                                ? const Color(0xFF15803D)
+                                                : const Color(0xFFB45309),
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                        Text(
+                                          hasDirectWorkers ? '~१५ मि. थेट' : '~२५ मि. आगमन',
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: hasDirectWorkers
+                                                ? const Color(0xFF166534)
+                                                : const Color(0xFF92400E),
+                                            fontSize: 8,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  spec.$4,
-                                  style: AppTypography.bodySm.copyWith(
-                                    color: AppColors.onSurfaceVariant,
-                                    fontSize: 10,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
-                            ),
-                            Row(
-                              children: [
-                                const Icon(Icons.groups, size: 14, color: AppColors.onSurfaceVariant),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    spec.$6,
-                                    style: AppTypography.labelSm.copyWith(
-                                      color: AppColors.onSurfaceVariant,
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
+                                ],
+                              ),
+
+                              // Middle Column: Title, Subtitle, Rating & Tags
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    spec.marathiName,
+                                    style: AppTypography.titleMd.copyWith(
+                                      color: AppColors.onSurface,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      height: 1.15,
                                     ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
+                                  Text(
+                                    spec.englishSubtitle,
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                      fontSize: 10,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.star, size: 12, color: AppColors.starRating),
+                                      const SizedBox(width: 2),
+                                      Text(
+                                        '${spec.rating} (${spec.jobsCount}+)',
+                                        style: AppTypography.labelSm.copyWith(
+                                          color: AppColors.onSurface,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  // Sub-service chip preview
+                                  Text(
+                                    spec.tags.take(2).join(' • '),
+                                    style: AppTypography.bodySm.copyWith(
+                                      color: AppColors.outline,
+                                      fontSize: 9,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+
+                              // Bottom Row: Starting Rate & Select Button
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '₹${spec.startingRate.toInt()} पासून',
+                                        style: AppTypography.labelMd.copyWith(
+                                          color: AppColors.primary,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                      Text(
+                                        '०% मध्यस्थ कमिशन',
+                                        style: AppTypography.labelSm.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                          fontSize: 8,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryContainer,
+                                      borderRadius: AppRadius.radiusSm,
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'निवडा',
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 2),
+                                        const Icon(Icons.chevron_right, size: 12, color: Colors.white),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTradePill(String key, String label, IconData icon) {
+    final isSelected = _selectedTradeFilter == key;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        setState(() {
+          _selectedTradeFilter = key;
+        });
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primaryContainer : AppColors.surfaceContainerLowest,
+          borderRadius: AppRadius.radiusFull,
+          border: Border.all(
+            color: isSelected ? AppColors.primaryContainer : AppColors.outlineVariant,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 3,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isSelected ? Colors.white : AppColors.primary,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: AppTypography.labelSm.copyWith(
+                color: isSelected ? Colors.white : AppColors.onSurface,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  int _getWorkerCountForTrade(String tradeId, String tradeName, String area) {
+    if (area == 'All Areas') {
+      return _featuredWorkers.where((w) => _workerMatchesTrade(w, tradeId, tradeName)).length;
+    }
+    final target = area.toLowerCase();
+    final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2).toList();
+    return _featuredWorkers.where((w) {
+      if (!_workerMatchesTrade(w, tradeId, tradeName)) return false;
+      final loc = w.locationTag.toLowerCase();
+      final matchesTag = keywords.any((k) => loc.contains(k));
+      final matchesAreas = w.serviceAreas.any((sa) => keywords.any((k) => sa.toLowerCase().contains(k)));
+      return matchesTag || matchesAreas;
+    }).length;
+  }
+
+  bool _workerMatchesTrade(Worker w, String tradeId, String tradeName) {
+    if (w.categoryId == tradeId) return true;
+    const uuidToId = {
+      '11111111-1111-1111-1111-111111111111': 'c1',
+      '22222222-2222-2222-2222-222222222222': 'c2',
+      '33333333-3333-3333-3333-333333333333': 'c3',
+      '55555555-5555-5555-5555-555555555555': 'c4',
+      '44444444-4444-4444-4444-444444444444': 'c5',
+      '99999999-9999-9999-9999-999999999999': 'c6',
+      '88888888-8888-8888-8888-888888888888': 'c7',
+      '77777777-7777-7777-7777-777777777777': 'c8',
+    };
+    if (uuidToId[w.categoryId] == tradeId) return true;
+    final nameLower = tradeName.toLowerCase();
+    return w.specializations.any((s) => s.toLowerCase().contains(nameLower));
+  }
+
+  List<Worker> _getArtisansForTrade(String tradeId, String tradeName, String area) {
+    final matchingWorkers = _featuredWorkers.where((w) => _workerMatchesTrade(w, tradeId, tradeName)).toList();
+    if (matchingWorkers.isEmpty) return [];
+
+    if (area == 'All Areas') return matchingWorkers;
+
+    final target = area.toLowerCase();
+    final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2).toList();
+    final direct = matchingWorkers.where((w) {
+      final loc = w.locationTag.toLowerCase();
+      final matchesTag = keywords.any((k) => loc.contains(k));
+      final matchesAreas = w.serviceAreas.any((sa) => keywords.any((k) => sa.toLowerCase().contains(k)));
+      return matchesTag || matchesAreas;
+    }).toList();
+
+    if (direct.isNotEmpty) return direct;
+
+    // Cooperative collective dispatch fallback: returns federation artisans ready to serve this area
+    return matchingWorkers.map((w) => Worker(
+      id: w.id,
+      name: w.name,
+      categoryId: w.categoryId,
+      rate: w.rate,
+      rating: w.rating,
+      reviewCount: w.reviewCount,
+      jobsCompleted: w.jobsCompleted,
+      distanceKm: 2.8,
+      experience: w.experience,
+      availability: 'Available Today',
+      specializations: w.specializations,
+      locationTag: 'Serving $area (${w.locationTag})',
+      imageUrl: w.imageUrl,
+      customTag: 'Cooperative Collective Dispatch',
+      bio: w.bio,
+      federationId: w.federationId,
+      insuranceAmount: w.insuranceAmount,
+      languages: w.languages,
+      serviceAreas: [...w.serviceAreas, area],
+      isUnionGold: w.isUnionGold,
+      isCoopMaster: w.isCoopMaster,
+    )).toList();
+  }
+
+  int _getTotalArtisansInArea(String area) {
+    if (area == 'All Areas') return _featuredWorkers.length;
+    final target = area.toLowerCase();
+    final keywords = target.split(RegExp(r'[\s,&]+')).where((s) => s.length > 2).toList();
+    final direct = _featuredWorkers.where((w) {
+      final loc = w.locationTag.toLowerCase();
+      final matchesTag = keywords.any((k) => loc.contains(k));
+      final matchesAreas = w.serviceAreas.any((sa) => keywords.any((k) => sa.toLowerCase().contains(k)));
+      return matchesTag || matchesAreas;
+    }).length;
+    return direct > 0 ? direct : _featuredWorkers.length;
+  }
+
+  void _showUrbanCompanyServiceSheet(
+    _UcTradeSpec spec,
+    ServiceCategory matchedCategory,
+    List<Worker> availableWorkers,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (modalCtx, setModalState) {
+            final currentWorkers = _getArtisansForTrade(spec.id, spec.name, _selectedArea);
+            final currentCount = _getWorkerCountForTrade(spec.id, spec.name, _selectedArea);
+            final currentHasDirect = currentCount > 0;
+
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.88,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              ),
+              child: Column(
+                children: [
+                  // Grab Handle
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 10, bottom: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.outlineVariant,
+                        borderRadius: AppRadius.radiusFull,
+                      ),
+                    ),
+                  ),
+
+                  // Header with service info & close button
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 48,
+                          height: 48,
+                          decoration: BoxDecoration(
+                            color: spec.accentColor.withValues(alpha: 0.12),
+                            borderRadius: AppRadius.radiusLg,
+                            border: Border.all(color: spec.accentColor.withValues(alpha: 0.25)),
+                          ),
+                          child: Icon(spec.iconData, color: spec.accentColor, size: 26),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                spec.marathiName,
+                                style: AppTypography.titleMd.copyWith(
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                spec.englishSubtitle,
+                                style: AppTypography.bodySm.copyWith(
+                                  color: AppColors.onSurfaceVariant,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  const Icon(Icons.star, size: 14, color: AppColors.starRating),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${spec.rating} (${spec.jobsCount}+ कामे)',
+                                    style: AppTypography.labelSm.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.onSurface,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primaryFixed.withValues(alpha: 0.15),
+                                      borderRadius: AppRadius.radiusSm,
+                                    ),
+                                    child: Text(
+                                      'सहकारी हमी दर • ०% कमिशन',
+                                      style: AppTypography.labelSm.copyWith(
+                                        color: AppColors.primary,
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(modalCtx),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Inline Area Bar with fast change button
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: currentHasDirect
+                          ? const Color(0xFFF0FDF4)
+                          : const Color(0xFFFFFBEB),
+                      borderRadius: AppRadius.radiusMd,
+                      border: Border.all(
+                        color: currentHasDirect
+                            ? const Color(0xFFBBF7D0)
+                            : const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Row(
+                            children: [
+                              Icon(
+                                currentHasDirect ? Icons.verified : Icons.bolt,
+                                size: 18,
+                                color: currentHasDirect
+                                    ? const Color(0xFF16A34A)
+                                    : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      currentHasDirect
+                                          ? '$_selectedArea: $currentCount स्थानिक कारागीर सज्ज'
+                                          : '$_selectedArea: सहकारी मंच एक्सप्रेस डिस्पॅच',
+                                      style: AppTypography.labelSm.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: currentHasDirect
+                                            ? const Color(0xFF15803D)
+                                            : const Color(0xFFB45309),
+                                      ),
+                                    ),
+                                    Text(
+                                      currentHasDirect
+                                          ? 'सरासरी १५-२० मिनिटांत थेट आगमन'
+                                          : '२५-३० मिनिटांत प्रमाणित कारागीर उपलब्ध',
+                                      style: AppTypography.labelSm.copyWith(
+                                        fontSize: 10,
+                                        color: currentHasDirect
+                                            ? const Color(0xFF166534)
+                                            : const Color(0xFF92400E),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pop(modalCtx);
+                            _showLocationPickerSheet();
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: AppRadius.radiusSm,
+                              border: Border.all(color: AppColors.outlineVariant),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.edit_location_alt, size: 12, color: AppColors.secondary),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'बदला',
+                                  style: AppTypography.labelSm.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.secondary,
+                                    fontSize: 11,
+                                  ),
                                 ),
                               ],
                             ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const Divider(height: 16),
+
+                  // Scrollable Body: Sub-Services Packages + Available Artisans
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      children: [
+                        Text(
+                          'सेवा पॅकेजेस निवडा (Select Service Package)',
+                          style: AppTypography.labelMd.copyWith(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+
+                        // Sub Services List
+                        ...spec.subServices.map((sub) {
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 10),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLowest,
+                              borderRadius: AppRadius.radiusLg,
+                              border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.6)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.03),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.secondaryFixed.withValues(alpha: 0.35),
+                                              borderRadius: AppRadius.radiusSm,
+                                            ),
+                                            child: Text(
+                                              sub.badge,
+                                              style: AppTypography.labelSm.copyWith(
+                                                color: AppColors.secondary,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            sub.title,
+                                            style: AppTypography.labelLg.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.onSurface,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            sub.description,
+                                            style: AppTypography.bodySm.copyWith(
+                                              color: AppColors.onSurfaceVariant,
+                                              fontSize: 11,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 6),
+                                          Row(
+                                            children: [
+                                              const Icon(Icons.timer_outlined, size: 13, color: AppColors.outline),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                '~${sub.durationMinutes} मिनिटे',
+                                                style: AppTypography.labelSm.copyWith(
+                                                  color: AppColors.outline,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 12),
+                                              const Icon(Icons.shield_outlined, size: 13, color: AppColors.outline),
+                                              const SizedBox(width: 3),
+                                              Text(
+                                                '३०-दिवस वॉरंटी',
+                                                style: AppTypography.labelSm.copyWith(
+                                                  color: AppColors.outline,
+                                                  fontSize: 11,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Column(
+                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '₹${sub.rate.toInt()}',
+                                          style: AppTypography.headlineSm.copyWith(
+                                            color: AppColors.primary,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          'सहकारी दर',
+                                          style: AppTypography.labelSm.copyWith(
+                                            color: AppColors.onSurfaceVariant,
+                                            fontSize: 9,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        ElevatedButton(
+                                          style: ElevatedButton.styleFrom(
+                                            backgroundColor: AppColors.primaryContainer,
+                                            foregroundColor: Colors.white,
+                                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                            shape: RoundedRectangleBorder(
+                                              borderRadius: AppRadius.radiusMd,
+                                            ),
+                                            elevation: 0,
+                                          ),
+                                          onPressed: () {
+                                            Navigator.pop(modalCtx);
+                                            // Preselect category and worker
+                                            bookingFlowState.selectedCategory = matchedCategory;
+                                            if (currentWorkers.isNotEmpty) {
+                                              bookingFlowState.selectedWorker = currentWorkers.first;
+                                            }
+                                            Navigator.of(context).push(
+                                              MaterialPageRoute(
+                                                builder: (_) => const BookingDateTimeScreen(),
+                                              ),
+                                            );
+                                          },
+                                          child: Text(
+                                            '+ बुक करा',
+                                            style: AppTypography.labelMd.copyWith(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+
+                        const SizedBox(height: 16),
+
+                        // Available Artisans Serving This Area
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              'प्रमाणित स्थानिक कारागीर ($_selectedArea)',
+                              style: AppTypography.labelMd.copyWith(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            Text(
+                              '${currentWorkers.length} उपलब्ध',
+                              style: AppTypography.labelSm.copyWith(
+                                color: AppColors.secondary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 8),
+
+                        if (currentWorkers.isEmpty)
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppColors.surfaceContainerLow,
+                              borderRadius: AppRadius.radiusLg,
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline, color: AppColors.secondary),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
+                                    'या प्रभागात थेट नोंदणीकृत कारागीर शोधत आहोत. सहकारी महासंघ एक्सप्रेस डिस्पॅच द्वारे त्वरित कारागीर पाठवला जाईल.',
+                                    style: AppTypography.bodySm.copyWith(fontSize: 11),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          SizedBox(
+                            height: 175,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: currentWorkers.length,
+                              separatorBuilder: (context, index) => const SizedBox(width: 10),
+                              itemBuilder: (context, wIdx) {
+                                final worker = currentWorkers[wIdx];
+                                return Container(
+                                  width: 250,
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: AppRadius.radiusLg,
+                                    border: Border.all(color: AppColors.outlineVariant.withValues(alpha: 0.7)),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.03),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 20,
+                                            backgroundColor: AppColors.surfaceContainerLow,
+                                            backgroundImage: worker.imageUrl.isNotEmpty
+                                                ? NetworkImage(worker.imageUrl)
+                                                : null,
+                                            child: worker.imageUrl.isEmpty
+                                                ? const Icon(Icons.person, color: AppColors.primary)
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  worker.name,
+                                                  style: AppTypography.labelMd.copyWith(
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                                Row(
+                                                  children: [
+                                                    const Icon(Icons.star, size: 12, color: AppColors.starRating),
+                                                    const SizedBox(width: 2),
+                                                    Text(
+                                                      '${worker.rating} (${worker.reviewCount})',
+                                                      style: AppTypography.labelSm.copyWith(
+                                                        fontSize: 10,
+                                                        fontWeight: FontWeight.bold,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Text(
+                                        worker.locationTag,
+                                        style: AppTypography.bodySm.copyWith(
+                                          color: AppColors.onSurfaceVariant,
+                                          fontSize: 10,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Row(
+                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        children: [
+                                          Text(
+                                            '₹${worker.rate.toInt()}/व्हिजिट',
+                                            style: AppTypography.labelMd.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                          Row(
+                                            children: [
+                                              InkWell(
+                                                onTap: () {
+                                                  Navigator.pop(modalCtx);
+                                                  _navigateToWorkerProfile(worker);
+                                                },
+                                                child: Text(
+                                                  'प्रोफाइल',
+                                                  style: AppTypography.labelSm.copyWith(
+                                                    color: AppColors.onSurfaceVariant,
+                                                    fontSize: 10,
+                                                    decoration: TextDecoration.underline,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              ElevatedButton(
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.secondary,
+                                                  foregroundColor: Colors.white,
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  minimumSize: Size.zero,
+                                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                                  shape: RoundedRectangleBorder(
+                                                    borderRadius: AppRadius.radiusSm,
+                                                  ),
+                                                ),
+                                                onPressed: () {
+                                                  Navigator.pop(modalCtx);
+                                                  bookingFlowState.selectedCategory = matchedCategory;
+                                                  bookingFlowState.selectedWorker = worker;
+                                                  Navigator.of(context).push(
+                                                    MaterialPageRoute(
+                                                      builder: (_) => const BookingDateTimeScreen(),
+                                                    ),
+                                                  );
+                                                },
+                                                child: const Text('निवडा', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold)),
+                                              ),
+                                            ],
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+
+                        const SizedBox(height: 16),
+
+                        // FairMatch Instant Dispatch Banner
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [AppColors.primary, AppColors.primaryContainer],
+                            ),
+                            borderRadius: AppRadius.radiusLg,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.15),
+                                  borderRadius: AppRadius.radiusMd,
+                                ),
+                                child: const Icon(Icons.auto_awesome, color: AppColors.tertiaryFixed, size: 20),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'FairMatch AI ऑटो-डिस्पॅच',
+                                      style: AppTypography.labelMd.copyWith(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    Text(
+                                      '३.५ किमी परिघात सर्वाधिक मानांकित कारागीर थेट नियुक्त करा.',
+                                      style: AppTypography.bodySm.copyWith(
+                                        color: Colors.white.withValues(alpha: 0.8),
+                                        fontSize: 10,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.secondary,
+                                  foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: AppRadius.radiusMd,
+                                  ),
+                                ),
+                                onPressed: () {
+                                  Navigator.pop(modalCtx);
+                                  bookingFlowState.selectedCategory = matchedCategory;
+                                  if (currentWorkers.isNotEmpty) {
+                                    bookingFlowState.selectedWorker = currentWorkers.first;
+                                  }
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute(
+                                      builder: (_) => const BookingDateTimeScreen(),
+                                    ),
+                                  );
+                                },
+                                child: const Text('थेट बुक करा', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  );
-                },
-              );
-            },
-          ),
-        ],
-      ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 
@@ -2140,52 +3455,21 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
           const SizedBox(height: 12),
 
           if (filteredWorkers.isEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: AppRadius.radiusLg,
-                border: Border.all(color: AppColors.outlineVariant),
-              ),
-              child: Column(
-                children: [
-                  const Icon(Icons.location_off_outlined, size: 36, color: AppColors.outline),
-                  const SizedBox(height: 8),
-                  Text(
-                    _selectedArea == 'All Areas'
-                        ? 'No artisans currently available'
-                        : 'No registered union artisans in $_selectedArea yet',
-                    style: AppTypography.labelLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Union onboarding is actively registering cooperatives in this area. You can explore all available artisans across other clusters.',
-                    style: AppTypography.bodySm.copyWith(color: AppColors.outline),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      elevation: 0,
-                    ),
-                    onPressed: () {
-                      setState(() {
-                        _selectedArea = 'All Areas';
-                        _searchQuery = '';
-                        _searchController.clear();
-                      });
-                    },
-                    icon: const Icon(Icons.explore_outlined, size: 14),
-                    label: const Text('View All Available Artisans'),
-                  ),
-                ],
-              ),
+            AppEmptyView(
+              title: _selectedArea == 'All Areas'
+                  ? 'No artisans currently available'
+                  : 'No registered union artisans in $_selectedArea yet',
+              subtitle:
+                  'Union onboarding is actively registering cooperatives in this area. You can explore all available artisans across other clusters.',
+              icon: Icons.location_off_outlined,
+              actionLabel: 'View All Available Artisans',
+              onActionPressed: () {
+                setState(() {
+                  _selectedArea = 'All Areas';
+                  _searchQuery = '';
+                  _searchController.clear();
+                });
+              },
             )
           else
             ListView.separated(
@@ -2863,4 +4147,52 @@ class _CustomerHomeScreenState extends State<CustomerHomeScreen> {
       ),
     );
   }
+}
+
+class _UcTradeSpec {
+  final String id;
+  final String tradeKey;
+  final String name;
+  final String marathiName;
+  final String englishSubtitle;
+  final String iconName;
+  final IconData iconData;
+  final Color accentColor;
+  final double startingRate;
+  final double rating;
+  final int jobsCount;
+  final List<String> tags;
+  final List<_UcSubService> subServices;
+
+  const _UcTradeSpec({
+    required this.id,
+    required this.tradeKey,
+    required this.name,
+    required this.marathiName,
+    required this.englishSubtitle,
+    required this.iconName,
+    required this.iconData,
+    required this.accentColor,
+    required this.startingRate,
+    required this.rating,
+    required this.jobsCount,
+    required this.tags,
+    required this.subServices,
+  });
+}
+
+class _UcSubService {
+  final String title;
+  final String description;
+  final double rate;
+  final int durationMinutes;
+  final String badge;
+
+  const _UcSubService({
+    required this.title,
+    required this.description,
+    required this.rate,
+    required this.durationMinutes,
+    this.badge = 'सहकारी हमी • Co-op Guarantee',
+  });
 }

@@ -9,6 +9,7 @@ class DocumentViewerModal extends StatefulWidget {
   final Map<String, dynamic> doc;
   final VoidCallback? onApprove;
   final VoidCallback? onFlag;
+  final VoidCallback? onResubmit;
   final bool isAdmin;
 
   const DocumentViewerModal({
@@ -16,6 +17,7 @@ class DocumentViewerModal extends StatefulWidget {
     required this.doc,
     this.onApprove,
     this.onFlag,
+    this.onResubmit,
     this.isAdmin = false,
   });
 
@@ -25,6 +27,7 @@ class DocumentViewerModal extends StatefulWidget {
     required Map<String, dynamic> doc,
     VoidCallback? onApprove,
     VoidCallback? onFlag,
+    VoidCallback? onResubmit,
     bool isAdmin = false,
   }) {
     return showDialog(
@@ -35,6 +38,7 @@ class DocumentViewerModal extends StatefulWidget {
         doc: doc,
         onApprove: onApprove,
         onFlag: onFlag,
+        onResubmit: onResubmit,
         isAdmin: isAdmin,
       ),
     );
@@ -350,6 +354,21 @@ class _DocumentViewerModalState extends State<DocumentViewerModal> {
                       runSpacing: 8,
                       crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
+                        if (widget.isAdmin && widget.onResubmit != null && status == 'APPROVED')
+                          OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.secondary,
+                              side: const BorderSide(color: AppColors.secondary),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              widget.onResubmit?.call();
+                            },
+                            icon: const Icon(Icons.replay_rounded, size: 16),
+                            label: const Text('Resubmit Document', style: TextStyle(fontSize: 12)),
+                          ),
                         if (widget.isAdmin && widget.onFlag != null && status != 'FLAGGED')
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
@@ -363,7 +382,7 @@ class _DocumentViewerModalState extends State<DocumentViewerModal> {
                               widget.onFlag?.call();
                             },
                             icon: const Icon(Icons.flag_outlined, size: 16),
-                            label: const Text('Flag for Resubmission', style: TextStyle(fontSize: 12)),
+                            label: const Text('Flag Queries', style: TextStyle(fontSize: 12)),
                           ),
                         if (widget.isAdmin && widget.onApprove != null && status != 'APPROVED')
                           ElevatedButton.icon(

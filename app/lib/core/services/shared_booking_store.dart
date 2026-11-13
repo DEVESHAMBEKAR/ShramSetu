@@ -1,6 +1,7 @@
 import 'dart:async';
 import '../../features/worker/data/models/worker_models.dart';
 import '../config/dependency_injection.dart';
+import '../config/app_config.dart';
 
 /// Single source of truth for mock & demo booking state across Customer, Worker, and Admin.
 /// Uses a broadcast stream to synchronize state changes across roles in real-time.
@@ -20,6 +21,14 @@ class SharedBookingStore {
 
   void _initDefaultBookings() {
     _bookings.clear();
+    // Only pre-seed demo bookings in mock or unit-test mode where Supabase is absent.
+    // Live mode strictly reflects database records without ghost dummy bookings.
+    if (!AppConfig.isSupabaseInitialized || AppConfig.useMockData) {
+      _seedDemoBookings();
+    }
+  }
+
+  void _seedDemoBookings() {
     _bookings.add({
       'id': 'j1',
       'worker_id': 'w1',
@@ -36,6 +45,7 @@ class SharedBookingStore {
       'distance_km': 1.8,
       'status': BookingStatus.onTheWay.toDbString(),
       'otp': '8492',
+      'payment_method': 'RAZORPAY',
       'notes': 'Kitchen sink faucet leaking steadily.',
       'created_at': 'Just now',
       'services': {
@@ -87,6 +97,7 @@ class SharedBookingStore {
     String? addressId,
     String? notes,
     String bookingType = 'NORMAL',
+    String paymentMethod = 'RAZORPAY',
   }) async {
     final newId = 'bk_${DateTime.now().millisecondsSinceEpoch}';
     final effectiveCustomerId = customerId ?? 'mock-customer-1';
@@ -106,6 +117,7 @@ class SharedBookingStore {
       'scheduled_time': scheduledTime,
       'base_amount': amount,
       'booking_type': bookingType,
+      'payment_method': paymentMethod,
       'labor_allowance': 50.0,
       'distance_km': 1.4,
       'status': BookingStatus.onTheWay.toDbString(),
@@ -310,6 +322,8 @@ class SharedBookingStore {
         workerName: b['worker_name'] as String?,
         federationRefId: b['federation_ref_id'] as String?,
         federationName: b['federation_name'] as String?,
+        paymentMethod: b['payment_method'] as String? ?? 'RAZORPAY',
+        otp: b['otp'] as String? ?? '8492',
       );
     }).toList();
   }
@@ -317,6 +331,18 @@ class SharedBookingStore {
   Stream<List<JobRequest>> watchWorkerBookings({String? workerId}) async* {
     yield getWorkerBookings(workerId: workerId);
     yield* _changeController.stream.map((_) => getWorkerBookings(workerId: workerId));
+  }
+
+  void addExternalBooking(Map<String, dynamic> booking) {
+    final id = booking['id']?.toString();
+    if (id == null) return;
+    final index = _bookings.indexWhere((b) => b['id'] == id);
+    if (index != -1) {
+      _bookings[index].addAll(booking);
+    } else {
+      _bookings.insert(0, Map<String, dynamic>.from(booking));
+    }
+    _changeController.add(null);
   }
 
   Future<bool> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
@@ -340,7 +366,8 @@ class SharedBookingStore {
     _changeController.add(null);
 
     // Send push notification to customer
-    final customerId = _bookings[index]['customer_id'] as String?;
+    final targetIndex = index != -1 ? index : (_bookings.length - 1);
+    final customerId = _bookings[targetIndex]['customer_id'] as String?;
     if (customerId != null) {
       try {
         DI.notificationRepo.sendPushNotification(
@@ -375,6 +402,23 @@ class SharedBookingStore {
     return false;
   }
 
+  Future<bool> updatePaymentMethod(String bookingId, String paymentMethod) async {
+    final index = _bookings.indexWhere((b) => b['id'] == bookingId);
+    if (index != -1) {
+      _bookings[index]['payment_method'] = paymentMethod;
+      _changeController.add(null);
+      return true;
+    }
+    return false;
+  }
+
+  Map<String, dynamic>? getBookingById(String bookingId) {
+    final index = _bookings.indexWhere((b) => b['id'] == bookingId);
+    if (index != -1) return Map<String, dynamic>.from(_bookings[index]);
+    return null;
+  }
+
+
   // ─────────────────────── Admin Methods ───────────────────────
 
   List<JobRequest> getAllBookings() => getWorkerBookings();
@@ -382,7 +426,8 @@ class SharedBookingStore {
   Stream<List<JobRequest>> watchAllBookings() => watchWorkerBookings();
 
   void resetDemoData() {
-    _initDefaultBookings();
+    _bookings.clear();
+    _seedDemoBookings();
     _changeController.add(null);
   }
 }

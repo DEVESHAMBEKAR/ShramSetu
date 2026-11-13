@@ -184,6 +184,7 @@ class MockWorkerRepository implements IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    List<String>? serviceAreas,
     String? dob,
     String? gender,
     String? address,
@@ -217,6 +218,7 @@ class MockWorkerRepository implements IWorkerRepository {
       skills: [skill],
       experience: '$experienceYears Years',
       serviceLocation: serviceLocation,
+      serviceAreas: serviceAreas ?? [serviceLocation],
       dob: dob,
       gender: gender,
       address: address,
@@ -328,5 +330,41 @@ class MockWorkerRepository implements IWorkerRepository {
       phone: phone.trim(),
       email: email.trim(),
     );
+  }
+
+  static final List<Map<String, dynamic>> mockAreaTickets = [];
+
+  @override
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas) async {
+    final firstLoc = serviceAreas.isNotEmpty ? serviceAreas.first : currentWorker.serviceLocation;
+    currentWorker = currentWorker.copyWith(
+      serviceAreas: serviceAreas,
+      serviceLocation: firstLoc,
+    );
+  }
+
+  @override
+  Future<void> raiseAreaChangeTicket({
+    required String workerId,
+    required List<String> requestedAreas,
+    required String reason,
+  }) async {
+    final ticket = <String, dynamic>{
+      'id': 'ticket-${DateTime.now().millisecondsSinceEpoch}',
+      'worker_id': workerId,
+      'worker_name': currentWorker.name,
+      'federation_id': currentWorker.federationRefId ?? 'fed-1',
+      'current_areas': List<String>.from(currentWorker.serviceAreas),
+      'requested_areas': List<String>.from(requestedAreas),
+      'reason': reason.trim(),
+      'status': 'PENDING',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    mockAreaTickets.insert(0, ticket);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets(String workerId) async {
+    return mockAreaTickets.where((t) => t['worker_id'] == workerId).toList();
   }
 }

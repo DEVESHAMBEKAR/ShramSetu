@@ -9,6 +9,7 @@ import '../../../../core/config/app_config.dart';
 import 'worker_profile_screen.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../shared/widgets/shramsetu_brand_mark.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class WorkerDiscoveryScreen extends StatefulWidget {
   final ServiceCategory? initialCategory;
@@ -207,10 +208,14 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                     future: _workersFuture,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
+                        return const AppLoadingView(message: 'Finding verified trade artisans...');
                       }
                       if (snapshot.hasError) {
-                        return Center(child: Text('Error: ${snapshot.error}', style: AppTypography.bodyMd));
+                        return AppErrorView(
+                          title: 'Unable to Load Artisans',
+                          message: snapshot.error.toString(),
+                          onRetry: _loadWorkers,
+                        );
                       }
 
                       final allWorkers = snapshot.data ?? [];
@@ -243,39 +248,24 @@ class _WorkerDiscoveryScreenState extends State<WorkerDiscoveryScreen> {
                       }
 
                       if (filtered.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  widget.isEmergency ? Icons.warning_amber_rounded : Icons.search_off,
-                                  size: 48,
-                                  color: widget.isEmergency ? AppColors.error : AppColors.outline,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  widget.isEmergency
-                                      ? 'No emergency artisans available in your area right now'
-                                      : 'No registered ${_currentCategory.name} artisans found matching criteria',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.titleMd.copyWith(
-                                    color: widget.isEmergency ? AppColors.error : AppColors.onSurface,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  widget.isEmergency
-                                      ? 'All nearby emergency specialists are currently engaged. Try scheduling a standard service or contact our union helpline: 1800-266-9090.'
-                                      : 'Try selecting "All Areas" or searching another trade (e.g., Electrician, Carpentry).',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.bodySm.copyWith(color: AppColors.outline),
-                                ),
-                              ],
-                            ),
-                          ),
+                        return AppEmptyView(
+                          icon: widget.isEmergency ? Icons.warning_amber_rounded : Icons.search_off,
+                          title: widget.isEmergency
+                              ? 'No emergency artisans available in your area right now'
+                              : 'No registered ${_currentCategory.name} artisans found matching criteria',
+                          subtitle: widget.isEmergency
+                              ? 'All nearby emergency specialists are currently engaged. Try scheduling a standard service or contact our union helpline: 1800-266-9090.'
+                              : 'Try selecting "All Areas" or searching another trade (e.g., Electrician, Carpentry).',
+                          actionLabel: _selectedWard != 'All Areas' ? 'View All Available Artisans' : null,
+                          onActionPressed: _selectedWard != 'All Areas'
+                              ? () {
+                                  setState(() {
+                                    _selectedWard = 'All Areas';
+                                    _searchQuery = '';
+                                    _searchController.clear();
+                                  });
+                                }
+                              : null,
                         );
                       }
 

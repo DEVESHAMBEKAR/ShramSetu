@@ -21,6 +21,7 @@ class CustomerMainLayout extends StatefulWidget {
 
 class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   int _currentIndex = 0;
+  bool _isDesktopSidebarCollapsed = false;
   String _customerName = 'ShramSetu Member';
   String _customerSubtitle = 'Labour Cooperative Federation';
   String? _customerFederationName;
@@ -927,8 +928,11 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
   }
 
   Widget _buildDesktopSidebar() {
-    return Container(
-      width: 260,
+    final isCollapsed = _isDesktopSidebarCollapsed;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeInOut,
+      width: isCollapsed ? 76 : 260,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(right: BorderSide(color: AppColors.outlineVariant, width: 1)),
@@ -937,36 +941,47 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.symmetric(horizontal: isCollapsed ? 14 : 20, vertical: 18),
             child: Row(
+              mainAxisAlignment: isCollapsed ? MainAxisAlignment.center : MainAxisAlignment.spaceBetween,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.primaryContainer,
-                    borderRadius: BorderRadius.circular(10),
+                GestureDetector(
+                  onTap: () => setState(() => _isDesktopSidebarCollapsed = !_isDesktopSidebarCollapsed),
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.deepTealContainer,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.handyman, color: AppColors.deepTeal, size: 22),
                   ),
-                  child: const Icon(Icons.handyman, color: AppColors.primary, size: 24),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ShramSetu',
-                        style: AppTypography.titleMd.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+                if (!isCollapsed) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ShramSetu',
+                          style: AppTypography.titleMd.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        'Service Marketplace',
-                        style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
-                      ),
-                    ],
+                        Text(
+                          'Service Marketplace',
+                          style: AppTypography.bodySm.copyWith(color: AppColors.outline, fontSize: 11),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                  IconButton(
+                    icon: const Icon(Icons.menu_open_rounded, size: 20, color: AppColors.outline),
+                    tooltip: 'Collapse Sidebar'.tr(),
+                    onPressed: () => setState(() => _isDesktopSidebarCollapsed = true),
+                  ),
+                ],
               ],
             ),
           ),
@@ -977,82 +992,103 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
           _buildDesktopNavItem(2, Icons.calendar_month_outlined, Icons.calendar_month, 'My Bookings'.tr()),
           _buildDesktopNavItem(3, Icons.account_circle_outlined, Icons.account_circle, 'Profile & Settings'.tr()),
           const Spacer(),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surfaceContainerLow,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.outlineVariant),
-              ),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: AppColors.primaryContainer,
-                    backgroundImage: (_customerAvatar != null && _customerAvatar!.isNotEmpty)
-                        ? NetworkImage(_customerAvatar!)
-                        : null,
-                    child: (_customerAvatar == null || _customerAvatar!.isEmpty)
-                        ? (_customerName == 'Add Your Name' || RegExp(r'^\+?\d+$').hasMatch(_customerName)
-                            ? const Icon(Icons.person_outline, size: 18, color: AppColors.primary)
-                            : Text(
-                                _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ))
-                        : null,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _customerName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.labelMd.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        Text(
-                          _customerSubtitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: AppTypography.bodySm.copyWith(
-                            color: AppColors.outline,
-                            fontSize: 10,
-                          ),
-                        ),
-                      ],
+          if (!isCollapsed)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.outlineVariant),
+                ),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: AppColors.primaryContainer,
+                      backgroundImage: (_customerAvatar != null && _customerAvatar!.isNotEmpty)
+                          ? NetworkImage(_customerAvatar!)
+                          : null,
+                      child: (_customerAvatar == null || _customerAvatar!.isEmpty)
+                          ? (_customerName == 'Add Your Name' || RegExp(r'^\+?\d+$').hasMatch(_customerName)
+                              ? const Icon(Icons.person_outline, size: 18, color: AppColors.primary)
+                              : Text(
+                                  _customerName.isNotEmpty ? _customerName[0].toUpperCase() : 'C',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.primary,
+                                  ),
+                                ))
+                          : null,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _customerName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.labelMd.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          Text(
+                            _customerSubtitle,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: AppTypography.bodySm.copyWith(
+                              color: AppColors.outline,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Center(
+                child: IconButton(
+                  icon: const Icon(Icons.menu_rounded, size: 22, color: AppColors.deepTeal),
+                  tooltip: 'Expand Sidebar'.tr(),
+                  onPressed: () => setState(() => _isDesktopSidebarCollapsed = false),
+                ),
               ),
             ),
-          ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(isCollapsed ? 8 : 16),
             child: SizedBox(
               width: double.infinity,
-              child: OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.error,
-                  side: const BorderSide(color: AppColors.outlineVariant),
-                ),
-                onPressed: () async {
-                  await DI.authRepo.logout();
-                  if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
-                },
-                icon: const Icon(Icons.logout, size: 18),
-                label: const Text('Sign Out'),
-              ),
+              child: isCollapsed
+                  ? IconButton(
+                      tooltip: 'Sign Out'.tr(),
+                      icon: const Icon(Icons.logout, size: 20, color: AppColors.error),
+                      onPressed: () async {
+                        await DI.authRepo.logout();
+                        if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
+                      },
+                    )
+                  : OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.error,
+                        side: const BorderSide(color: AppColors.outlineVariant),
+                      ),
+                      onPressed: () async {
+                        await DI.authRepo.logout();
+                        if (mounted) Navigator.of(context).pushReplacementNamed('/onboarding');
+                      },
+                      icon: const Icon(Icons.logout, size: 18),
+                      label: Text('Sign Out'.tr()),
+                    ),
             ),
           ),
         ],
@@ -1062,19 +1098,48 @@ class _CustomerMainLayoutState extends State<CustomerMainLayout> {
 
   Widget _buildDesktopNavItem(int index, IconData iconOutlined, IconData iconFilled, String label) {
     final isSelected = _currentIndex == index;
+    final isCollapsed = _isDesktopSidebarCollapsed;
+
+    if (isCollapsed) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Tooltip(
+          message: label,
+          preferBelow: false,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: () => setState(() => _currentIndex = index),
+            child: Container(
+              height: 44,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.deepTeal.withValues(alpha: 0.12) : Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              alignment: Alignment.center,
+              child: Icon(
+                isSelected ? iconFilled : iconOutlined,
+                color: isSelected ? AppColors.deepTeal : AppColors.outline,
+                size: 22,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        tileColor: isSelected ? AppColors.primary.withValues(alpha: 0.08) : Colors.transparent,
+        tileColor: isSelected ? AppColors.deepTeal.withValues(alpha: 0.08) : Colors.transparent,
         leading: Icon(
           isSelected ? iconFilled : iconOutlined,
-          color: isSelected ? AppColors.primary : AppColors.outline,
+          color: isSelected ? AppColors.deepTeal : AppColors.outline,
         ),
         title: Text(
           label,
           style: AppTypography.labelLg.copyWith(
-            color: isSelected ? AppColors.primary : AppColors.outline,
+            color: isSelected ? AppColors.deepTeal : AppColors.outline,
             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
           ),
         ),

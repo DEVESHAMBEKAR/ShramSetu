@@ -29,10 +29,17 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
+  <!-- Leaflet CSS & JS for Live Interactive Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
   <title>ShramSetu</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- Firebase Phone Auth reCAPTCHA Container -->
+  <div id="recaptcha-container" style="position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); z-index: 999999;"></div>
+
   <!--
     You can customize the "flutter_bootstrap.js" script.
     This is useful to provide a custom configuration to the Flutter loader

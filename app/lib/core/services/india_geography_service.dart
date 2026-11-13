@@ -242,9 +242,26 @@ class IndiaGeographyService {
       'Ghatkopar', 'Kurla', 'Powai', 'Chembur', 'Mulund', 'Bhandup', 'Vikhroli'
     ],
     'Thane': ['Thane West', 'Thane East', 'Kalyan', 'Dombivli', 'Mira Road', 'Bhayandar', 'Ulhasnagar', 'Badlapur'],
+    'Ahmednagar': [
+      'Savedi', 'Bhavani Nagar', 'Pipeline Road', 'MIDC Ahmednagar', 'Station Road',
+      'Kotla', 'Tophkhana', 'Bhingar', 'Mukundnagar', 'Nagar City', 'Vilad Ghat'
+    ],
+    'Ahilyanagar': [
+      'Savedi', 'Bhavani Nagar', 'Pipeline Road', 'MIDC Ahmednagar', 'Station Road',
+      'Kotla', 'Tophkhana', 'Bhingar', 'Mukundnagar', 'Nagar City', 'Vilad Ghat'
+    ],
     'Nashik': ['Panchavati', 'Indira Nagar', 'Cidco', 'Gangapur Road', 'College Road', 'Satpur', 'Ambad', 'Deolali'],
     'Nagpur': ['Dharampeth', 'Sitabuldi', 'Civil Lines', 'Sadar', 'Ramdaspeth', 'Manish Nagar', 'Wardha Road', 'IT Park'],
     'Chhatrapati Sambhajinagar': ['Cidco', 'Garkheda', 'Samarth Nagar', 'Waluj', 'Railway Station Area', 'Shahgunj'],
+    'Kolhapur': ['Rajarampuri', 'Shahupuri', 'Tarabai Park', 'Nagala Park', 'Laxmipuri', 'Rankala', 'Shiroli MIDC', 'Gokul Shirgaon'],
+    'Solapur': ['Jule Solapur', 'Hotgi Road', 'Saat Rasta', 'Budhwar Peth', 'Old Pune Naka', 'MIDC Solapur', 'Lashkar'],
+    'Amravati': ['Rajapeth', 'Gadge Nagar', 'Camp', 'Rathi Nagar', 'Dastur Nagar', 'Badnera', 'Sai Nagar'],
+    'Jalgaon': ['MIDC Jalgaon', 'Ring Road', 'Muktainagar Road', 'Golani Market', 'Pratap Nagar', 'Mehrun'],
+    'Satara': ['Moti Chowk', 'Powai Naka', 'Sadar Bazar', 'Godoli', 'MIDC Satara', 'Karanje'],
+    'Sangli': ['Vishrambag', 'Miraj Road', 'Gaonbhag', 'Kupwad MIDC', 'Madhavnagar', 'Market Yard'],
+    'Nanded': ['Vazirabad', 'Taroda Naka', 'CIDCO Nanded', 'Work Shop Corner', 'Shivaji Nagar'],
+    'Latur': ['Ausa Road', 'Barshi Road', 'MIDC Latur', 'Gandhi Chowk', 'Khadgaon Road'],
+    'Dhule': ['Agra Road', 'Deopur', 'MIDC Avdhan', 'Sakri Road', 'Parola Road'],
     'New Delhi': ['Connaught Place', 'Chanakyapuri', 'Barakhamba', 'Gole Market', 'Lodi Colony', 'Jor Bagh'],
     'South Delhi': ['Hauz Khas', 'Saket', 'Greater Kailash', 'Lajpat Nagar', 'Vasant Kunj', 'Green Park', 'Malviya Nagar'],
     'Bengaluru Urban': ['Indiranagar', 'Koramangala', 'Whitefield', 'HSR Layout', 'Jayanagar', 'JP Nagar', 'Electronic City', 'Hebbal', 'Marathahalli', 'BTM Layout'],
@@ -310,6 +327,9 @@ class IndiaGeographyService {
   /// Match a freeform district string to an official district in a state
   static String matchDistrict(String? stateName, String raw) {
     final clean = raw.trim().toLowerCase();
+    if (clean == 'ahilyanagar') return 'Ahmednagar';
+    if (clean == 'aurangabad') return 'Chhatrapati Sambhajinagar';
+    if (clean == 'dharashiv') return 'Osmanabad';
     final dList = getDistricts(stateName);
     for (final dist in dList) {
       if (dist.toLowerCase() == clean) return dist;

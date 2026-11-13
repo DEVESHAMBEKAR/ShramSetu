@@ -20,6 +20,7 @@ abstract class IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    List<String>? serviceAreas,
     String? dob,
     String? gender,
     String? address,
@@ -34,6 +35,19 @@ abstract class IWorkerRepository {
     String? bio,
     bool declarationAccepted = true,
   });
+
+  /// Update worker designated service areas (by admin or verified ticket approval)
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas);
+
+  /// Raise an area change ticket from a verified worker to their federation admin
+  Future<void> raiseAreaChangeTicket({
+    required String workerId,
+    required List<String> requestedAreas,
+    required String reason,
+  });
+
+  /// Get pending area change tickets for a worker
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets(String workerId);
 
   /// Update worker credentials (mobile and email)
   Future<void> updateWorkerCredentials(

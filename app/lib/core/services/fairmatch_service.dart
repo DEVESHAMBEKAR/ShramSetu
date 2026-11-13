@@ -95,8 +95,8 @@ class FairMatchService implements IFairMatchService {
     }
 
     // 2. Proximity factor
-    if (result.worker.distanceKm <= 3.0 || result.features.distanceScore >= 0.7) {
-      tags.add('Nearby Specialist');
+    if (result.worker.distanceKm <= FairMatchConfig.operationalRadiusKm || result.features.distanceScore >= 0.7) {
+      tags.add('Within 3.5 km Ward');
     }
 
     // 3. Rating & Community track record
@@ -125,7 +125,7 @@ class FairMatchService implements IFairMatchService {
   String getRecommendationSummary(FairMatchResult result) {
     final reasons = <String>[];
     if (result.features.skillScore >= 0.8) reasons.add('certified trade skill');
-    if (result.worker.distanceKm <= 3.0) reasons.add('immediate local proximity');
+    if (result.worker.distanceKm <= FairMatchConfig.operationalRadiusKm) reasons.add('within 3.5 km ward radius');
     if (result.worker.rating >= 4.7) reasons.add('consistently high customer satisfaction');
     if (result.features.fairnessScore >= 0.6) reasons.add('equitable cooperative distribution');
 

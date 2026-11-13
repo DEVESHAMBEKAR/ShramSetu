@@ -286,18 +286,18 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.15),
+                  color: AppColors.successContainer,
                   borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.verified, color: Colors.green, size: 12),
+                    const Icon(Icons.verified, color: AppColors.success, size: 12),
                     const SizedBox(width: 4),
                     Text(
                       _scopeLevel ?? 'Active',
-                      style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: AppColors.onSuccessContainer, fontSize: 10, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),

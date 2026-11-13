@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ShramSetu Live Map Location Picker</title>
+  
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #F1F5F9;
+    }
+    #map {
+      width: 100%;
+      height: 100%;
+      background: #E2E8F0;
+    }
+    .custom-pin-container {
+      position: relative;
+      cursor: grab;
+      user-select: none;
+    }
+    .custom-pin-container:active {
+      cursor: grabbing;
+    }
+    .pin-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translate(-50%, -100%);
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+      transition: transform 0.15s ease-out;
+    }
+    .pin-badge {
+      background: #004D40;
+      color: #FFFFFF;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 12px;
+      margin-bottom: 2px;
+      white-space: nowrap;
+      border: 1.5px solid #FFFFFF;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.25);
+      letter-spacing: 0.3px;
+    }
+    .pin-svg {
+      width: 36px;
+      height: 44px;
+    }
+    .pin-shadow {
+      width: 12px;
+      height: 4px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 50%;
+      margin-top: -2px;
+    }
+    /* Floating Map Tool Overlay */
+    .map-hint-banner {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1000;
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(4px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      font-size: 12px;
+      font-weight: 600;
+      color: #0F172A;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid rgba(0,0,0,0.08);
+      pointer-events: none;
+    }
+    .map-recenter-btn {
+      position: absolute;
+      bottom: 24px;
+      right: 14px;
+      z-index: 1000;
+      background: #FFFFFF;
+      color: #004D40;
+      border: 1px solid #CBD5E1;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      transition: all 0.2s;
+    }
+    .map-recenter-btn:hover {
+      background: #F8FAFC;
+      border-color: #004D40;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  
+  <div class="map-hint-banner">
+    <span>📍</span> <span>Drag marker or tap anywhere to place pin</span>
+  </div>
+
+  <button class="map-recenter-btn" id="recenterBtn" title="Center marker on view">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"></circle>
+      <line x1="22" y1="12" x2="18" y2="12"></line>
+      <line x1="6" y1="12" x2="2" y2="12"></line>
+      <line x1="12" y1="6" x2="12" y2="2"></line>
+      <line x1="12" y1="22" x2="12" y2="18"></line>
+    </svg>
+    Drop Pin at Center
+  </button>
+
+  <script>
+    function initMap() {
+      if (typeof L === 'undefined') {
+        setTimeout(initMap, 50);
+        return;
+      }
+      if (window._shramSetuMapInitialized) return;
+      window._shramSetuMapInitialized = true;
+
+      // Parse query params for initial coordinates
+      var params = new URLSearchParams(window.location.search);
+      var defaultLat = 18.5204;
+      var defaultLng = 73.8567;
+      var initLat = parseFloat(params.get('lat')) || defaultLat;
+      var initLng = parseFloat(params.get('lng')) || defaultLng;
+      var initZoom = parseInt(params.get('zoom')) || 15;
+
+      // Initialize Leaflet Map
+      var map = L.map('map', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView([initLat, initLng], initZoom);
+
+      // Primary Tile Layer: OpenStreetMap Standard Tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        subdomains: ['a', 'b', 'c'],
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // High-speed CartoDB Voyager tiles (global and India coverage, zero-cors)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '© CartoDB'
+      }).addTo(map);
+
+      // Custom Draggable Pin Icon
+      var customIcon = L.divIcon({
+        className: 'custom-pin-container',
+        html: '<div class="pin-wrapper">' +
+              '  <div class="pin-badge">📍 Selected Location</div>' +
+              '  <svg class="pin-svg" viewBox="0 0 24 24" fill="#E65100" stroke="#FFFFFF" stroke-width="1.5">' +
+              '    <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>' +
+              '    <circle cx="12" cy="9" r="2.5" fill="#FFFFFF"/>' +
+              '  </svg>' +
+              '  <div class="pin-shadow"></div>' +
+              '</div>',
+        iconSize: [0, 0]
+      });
+
+      var marker = L.marker([initLat, initLng], {
+        draggable: true,
+        icon: customIcon
+      }).addTo(map);
+
+      function notifyFlutter(eventName, lat, lng) {
+        var payload = JSON.stringify({
+          source: 'SHRAMSETU_MAP',
+          event: eventName,
+          lat: parseFloat(lat.toFixed(6)),
+          lng: parseFloat(lng.toFixed(6))
+        });
+        
+        // Notify parent window (Flutter Web Host)
+        if (window.parent && window.parent !== window) {
+          window.parent.postMessage(payload, '*');
+        }
+      }
+
+      // Drag pin event
+      marker.on('dragend', function(e) {
+        var pos = marker.getLatLng();
+        notifyFlutter('pin_dragged', pos.lat, pos.lng);
+      });
+
+      // Click anywhere on map to instantly jump pin
+      map.on('click', function(e) {
+        marker.setLatLng(e.latlng);
+        notifyFlutter('map_clicked', e.latlng.lat, e.latlng.lng);
+      });
+
+      // Center button
+      document.getElementById('recenterBtn').addEventListener('click', function() {
+        var center = map.getCenter();
+        marker.setLatLng(center);
+        notifyFlutter('center_pinned', center.lat, center.lng);
+      });
+
+      // Listen for commands from Flutter host
+      window.addEventListener('message', function(e) {
+        if (!e.data) return;
+        var data = e.data;
+        if (typeof data === 'string') {
+          try { data = JSON.parse(data); } catch (_) { return; }
+        }
+        if (!data || data.source !== 'SHRAMSETU_HOST') return;
+
+        if (data.action === 'set_location' || data.type === 'SET_CENTER') {
+          var lat = parseFloat(data.lat);
+          var lng = parseFloat(data.lng);
+          var zoom = data.zoom || map.getZoom();
+          if (!isNaN(lat) && !isNaN(lng)) {
+            map.flyTo([lat, lng], zoom, { animate: true, duration: 0.7 });
+            marker.setLatLng([lat, lng]);
+          }
+        }
+      });
+
+      // Notify Flutter that live map is initialized
+      setTimeout(function() {
+        notifyFlutter('map_ready', initLat, initLng);
+      }, 200);
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+      initMap();
+    } else {
+      window.addEventListener('load', initMap);
+    }
+    setTimeout(initMap, 50);
+  </script>
+</body>
+</html>
+

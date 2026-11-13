@@ -9,6 +9,9 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../widgets/review_rating_modal.dart';
 import '../../../../core/localization/locale_controller.dart';
+import '../../../../shared/widgets/booking_status_badge.dart';
+import '../../../../shared/widgets/state_views.dart';
+import '../../../../core/services/shared_booking_store.dart';
 
 class CustomerLiveTrackingScreen extends StatefulWidget {
   final String bookingId;
@@ -118,6 +121,49 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) setState(() => _copiedOtp = false);
     });
+  }
+
+  Future<void> _switchPaymentToRazorpay() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceContainerLowest,
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusXl),
+        title: const Text('Pay via Razorpay / UPI', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold)),
+        content: const Text('Switch this order to Sovereign Online Escrow? You can pay immediately via UPI or Net Banking.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Cash')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Switch to Online'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await DI.paymentRepo.createPaymentOrder(widget.bookingId);
+        // Update local booking store
+        SharedBookingStore.instance.addExternalBooking({
+          'id': widget.bookingId,
+          'payment_method': 'RAZORPAY',
+        });
+        _loadBookingDetails();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Switched to Razorpay Online Escrow.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Payment switch note: $e')),
+          );
+        }
+      }
+    }
   }
 
   Future<void> _handleCancelBooking() async {
@@ -294,7 +340,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: _buildAppBar(),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const AppLoadingView(message: 'Tracking your live service order...'),
       );
     }
 
@@ -302,26 +348,10 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
       return Scaffold(
         backgroundColor: AppColors.background,
         appBar: _buildAppBar(),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.marginMobile),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                const SizedBox(height: AppSpacing.spacingSm),
-                Text('Could not load booking', style: AppTypography.titleLg.copyWith(color: AppColors.primary)),
-                const SizedBox(height: AppSpacing.spacingXs),
-                Text(_errorMessage ?? 'Booking not found', textAlign: TextAlign.center, style: AppTypography.bodyMd.copyWith(color: AppColors.onSurfaceVariant)),
-                const SizedBox(height: AppSpacing.spacingLg),
-                ElevatedButton(
-                  onPressed: _loadBookingDetails,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: AppColors.onPrimary),
-                  child: const Text('Try Again'),
-                ),
-              ],
-            ),
-          ),
+        body: AppErrorView(
+          title: 'Could not load booking',
+          message: _errorMessage ?? 'Booking not found',
+          onRetry: _loadBookingDetails,
         ),
       );
     }
@@ -349,6 +379,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
 
     final customerAddress = address['address_line'] as String? ?? 'Flat 402, Paud Road, Pune';
     final otpCode = booking['otp'] as String? ?? '8492';
+    final paymentMethod = (booking['payment_method'] as String?)?.toUpperCase() ?? 'RAZORPAY';
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -364,25 +395,25 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // 1. Order Reference Header Strip
-                  _buildOrderRefHeader(),
+                  _buildOrderRefHeader(status),
 
                   // 2. Live Status Hero Card
                   _buildStatusHeroCard(status, workerName, workerLocation, customerAddress),
 
                   // 3. Visual Route & Location Map HUD
-                  _buildMapHud(workerName),
+                  _buildMapHud(workerName, status, workerLocation),
 
                   // 4. Worker Trust & Direct Communications Card
                   _buildWorkerCard(workerName, workerAvatar, workerRating, jobsCompleted, workerPhone),
 
                   // 5. 4-Digit Escrow Release Security Box
-                  _buildEscrowSecurityBox(otpCode, workerName, status),
+                  _buildEscrowSecurityBox(otpCode, workerName, status, paymentMethod, totalEscrow),
 
                   // 6. Service Milestones Progress Timeline
                   _buildMilestoneTimeline(status),
 
                   // 7. Job & Fare Summary
-                  _buildFareSummaryCard(serviceName, serviceDesc, baseAmount, laborAllowance, totalEscrow),
+                  _buildFareSummaryCard(serviceName, serviceDesc, baseAmount, laborAllowance, totalEscrow, paymentMethod, status, workerName),
 
                   // 8. Action Buttons (Reschedule / Cancel / Rate)
                   _buildActionButtons(status, workerName, serviceName),
@@ -462,7 +493,7 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     );
   }
 
-  Widget _buildOrderRefHeader() {
+  Widget _buildOrderRefHeader(BookingStatus status) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(AppSpacing.marginMobile, AppSpacing.spacingSm, AppSpacing.marginMobile, AppSpacing.spacingXs),
       child: Row(
@@ -482,9 +513,15 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'ORDER REFERENCE',
-                    style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, letterSpacing: 1.1),
+                  Row(
+                    children: [
+                      Text(
+                        'ORDER REFERENCE',
+                        style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, letterSpacing: 1.1),
+                      ),
+                      const SizedBox(width: 8),
+                      BookingStatusBadge(status: status, isCompact: true),
+                    ],
                   ),
                   Text(
                     '#SS-$_orderRef',
@@ -654,11 +691,85 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     );
   }
 
-  Widget _buildMapHud(String workerName) {
+  Widget _buildMapHud(String workerName, BookingStatus status, String workerLocation) {
+    final double workerTop;
+    final double? workerLeft;
+    final double? workerRight;
+    final double? workerBottom;
+    final String workerBadgeText;
+    final IconData workerIcon;
+    final String corridorPill;
+    final double routeProgress;
+
+    switch (status) {
+      case BookingStatus.pending:
+      case BookingStatus.accepted:
+        workerTop = 85;
+        workerLeft = 35;
+        workerRight = null;
+        workerBottom = null;
+        workerBadgeText = '$workerName • Stand ($workerLocation)';
+        workerIcon = Icons.storefront;
+        corridorPill = 'Artisan Assigned • At Workshop Stand';
+        routeProgress = 0.05;
+        break;
+      case BookingStatus.onTheWay:
+        workerTop = 60;
+        workerLeft = 140;
+        workerRight = null;
+        workerBottom = null;
+        workerBadgeText = '$workerName (1.8 km • 12m away)';
+        workerIcon = Icons.two_wheeler;
+        corridorPill = 'In Transit • 3.5 km Ward Corridor';
+        routeProgress = 0.55;
+        break;
+      case BookingStatus.arrived:
+        workerTop = 90;
+        workerLeft = null;
+        workerRight = 90;
+        workerBottom = null;
+        workerBadgeText = '$workerName (At Doorstep)';
+        workerIcon = Icons.location_on;
+        corridorPill = 'Arrived • Ready for Inspection';
+        routeProgress = 0.92;
+        break;
+      case BookingStatus.inProgress:
+        workerTop = 85;
+        workerLeft = null;
+        workerRight = 75;
+        workerBottom = null;
+        workerBadgeText = '$workerName (Active Repair)';
+        workerIcon = Icons.handyman;
+        corridorPill = 'Service Underway • Active on Site';
+        routeProgress = 1.0;
+        break;
+      case BookingStatus.completed:
+        workerTop = 85;
+        workerLeft = null;
+        workerRight = 65;
+        workerBottom = null;
+        workerBadgeText = 'Job Verified & Completed ✓';
+        workerIcon = Icons.verified;
+        corridorPill = 'Completed • 100% Quality Guaranteed';
+        routeProgress = 1.0;
+        break;
+      case BookingStatus.cancelled:
+      case BookingStatus.rejected:
+        workerTop = 85;
+        workerLeft = 35;
+        workerRight = null;
+        workerBottom = null;
+        workerBadgeText = 'Booking Cancelled';
+        workerIcon = Icons.cancel;
+        corridorPill = 'Cancelled';
+        routeProgress = 0.0;
+        break;
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
       child: Container(
-        height: 200,
+        height: 210,
         width: double.infinity,
         decoration: BoxDecoration(
           color: AppColors.surfaceContainerHigh,
@@ -668,17 +779,17 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
         clipBehavior: Clip.antiAlias,
         child: Stack(
           children: [
-            // Map stylized canvas grid background
+            // Map stylized canvas grid & route background
             Positioned.fill(
               child: Container(
-                color: AppColors.surfaceVariant,
+                color: const Color(0xFFE8EEF2),
                 child: CustomPaint(
-                  painter: _MapCanvasPainter(),
+                  painter: _MapCanvasPainter(progress: routeProgress, status: status),
                 ),
               ),
             ),
 
-            // Traffic alert pill top left
+            // Live corridor alert pill top left
             Positioned(
               top: 12,
               left: 12,
@@ -692,26 +803,86 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.traffic, size: 16, color: AppColors.secondary),
-                    const SizedBox(width: 4),
-                    Text('Live Route • Pune Municipal Corridor', style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.w600)),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: status == BookingStatus.completed
+                            ? AppColors.civicVerifiedGreen
+                            : (status == BookingStatus.onTheWay ? AppColors.secondary : AppColors.primary),
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      corridorPill,
+                      style: AppTypography.labelSm.copyWith(color: AppColors.onSurface, fontWeight: FontWeight.w600, fontSize: 11),
+                    ),
                   ],
                 ),
               ),
             ),
 
-            // Worker Pin Marker
+            // 3.5 km Ward Radius indicator chip top right
             Positioned(
-              top: 70,
-              left: 80,
+              top: 12,
+              right: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.9),
+                  borderRadius: AppRadius.radiusSm,
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.radar, size: 12, color: Colors.white),
+                    SizedBox(width: 4),
+                    Text(
+                      '3.5 km FairMatch Ward',
+                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Cooperative Stand Pin (Origin)
+            Positioned(
+              top: 105,
+              left: 28,
+              child: Column(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceContainerHighest,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.outlineVariant),
+                    ),
+                    child: const Icon(Icons.storefront, size: 13, color: AppColors.primary),
+                  ),
+                  const SizedBox(height: 2),
+                  Text('Stand Hub', style: AppTypography.labelSm.copyWith(fontSize: 9, color: AppColors.outline)),
+                ],
+              ),
+            ),
+
+            // Dynamic Worker Pin Marker (moves with stage)
+            Positioned(
+              top: workerTop,
+              left: workerLeft,
+              right: workerRight,
+              bottom: workerBottom,
               child: Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(
-                      color: AppColors.primary,
+                    decoration: BoxDecoration(
+                      color: status == BookingStatus.completed ? AppColors.civicVerifiedGreen : AppColors.primary,
                       shape: BoxShape.circle,
-                      boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 6)],
+                      boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 6)],
                     ),
                     child: Stack(
                       clipBehavior: Clip.none,
@@ -726,8 +897,11 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                           bottom: -2,
                           child: Container(
                             padding: const EdgeInsets.all(2),
-                            decoration: const BoxDecoration(color: AppColors.secondaryContainer, shape: BoxShape.circle),
-                            child: const Icon(Icons.two_wheeler, size: 10, color: AppColors.onSecondary),
+                            decoration: BoxDecoration(
+                              color: status == BookingStatus.completed ? AppColors.civicVerifiedGreen : AppColors.secondaryContainer,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(workerIcon, size: 10, color: status == BookingStatus.completed ? Colors.white : AppColors.onSecondary),
                           ),
                         ),
                       ],
@@ -736,17 +910,23 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                   const SizedBox(height: 2),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(color: AppColors.primary, borderRadius: AppRadius.radiusSm),
-                    child: Text('$workerName (1.4 km)', style: AppTypography.labelSm.copyWith(color: AppColors.onPrimary, fontSize: 10)),
+                    decoration: BoxDecoration(
+                      color: status == BookingStatus.completed ? AppColors.civicVerifiedGreen : AppColors.primary,
+                      borderRadius: AppRadius.radiusSm,
+                    ),
+                    child: Text(
+                      workerBadgeText,
+                      style: AppTypography.labelSm.copyWith(color: AppColors.onPrimary, fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ],
               ),
             ),
 
-            // Customer Destination Pin
+            // Customer Destination Pin (Target)
             Positioned(
-              bottom: 24,
-              right: 48,
+              bottom: 16,
+              right: 24,
               child: Column(
                 children: [
                   Container(
@@ -873,8 +1053,9 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     );
   }
 
-  Widget _buildEscrowSecurityBox(String otp, String workerName, BookingStatus status) {
+  Widget _buildEscrowSecurityBox(String otp, String workerName, BookingStatus status, String paymentMethod, double totalAmount) {
     final isSettled = status == BookingStatus.completed;
+    final isCash = paymentMethod == 'CASH';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
@@ -893,20 +1074,31 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.lock, size: 16, color: AppColors.secondary),
+                    Icon(isCash ? Icons.payments_outlined : Icons.lock, size: 16, color: AppColors.secondary),
                     const SizedBox(width: 4),
-                    Text('Escrow Protection Code', style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold)),
+                    Text(
+                      isCash ? 'Order Verification Code' : 'Escrow Protection Code',
+                      style: AppTypography.labelSm.copyWith(color: AppColors.secondary, fontWeight: FontWeight.bold),
+                    ),
                   ],
                 ),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: isSettled ? AppColors.tertiaryFixed : AppColors.tertiaryFixed.withValues(alpha: 0.5),
+                    color: isSettled
+                        ? AppColors.tertiaryFixed
+                        : (isCash ? const Color(0xFFFFF3E0) : AppColors.tertiaryFixed.withValues(alpha: 0.5)),
                     borderRadius: AppRadius.radiusSm,
                   ),
                   child: Text(
-                    isSettled ? 'Payment Released' : 'Payment Locked',
-                    style: AppTypography.labelSm.copyWith(color: AppColors.tertiary, fontWeight: FontWeight.bold, fontSize: 11),
+                    isSettled
+                        ? (isCash ? 'Service Settled' : 'Payment Released')
+                        : (isCash ? 'Pay on Completion' : 'Payment Locked'),
+                    style: AppTypography.labelSm.copyWith(
+                      color: isCash ? const Color(0xFFE65100) : AppColors.tertiary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
@@ -961,7 +1153,9 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    'Share this 4-digit code with $workerName ONLY after job inspection and complete satisfaction.',
+                    isCash
+                        ? 'Hand over ₹${totalAmount.toStringAsFixed(0)} cash and share this 4-digit code with $workerName ONLY after complete inspection.'
+                        : 'Share this 4-digit code with $workerName ONLY after job inspection and complete satisfaction to release escrow.',
                     style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
                   ),
                 ),
@@ -1086,7 +1280,18 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
     );
   }
 
-  Widget _buildFareSummaryCard(String serviceName, String serviceDesc, double base, double allowance, double total) {
+  Widget _buildFareSummaryCard(
+    String serviceName,
+    String serviceDesc,
+    double base,
+    double allowance,
+    double total,
+    String paymentMethod,
+    BookingStatus status,
+    String workerName,
+  ) {
+    final isCash = paymentMethod == 'CASH';
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.marginMobile, vertical: AppSpacing.spacingXs),
       child: Container(
@@ -1105,8 +1310,28 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 Text('Job & Fare Summary', style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.tertiaryFixedDim.withValues(alpha: 0.3), borderRadius: AppRadius.radiusFull),
-                  child: Text('Safe Escrow Deposit', style: AppTypography.labelSm.copyWith(color: AppColors.onTertiaryContainer, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(
+                    color: isCash ? const Color(0xFFFFF3E0) : AppColors.tertiaryFixedDim.withValues(alpha: 0.3),
+                    borderRadius: AppRadius.radiusFull,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isCash ? Icons.payments_outlined : Icons.lock,
+                        size: 11,
+                        color: isCash ? const Color(0xFFE65100) : AppColors.onTertiaryContainer,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        isCash ? 'Cash on Service' : 'Safe Escrow Deposit',
+                        style: AppTypography.labelSm.copyWith(
+                          color: isCash ? const Color(0xFFE65100) : AppColors.onTertiaryContainer,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1144,13 +1369,37 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Total Amount Locked', style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                    Text('Held securely in ShramSetu Cooperative Escrow', style: AppTypography.labelSm.copyWith(color: AppColors.tertiary, fontSize: 11)),
+                    Text(
+                      isCash ? 'Total Cash Due on Sign-off' : 'Total Amount Locked',
+                      style: AppTypography.titleLg.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      isCash
+                          ? 'Pay directly to $workerName after OTP verification'
+                          : 'Held securely in ShramSetu Cooperative Escrow',
+                      style: AppTypography.labelSm.copyWith(color: AppColors.tertiary, fontSize: 11),
+                    ),
                   ],
                 ),
                 Text('₹${total.toStringAsFixed(0)}', style: AppTypography.currencyDisplay.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
               ],
             ),
+            if (isCash && status != BookingStatus.completed) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _switchPaymentToRazorpay,
+                  icon: const Icon(Icons.credit_card, size: 16),
+                  label: const Text('Switch & Pay via Razorpay / Online UPI', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1261,36 +1510,82 @@ class _CustomerLiveTrackingScreenState extends State<CustomerLiveTrackingScreen>
 }
 
 class _MapCanvasPainter extends CustomPainter {
+  final double progress;
+  final BookingStatus status;
+
+  _MapCanvasPainter({this.progress = 0.5, this.status = BookingStatus.onTheWay});
+
   @override
   void paint(Canvas canvas, Size size) {
-    final roadPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.8)
-      ..strokeWidth = 6
+    // 1. Urban street network grid
+    final gridRoadPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..strokeWidth = 7
       ..style = PaintingStyle.stroke;
 
-    final routePaint = Paint()
-      ..color = AppColors.secondary
+    final roadPath1 = Path()
+      ..moveTo(0, size.height * 0.45)
+      ..quadraticBezierTo(size.width * 0.5, size.height * 0.35, size.width, size.height * 0.75);
+    canvas.drawPath(roadPath1, gridRoadPaint);
+
+    final roadPath2 = Path()
+      ..moveTo(size.width * 0.25, 0)
+      ..lineTo(size.width * 0.75, size.height);
+    canvas.drawPath(roadPath2, gridRoadPaint);
+
+    final roadPath3 = Path()
+      ..moveTo(size.width * 0.05, size.height * 0.8)
+      ..lineTo(size.width * 0.95, size.height * 0.2);
+    canvas.drawPath(roadPath3, gridRoadPaint);
+
+    // 2. 3.5 km Ward radius boundary circle
+    final radiusPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.08)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.height * 0.46, radiusPaint);
+
+    final radiusBorderPaint = Paint()
+      ..color = AppColors.primary.withValues(alpha: 0.3)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawCircle(Offset(size.width * 0.5, size.height * 0.5), size.height * 0.46, radiusBorderPaint);
+
+    // 3. Planned Corridor Path
+    final startPt = Offset(45, size.height * 0.52);
+    final controlPt = Offset(size.width * 0.48, size.height * 0.38);
+    final endPt = Offset(size.width - 45, size.height - 35);
+
+    final plannedPath = Path()
+      ..moveTo(startPt.dx, startPt.dy)
+      ..quadraticBezierTo(controlPt.dx, controlPt.dy, endPt.dx, endPt.dy);
+
+    final bgRoutePaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.12)
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke;
+    canvas.drawPath(plannedPath, bgRoutePaint);
 
-    // Background road lines
-    final path1 = Path()
-      ..moveTo(0, size.height * 0.4)
-      ..quadraticBezierTo(size.width * 0.5, size.height * 0.3, size.width, size.height * 0.7);
-    canvas.drawPath(path1, roadPaint);
+    // 4. Traveled Route Progress Path (vibrant amber / teal)
+    final activeRoutePaint = Paint()
+      ..color = status == BookingStatus.completed ? AppColors.civicVerifiedGreen : AppColors.secondary
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
 
-    final path2 = Path()
-      ..moveTo(size.width * 0.3, 0)
-      ..lineTo(size.width * 0.7, size.height);
-    canvas.drawPath(path2, roadPaint);
+    final progressPath = Path();
+    progressPath.moveTo(startPt.dx, startPt.dy);
 
-    // Active worker path
-    final routePath = Path()
-      ..moveTo(100, 95)
-      ..quadraticBezierTo(size.width * 0.45, size.height * 0.55, size.width - 65, size.height - 40);
-    canvas.drawPath(routePath, routePaint);
+    final clampedProgress = progress.clamp(0.01, 1.0);
+    final currentX = startPt.dx + (endPt.dx - startPt.dx) * clampedProgress;
+    final currentY = startPt.dy + (endPt.dy - startPt.dy) * clampedProgress;
+    final ctrlCurrentX = startPt.dx + (controlPt.dx - startPt.dx) * clampedProgress;
+    final ctrlCurrentY = startPt.dy + (controlPt.dy - startPt.dy) * clampedProgress;
+    progressPath.quadraticBezierTo(ctrlCurrentX, ctrlCurrentY, currentX, currentY);
+
+    canvas.drawPath(progressPath, activeRoutePaint);
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _MapCanvasPainter oldDelegate) =>
+      oldDelegate.progress != progress || oldDelegate.status != status;
 }

@@ -10,6 +10,8 @@ import 'customer_booking_detail_screen.dart';
 import '../widgets/review_rating_modal.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../shared/widgets/booking_status_badge.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
   final VoidCallback? onExploreServices;
@@ -236,56 +238,29 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
                   child: Builder(
                     builder: (context) {
                       if (_isLoading && (_bookings == null || _bookings!.isEmpty)) {
-                        return const Center(child: CircularProgressIndicator(color: AppColors.secondary));
+                        return const AppLoadingView(message: 'Loading your bookings...');
                       }
                       if (_errorMessage != null && (_bookings == null || _bookings!.isEmpty)) {
-                        return Center(child: Text('Error: $_errorMessage', style: AppTypography.bodyMd));
+                        return AppErrorView(
+                          title: 'Unable to Load Bookings',
+                          message: _errorMessage,
+                          onRetry: () => _refreshBookings(),
+                        );
                       }
 
                       final currentList = _selectedTab == 0 ? activeBookings : pastBookings;
 
                       if (currentList.isEmpty) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _selectedTab == 0 ? Icons.inventory_2_outlined : Icons.history,
-                                  size: 56,
-                                  color: AppColors.outline,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  _selectedTab == 0 ? 'No active orders in progress' : 'No past orders yet',
-                                  style: AppTypography.titleMd.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  _selectedTab == 0
-                                      ? 'Book verified union artisans with zero commission and upfront pricing.'
-                                      : 'Completed bookings and ratings history will be displayed here.',
-                                  textAlign: TextAlign.center,
-                                  style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                                ),
-                                if (_selectedTab == 0 && widget.onExploreServices != null) ...[
-                                  const SizedBox(height: 18),
-                                  ElevatedButton.icon(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.primary,
-                                      foregroundColor: AppColors.onPrimary,
-                                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                      shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                                    ),
-                                    onPressed: widget.onExploreServices,
-                                    icon: const Icon(Icons.search, size: 18),
-                                    label: const Text('Explore Available Services', style: TextStyle(fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
+                        return AppEmptyView(
+                          icon: _selectedTab == 0 ? Icons.inventory_2_outlined : Icons.history_rounded,
+                          title: _selectedTab == 0 ? 'No active orders in progress' : 'No past orders yet',
+                          subtitle: _selectedTab == 0
+                              ? 'Book verified union artisans with zero commission and upfront pricing.'
+                              : 'Completed bookings and ratings history will be displayed here.',
+                          actionLabel: (_selectedTab == 0 && widget.onExploreServices != null)
+                              ? 'Explore Available Services'
+                              : null,
+                          onActionPressed: widget.onExploreServices,
                         );
                       }
 
@@ -348,54 +323,54 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header strip
-          if (!isPast)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              color: AppColors.primary,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
+          // Accessible Header strip with BookingStatusBadge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: isPast ? AppColors.surfaceContainerLow : AppColors.surfaceContainer,
+              border: const Border(bottom: BorderSide(color: AppColors.outlineVariant, width: 0.5)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                BookingStatusBadge.fromString(status, isCompact: true),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!isPast && (status == 'ontheway' || status == 'onTheWay')) ...[
                       Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.tertiaryFixed,
-                          shape: BoxShape.circle,
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warmAmberContainer,
+                          borderRadius: AppRadius.radiusSm,
+                          border: Border.all(color: AppColors.warmAmber.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          'Arriving shortly'.tr(),
+                          style: AppTypography.labelSm.copyWith(
+                            color: AppColors.onWarmAmberContainer,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        status == 'onTheWay' ? 'PARTNER EN ROUTE' : status.toUpperCase(),
-                        style: AppTypography.labelSm.copyWith(color: Colors.white, fontWeight: FontWeight.bold, letterSpacing: 0.5),
-                      ),
+                      const SizedBox(width: 8),
                     ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.15),
-                      borderRadius: AppRadius.radiusSm,
+                    Text(
+                      isPast
+                          ? '${booking['scheduled_date'] ?? 'Completed'}'
+                          : '#SS-$orderRef',
+                      style: AppTypography.labelSm.copyWith(
+                        color: AppColors.outline,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                    child: Text('Arriving shortly', style: AppTypography.labelSm.copyWith(color: Colors.white, fontSize: 10)),
-                  ),
-                ],
-              ),
-            )
-          else
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              color: AppColors.surfaceContainerLow,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('Completed Order', style: AppTypography.labelSm.copyWith(color: AppColors.onSurfaceVariant, fontWeight: FontWeight.bold)),
-                  Text('${booking['scheduled_date']}', style: AppTypography.labelSm.copyWith(color: AppColors.outline, fontSize: 11)),
-                ],
-              ),
+                  ],
+                ),
+              ],
             ),
+          ),
 
           // Content body
           Padding(

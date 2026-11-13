@@ -68,7 +68,7 @@ void main() {
       expect(find.text('PENDING'), findsOneWidget);
       expect(find.text('Close'), findsOneWidget);
       expect(find.text('Approve Document'), findsOneWidget);
-      expect(find.text('Flag for Resubmission'), findsOneWidget);
+      expect(find.text('Flag Queries'), findsOneWidget);
     });
 
     testWidgets('calls onApprove when Approve Document button is tapped', (tester) async {
@@ -110,6 +110,55 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(approved, isTrue);
+    });
+
+    testWidgets('when document is APPROVED: hides Approve button, shows Resubmit Document and Flag Queries', (tester) async {
+      bool resubmitted = false;
+      final doc = {
+        'id': 'doc-789',
+        'file_name': 'iti_cert.pdf',
+        'document_type': 'SKILL_CERTIFICATE',
+        'storage_path': 'workers/w1/iti.pdf',
+        'file_size': 120400,
+        'mime_type': 'application/pdf',
+        'status': 'APPROVED',
+      };
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: Builder(
+              builder: (ctx) => ElevatedButton(
+                onPressed: () => DocumentViewerModal.show(
+                  ctx,
+                  doc: doc,
+                  isAdmin: true,
+                  onApprove: () {},
+                  onFlag: () {},
+                  onResubmit: () => resubmitted = true,
+                ),
+                child: const Text('Open Approved Doc'),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open Approved Doc'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      // Approve button must be HIDDEN when status is APPROVED
+      expect(find.text('Approve Document'), findsNothing);
+
+      // Resubmit Document and Flag Queries buttons must be visible
+      expect(find.text('Resubmit Document'), findsOneWidget);
+      expect(find.text('Flag Queries'), findsOneWidget);
+
+      await tester.tap(find.text('Resubmit Document'));
+      await tester.pumpAndSettle();
+
+      expect(resubmitted, isTrue);
     });
 
     testWidgets('shows graceful digital KYC certificate view when storage path is empty', (tester) async {

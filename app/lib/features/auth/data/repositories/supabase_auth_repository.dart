@@ -1,8 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/repositories/i_auth_repository.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../core/services/firebase_phone_auth_service.dart';
 import '../../../../core/utils/phone_number_util.dart';
 
 class SupabaseAuthRepository implements IAuthRepository {
@@ -60,12 +62,31 @@ class SupabaseAuthRepository implements IAuthRepository {
   @override
   Future<void> sendOtp(String phone) async {
     final formattedPhone = _normalizePhone(phone);
-    await _client.auth.signInWithOtp(phone: formattedPhone);
+    if (AppConfig.isFirebaseOtpEnabled && FirebasePhoneAuthService.instance.isAvailable) {
+      debugPrint('[AuthRepo] Sending SMS OTP via Firebase Phone Auth for $formattedPhone...');
+      await FirebasePhoneAuthService.instance.sendOtp(formattedPhone);
+    } else {
+      debugPrint('[AuthRepo] Sending SMS OTP via Supabase Auth for $formattedPhone...');
+      await _client.auth.signInWithOtp(phone: formattedPhone);
+    }
   }
 
   @override
   Future<bool> verifyOtp(String phone, String otp) async {
     final formattedPhone = _normalizePhone(phone);
+
+    if (AppConfig.isFirebaseOtpEnabled && FirebasePhoneAuthService.instance.isAvailable) {
+      debugPrint('[AuthRepo] Verifying OTP via Firebase Phone Auth...');
+      final fbResult = await FirebasePhoneAuthService.instance.verifyOtp(formattedPhone, otp);
+      if (!fbResult.isSuccess) {
+        throw Exception(fbResult.errorMessage ?? 'Invalid OTP code.');
+      }
+
+      // Sync verified phone with Supabase backend to establish Supabase JWT & RLS session
+      final synced = await _syncFirebaseUserWithSupabase(formattedPhone, fbResult.uid);
+      return synced;
+    }
+
     try {
       final response = await _client.auth.verifyOTP(
         phone: formattedPhone,
@@ -84,6 +105,57 @@ class SupabaseAuthRepository implements IAuthRepository {
     } catch (e) {
       debugPrint('[AuthRepo] Supabase verifyOTP note: $e');
       rethrow;
+    }
+
+    return false;
+  }
+
+  /// Establishes or syncs an authenticated Supabase user session after Firebase verifies the phone OTP.
+  /// Ensures full compatibility with Supabase Row Level Security (RLS) and public.users profile records.
+  Future<bool> _syncFirebaseUserWithSupabase(String formattedPhone, String? firebaseUid) async {
+    final cleanDigits = formattedPhone.replaceAll(RegExp(r'\D'), '');
+    final authEmail = 'phone_$cleanDigits@shramsetu.internal';
+    final authPassword = 'ShramSetu_PhoneAuth_${cleanDigits}_SecureSalt';
+
+    try {
+      // 1. Try signing in with existing user account
+      final res = await _client.auth.signInWithPassword(
+        email: authEmail,
+        password: authPassword,
+      );
+      if (res.session != null) {
+        try {
+          await DI.notificationService.registerDeviceToken(userId: res.session!.user.id);
+        } catch (_) {}
+        return true;
+      }
+    } catch (_) {
+      // 2. First-time login: create Supabase account for this phone number
+      try {
+        final signUpRes = await _client.auth.signUp(
+          email: authEmail,
+          password: authPassword,
+          data: {
+            'phone': formattedPhone,
+            'firebase_uid': firebaseUid ?? '',
+            'auth_method': 'FIREBASE_PHONE_OTP',
+          },
+        );
+        final uid = signUpRes.session?.user.id ?? signUpRes.user?.id ?? _client.auth.currentUser?.id;
+        if (uid != null) {
+          try {
+            await DI.notificationService.registerDeviceToken(userId: uid);
+          } catch (_) {}
+        }
+        return true;
+      } catch (e) {
+        debugPrint('[AuthRepo] Supabase bridge signUp note: $e');
+      }
+    }
+
+    // 3. Fallback: if Supabase already has an active session, succeed
+    if (_client.auth.currentUser != null) {
+      return true;
     }
 
     return false;
@@ -178,6 +250,7 @@ class SupabaseAuthRepository implements IAuthRepository {
     try {
       await DI.notificationService.deactivateCurrentToken();
     } catch (_) {}
+    await FirebasePhoneAuthService.instance.signOut();
     await _client.auth.signOut();
   }
 }

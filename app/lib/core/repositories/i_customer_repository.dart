@@ -29,6 +29,7 @@ abstract class ICustomerRepository {
     String? addressId,
     String? notes,
     String bookingType = 'NORMAL',
+    String paymentMethod = 'RAZORPAY',
   });
 
   /// Get the authenticated customer's booking history

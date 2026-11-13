@@ -63,7 +63,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
 
     if (isWide) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0A0E1A),
+        backgroundColor: AppColors.background,
         body: Row(
           children: [
             _buildDesktopSidebar(),
@@ -74,12 +74,12 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E1A),
+      backgroundColor: AppColors.background,
       body: _screens[_currentIndex],
       bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFF111827),
-          border: const Border(top: BorderSide(color: Color(0xFF1F2937))),
+        decoration: const BoxDecoration(
+          color: Color(0xFF072424),
+          border: Border(top: BorderSide(color: Color(0xFF0E3838))),
         ),
         child: SafeArea(
           child: SizedBox(
@@ -113,7 +113,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
             Icon(
               isActive ? activeIcon : icon,
               size: 22,
-              color: isActive ? AppColors.secondaryContainer : Colors.white38,
+              color: isActive ? AppColors.secondary : Colors.white38,
             ),
             const SizedBox(height: 3),
             Text(
@@ -121,7 +121,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
               style: TextStyle(
                 fontSize: 9,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                color: isActive ? AppColors.secondaryContainer : Colors.white38,
+                color: isActive ? AppColors.secondary : Colors.white38,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -135,7 +135,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
   Widget _buildDesktopSidebar() {
     return Container(
       width: 260,
-      color: const Color(0xFF0F1320),
+      color: const Color(0xFF072424),
       child: Column(
         children: [
           const SizedBox(height: 24),
@@ -148,10 +148,10 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: AppColors.secondaryContainer.withValues(alpha: 0.15),
+                    color: AppColors.secondary.withValues(alpha: 0.15),
                     borderRadius: AppRadius.radiusSm,
                   ),
-                  child: const Icon(Icons.shield, color: AppColors.secondaryContainer, size: 18),
+                  child: const Icon(Icons.shield, color: AppColors.secondary, size: 18),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -169,7 +169,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
                       Text(
                         'Super Admin',
                         style: AppTypography.labelSm.copyWith(
-                          color: AppColors.secondaryContainer,
+                          color: AppColors.secondary,
                           fontSize: 10,
                         ),
                       ),
@@ -180,7 +180,7 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
             ),
           ),
           const SizedBox(height: 24),
-          const Divider(color: Color(0xFF1F2937), height: 1),
+          const Divider(color: Color(0xFF0E3838), height: 1),
           const SizedBox(height: 8),
           // Navigation
           _buildSidebarItem(0, Icons.dashboard, 'Dashboard'),
@@ -195,15 +195,15 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF1F2937),
+              color: const Color(0xFF0E3838),
               borderRadius: AppRadius.radiusMd,
             ),
             child: Row(
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundColor: AppColors.secondaryContainer.withValues(alpha: 0.2),
-                  child: const Icon(Icons.shield, color: AppColors.secondaryContainer, size: 16),
+                  backgroundColor: AppColors.secondary.withValues(alpha: 0.2),
+                  child: const Icon(Icons.shield, color: AppColors.secondary, size: 16),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -242,12 +242,12 @@ class _SuperAdminMainLayoutState extends State<SuperAdminMainLayout> {
         margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.secondaryContainer.withValues(alpha: 0.12) : Colors.transparent,
+          color: isActive ? AppColors.secondary.withValues(alpha: 0.15) : Colors.transparent,
           borderRadius: AppRadius.radiusSm,
         ),
         child: Row(
           children: [
-            Icon(icon, size: 18, color: isActive ? AppColors.secondaryContainer : Colors.white38),
+            Icon(icon, size: 18, color: isActive ? AppColors.secondary : Colors.white38),
             const SizedBox(width: 12),
             Text(
               label,

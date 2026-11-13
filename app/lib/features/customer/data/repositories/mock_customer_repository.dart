@@ -528,6 +528,7 @@ class MockCustomerRepository implements ICustomerRepository {
     String? addressId,
     String? notes,
     String bookingType = 'NORMAL',
+    String paymentMethod = 'RAZORPAY',
   }) async {
     await Future.delayed(const Duration(milliseconds: 300));
     final worker = workers.firstWhere((w) => w.id == workerId, orElse: () => workers.first);
@@ -544,6 +545,7 @@ class MockCustomerRepository implements ICustomerRepository {
       addressId: addressId,
       notes: notes,
       bookingType: bookingType,
+      paymentMethod: paymentMethod,
     );
   }
 

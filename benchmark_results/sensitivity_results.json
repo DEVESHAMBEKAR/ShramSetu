@@ -1,0 +1,82 @@
+{
+  "fairness_0pct": {
+    "weights": {
+      "skill": 0.35,
+      "distance": 0.25,
+      "availability": 0.15,
+      "rating": 0.125,
+      "experience": 0.125,
+      "fairness": 0
+    },
+    "jainsIndex": 0.3188,
+    "gini": 0.6946,
+    "top10Share": 44.185,
+    "starvationRate": 35.3431,
+    "avgDistanceKm": 2.2682,
+    "avgRating": 4.5483
+  },
+  "fairness_5pct": {
+    "weights": {
+      "skill": 0.35,
+      "distance": 0.225,
+      "availability": 0.15,
+      "rating": 0.1125,
+      "experience": 0.1125,
+      "fairness": 0.05
+    },
+    "jainsIndex": 0.4467,
+    "gini": 0.594,
+    "top10Share": 32.3304,
+    "starvationRate": 27.3037,
+    "avgDistanceKm": 2.0939,
+    "avgRating": 4.4434
+  },
+  "fairness_10pct": {
+    "weights": {
+      "skill": 0.35,
+      "distance": 0.2,
+      "availability": 0.15,
+      "rating": 0.1,
+      "experience": 0.1,
+      "fairness": 0.1
+    },
+    "jainsIndex": 0.5335,
+    "gini": 0.5218,
+    "top10Share": 27.1266,
+    "starvationRate": 20.4076,
+    "avgDistanceKm": 2.187,
+    "avgRating": 4.3801
+  },
+  "fairness_15pct": {
+    "weights": {
+      "skill": 0.35,
+      "distance": 0.175,
+      "availability": 0.15,
+      "rating": 0.0875,
+      "experience": 0.0875,
+      "fairness": 0.15
+    },
+    "jainsIndex": 0.5916,
+    "gini": 0.4712,
+    "top10Share": 24.5352,
+    "starvationRate": 16.2652,
+    "avgDistanceKm": 2.2925,
+    "avgRating": 4.3342
+  },
+  "fairness_20pct": {
+    "weights": {
+      "skill": 0.35,
+      "distance": 0.15,
+      "availability": 0.15,
+      "rating": 0.075,
+      "experience": 0.075,
+      "fairness": 0.2
+    },
+    "jainsIndex": 0.6451,
+    "gini": 0.4239,
+    "top10Share": 22.2897,
+    "starvationRate": 14.5856,
+    "avgDistanceKm": 2.4745,
+    "avgRating": 4.328
+  }
+}

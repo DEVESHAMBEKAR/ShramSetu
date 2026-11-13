@@ -30,6 +30,21 @@ abstract class IAdminRepository {
   /// Approve worker insurance application, generate policy number and issue policy
   Future<WorkerInsuranceModel> approveWorkerInsurance(String workerId, {String? remarks});
 
+  /// Update worker designated service areas (by admin)
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas);
+
+  /// Fetch area change tickets raised by workers
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets({String? federationId});
+
+  /// Resolve an area change ticket (approve or reject)
+  Future<void> resolveAreaChangeTicket({
+    required String ticketId,
+    required String workerId,
+    required bool isApproved,
+    required List<String> approvedAreas,
+    String? remarks,
+  });
+
   Future<List<JobRequest>> getBookings();
   Stream<List<JobRequest>> watchBookings();
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus);

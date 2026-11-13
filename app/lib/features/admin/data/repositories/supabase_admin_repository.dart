@@ -10,7 +10,10 @@ import '../../../../core/models/insurance_models.dart';
 import '../../../../core/models/federation_models.dart';
 import '../../../../core/services/audit_log_service.dart';
 import '../../../../core/services/shared_booking_store.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../worker/data/models/worker_models.dart';
+import '../../../worker/data/repositories/mock_worker_repository.dart';
+import 'mock_admin_repository.dart';
 
 class SupabaseAdminRepository implements IAdminRepository {
   final SupabaseClient _client;
@@ -18,6 +21,9 @@ class SupabaseAdminRepository implements IAdminRepository {
 
   SupabaseAdminRepository(this._client)
       : _realtimeService = BookingRealtimeService(_client);
+
+  /// In-memory cache for worker verification documents to preserve admin approval and review state across visits.
+  static final Map<String, List<Map<String, dynamic>>> _workerDocsCache = {};
 
   /// Returns the federation scope service (if available).
   FederationScopeService? get _scopeService => DI.federationScopeService ?? FederationScopeService(_client);
@@ -471,7 +477,7 @@ class SupabaseAdminRepository implements IAdminRepository {
       var list = (response as List).map((b) {
         final cData = b['users'] ?? {};
         final wData = b['workers'] ?? {};
-        final fedId = wData['federation_ref_id']?.toString();
+        final fedId = wData['federation_ref_id']?.toString() ?? wData['federation_id']?.toString();
         final rawAmount = b['base_amount'] ?? b['amount'] ?? 0;
         final wUsers = wData['users'] is Map ? (wData['users'] as Map)['full_name'] as String? : null;
         final workerName = wUsers ?? 'Assigned Artisan';
@@ -481,10 +487,10 @@ class SupabaseAdminRepository implements IAdminRepository {
           job: JobRequest(
             id: b['id'],
             customerId: b['customer_id'] ?? '',
-            customerName: cData['full_name'] ?? 'Unknown',
+            customerName: cData['full_name'] ?? 'Customer',
             customerLocation: 'Local',
-            customerPhone: cData['phone'] ?? 'Unknown',
-            serviceName: b['services'] != null ? b['services']['name'] : 'Unknown',
+            customerPhone: cData['phone'] ?? '',
+            serviceName: b['services'] != null ? b['services']['name'] : 'Service',
             date: b['scheduled_date'] ?? '',
             time: b['scheduled_time'] ?? '',
             baseAmount: (rawAmount as num).toDouble(),
@@ -508,9 +514,24 @@ class SupabaseAdminRepository implements IAdminRepository {
         }).toList();
       }
 
-      return list.map((item) => item.job).toList();
+      if (list.isNotEmpty || !AppConfig.useMockData) {
+        return list.map((item) => item.job).toList();
+      }
+
+      final storeBookings = SharedBookingStore.instance.getAllBookings();
+      if (!isGlobal && federationFilter.isNotEmpty) {
+        return storeBookings.where((b) => b.federationRefId == null || federationFilter.contains(b.federationRefId)).toList();
+      }
+      return storeBookings;
     } catch (e) {
       debugPrint('[AdminRepo] getBookings error fallback: $e');
+      if (AppConfig.useMockData) {
+        final storeBookings = SharedBookingStore.instance.getAllBookings();
+        if (!isGlobal && federationFilter.isNotEmpty) {
+          return storeBookings.where((b) => b.federationRefId == null || federationFilter.contains(b.federationRefId)).toList();
+        }
+        return storeBookings;
+      }
       return [];
     }
   }
@@ -1081,21 +1102,59 @@ class SupabaseAdminRepository implements IAdminRepository {
 
   @override
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId) async {
-    try {
-      final res = await _client
-          .from('worker_verification_documents')
-          .select()
-          .eq('worker_id', workerId)
-          .order('created_at');
-      if ((res as List).isNotEmpty) {
-        return List<Map<String, dynamic>>.from(res);
+    final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+
+    // 1. If workerId is a valid UUID, query Supabase database
+    if (isUuid) {
+      try {
+        final res = await _client
+            .from('worker_verification_documents')
+            .select()
+            .eq('worker_id', workerId)
+            .order('created_at');
+        if ((res as List).isNotEmpty) {
+          final dbDocs = List<Map<String, dynamic>>.from(
+            res.map((item) => Map<String, dynamic>.from(item as Map)),
+          );
+
+          // If cache has status updates (e.g. APPROVED or RESUBMIT), merge them so admin action is never lost
+          if (_workerDocsCache.containsKey(workerId)) {
+            final cachedList = _workerDocsCache[workerId]!;
+            for (final doc in dbDocs) {
+              final cachedDoc = cachedList.firstWhere(
+                (c) => c['id'] == doc['id'] || c['document_type'] == doc['document_type'],
+                orElse: () => {},
+              );
+              if (cachedDoc.isNotEmpty && cachedDoc.containsKey('status')) {
+                final cachedStatus = cachedDoc['status']?.toString();
+                if (cachedStatus != null && cachedStatus != 'PENDING' && doc['status'] == 'PENDING') {
+                  doc['status'] = cachedStatus;
+                  if (cachedDoc['rejection_reason'] != null) {
+                    doc['rejection_reason'] = cachedDoc['rejection_reason'];
+                  }
+                  if (cachedDoc['admin_remarks'] != null) {
+                    doc['admin_remarks'] = cachedDoc['admin_remarks'];
+                  }
+                }
+              }
+            }
+          }
+
+          _workerDocsCache[workerId] = dbDocs;
+          return List<Map<String, dynamic>>.from(dbDocs);
+        }
+      } catch (e) {
+        debugPrint('[SupabaseAdminRepo] getWorkerDocuments DB query note: $e');
       }
-    } catch (e) {
-      debugPrint('[SupabaseAdminRepo] getWorkerDocuments note: $e');
     }
 
-    // Canonical verification documents placeholder records for registered workers
-    return [
+    // 2. If already in cache (for mock IDs, non-UUIDs, or workers with no DB records yet), return cached documents
+    if (_workerDocsCache.containsKey(workerId)) {
+      return List<Map<String, dynamic>>.from(_workerDocsCache[workerId]!);
+    }
+
+    // 3. Otherwise, construct the default canonical verification documents
+    final defaultDocs = <Map<String, dynamic>>[
       {
         'id': 'doc-id-$workerId',
         'worker_id': workerId,
@@ -1130,24 +1189,182 @@ class SupabaseAdminRepository implements IAdminRepository {
         'created_at': DateTime.now().subtract(const Duration(hours: 12)).toIso8601String(),
       },
     ];
+
+    // 4. If valid UUID, attempt to insert into Supabase so permanent DB records exist
+    if (isUuid) {
+      try {
+        await _client.from('worker_verification_documents').insert([
+          {
+            'worker_id': workerId,
+            'document_type': 'IDENTITY',
+            'file_name': 'aadhaar_card_artisan.pdf',
+            'mime_type': 'application/pdf',
+            'file_size': 1024 * 480,
+            'storage_path': '$workerId/IDENTITY.pdf',
+            'status': 'PENDING',
+          },
+          {
+            'worker_id': workerId,
+            'document_type': 'ADDRESS',
+            'file_name': 'electricity_bill_residence.jpg',
+            'mime_type': 'image/jpeg',
+            'file_size': 1024 * 720,
+            'storage_path': '$workerId/ADDRESS.jpg',
+            'status': 'PENDING',
+          },
+          {
+            'worker_id': workerId,
+            'document_type': 'SKILL_CERTIFICATE',
+            'file_name': 'iti_trade_certificate.pdf',
+            'mime_type': 'application/pdf',
+            'file_size': 1024 * 850,
+            'storage_path': '$workerId/SKILL_CERTIFICATE.pdf',
+            'status': 'PENDING',
+          },
+        ]);
+
+        final inserted = await _client
+            .from('worker_verification_documents')
+            .select()
+            .eq('worker_id', workerId)
+            .order('created_at');
+        if ((inserted as List).isNotEmpty) {
+          final insertedDocs = List<Map<String, dynamic>>.from(
+            inserted.map((item) => Map<String, dynamic>.from(item as Map)),
+          );
+          _workerDocsCache[workerId] = insertedDocs;
+          return insertedDocs;
+        }
+      } catch (seedErr) {
+        debugPrint('[SupabaseAdminRepo] Seed default documents into DB note: $seedErr');
+      }
+    }
+
+    _workerDocsCache[workerId] = defaultDocs;
+    return defaultDocs;
   }
 
   @override
   Future<void> updateDocumentStatus(String documentId, String status, {String? remarks}) async {
+    // 1. Update in-memory cache immediately
+    String? affectedWorkerId;
+    String? affectedDocType;
+    for (final entry in _workerDocsCache.entries) {
+      final docList = entry.value;
+      final idx = docList.indexWhere((d) => d['id']?.toString() == documentId);
+      if (idx != -1) {
+        affectedWorkerId = entry.key;
+        affectedDocType = docList[idx]['document_type']?.toString();
+        docList[idx]['status'] = status;
+        if (remarks != null && remarks.isNotEmpty) {
+          docList[idx]['rejection_reason'] = remarks;
+          docList[idx]['admin_remarks'] = remarks;
+        }
+        break;
+      }
+    }
+
+    // 2. Prepare database payload (rejection_reason is the column in worker_verification_documents)
     final payload = <String, dynamic>{
       'status': status,
-      'updated_at': DateTime.now().toIso8601String(),
     };
     if (remarks != null && remarks.isNotEmpty) {
-      payload['admin_remarks'] = remarks;
+      payload['rejection_reason'] = remarks;
     }
-    try {
-      await _client
-          .from('worker_verification_documents')
-          .update(payload)
-          .eq('id', documentId);
-    } catch (_) {
-      // Column may not exist in older schema — silently ignore
+
+    final isDocUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(documentId);
+
+    if (isDocUuid) {
+      try {
+        await _client
+            .from('worker_verification_documents')
+            .update(payload)
+            .eq('id', documentId);
+      } catch (e) {
+        debugPrint('[SupabaseAdminRepo] updateDocumentStatus DB error: $e');
+      }
+    } else if (affectedWorkerId != null &&
+        affectedDocType != null &&
+        RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(affectedWorkerId)) {
+      // If synthetic doc ID, update or upsert in DB by worker_id and document_type
+      try {
+        final existing = await _client
+            .from('worker_verification_documents')
+            .select('id')
+            .eq('worker_id', affectedWorkerId)
+            .eq('document_type', affectedDocType)
+            .maybeSingle();
+
+        if (existing != null && existing['id'] != null) {
+          await _client
+              .from('worker_verification_documents')
+              .update(payload)
+              .eq('id', existing['id']);
+          // Also update the document ID in the cache to the real DB UUID
+          final docList = _workerDocsCache[affectedWorkerId];
+          final idx = docList?.indexWhere((d) => d['id']?.toString() == documentId) ?? -1;
+          if (docList != null && idx != -1) {
+            docList[idx]['id'] = existing['id'].toString();
+          }
+        } else {
+          // Insert the document record with the updated status into DB
+          final inserted = await _client.from('worker_verification_documents').insert({
+            'worker_id': affectedWorkerId,
+            'document_type': affectedDocType,
+            'file_name': affectedDocType == 'IDENTITY'
+                ? 'aadhaar_card_artisan.pdf'
+                : affectedDocType == 'ADDRESS'
+                    ? 'electricity_bill_residence.jpg'
+                    : 'iti_trade_certificate.pdf',
+            'mime_type': affectedDocType == 'ADDRESS' ? 'image/jpeg' : 'application/pdf',
+            'file_size': affectedDocType == 'IDENTITY' ? 491520 : (affectedDocType == 'ADDRESS' ? 737280 : 870400),
+            'storage_path': '$affectedWorkerId/$affectedDocType.pdf',
+            'status': status,
+            if (remarks != null && remarks.isNotEmpty) 'rejection_reason': remarks,
+          }).select('id').maybeSingle();
+
+          if (inserted != null && inserted['id'] != null) {
+            final docList = _workerDocsCache[affectedWorkerId];
+            final idx = docList?.indexWhere((d) => d['id']?.toString() == documentId) ?? -1;
+            if (docList != null && idx != -1) {
+              docList[idx]['id'] = inserted['id'].toString();
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('[SupabaseAdminRepo] update/upsert document by worker_id and type error: $e');
+      }
+    }
+
+    // 3. Log verification audit history
+    final targetWorkerId = affectedWorkerId ?? (isDocUuid ? null : documentId.split('-').lastOrNull);
+    if (targetWorkerId != null) {
+      final adminId = _client.auth.currentUser?.id;
+      final actionName = status == 'APPROVED'
+          ? 'DOCUMENT_APPROVED'
+          : status == 'RESUBMIT'
+              ? 'DOCUMENT_RESUBMISSION_REQUESTED'
+              : 'DOCUMENT_FLAGGED';
+      final actionRemarks = remarks ?? 'Document ${affectedDocType ?? ''} status changed to $status';
+
+      try {
+        await _client.from('worker_verification_history').insert({
+          'worker_id': targetWorkerId,
+          'admin_id': adminId,
+          'previous_status': 'PENDING',
+          'new_status': status,
+          'action': actionName,
+          'remarks': actionRemarks,
+        });
+      } catch (_) {}
+
+      AuditLogService.logWorkerVerification(
+        workerId: targetWorkerId,
+        action: actionName,
+        previousStatus: 'PENDING',
+        newStatus: status,
+        remarks: actionRemarks,
+      );
     }
   }
 
@@ -1550,5 +1767,79 @@ class SupabaseAdminRepository implements IAdminRepository {
       debugPrint('[SupabaseAdminRepo] updateFederationAdminDetails error: $e');
       rethrow;
     }
+  }
+
+  @override
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas) async {
+    final firstLoc = serviceAreas.isNotEmpty ? serviceAreas.first : null;
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      final query = _client.from('workers').update({
+        'service_areas': serviceAreas,
+        if (firstLoc != null) 'service_location': firstLoc,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      if (isUuid) {
+        await query.or('id.eq.$workerId,user_id.eq.$workerId');
+      } else {
+        await query.eq('id', workerId);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseAdminRepo] updateWorkerServiceAreas note: $e');
+    }
+    await MockAdminRepository().updateWorkerServiceAreas(workerId, serviceAreas);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets({String? federationId}) async {
+    try {
+      var query = _client.from('worker_area_tickets').select('''
+        id, worker_id, federation_id, current_areas, requested_areas,
+        reason, status, admin_remarks, resolved_by, resolved_at, created_at
+      ''');
+      if (federationId != null && federationId.isNotEmpty) {
+        query = query.eq('federation_id', federationId);
+      }
+      final res = await query.order('created_at', ascending: false);
+      if (res is List && res.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(res);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseAdminRepo] getAreaChangeTickets note: $e');
+    }
+    return MockAdminRepository().getAreaChangeTickets(federationId: federationId);
+  }
+
+  @override
+  Future<void> resolveAreaChangeTicket({
+    required String ticketId,
+    required String workerId,
+    required bool isApproved,
+    required List<String> approvedAreas,
+    String? remarks,
+  }) async {
+    try {
+      final curUser = _client.auth.currentUser;
+      await _client.from('worker_area_tickets').update({
+        'status': isApproved ? 'APPROVED' : 'REJECTED',
+        'admin_remarks': remarks,
+        'resolved_by': curUser?.id,
+        'resolved_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+      }).eq('id', ticketId);
+
+      if (isApproved && approvedAreas.isNotEmpty) {
+        await updateWorkerServiceAreas(workerId, approvedAreas);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseAdminRepo] resolveAreaChangeTicket note: $e');
+    }
+    await MockAdminRepository().resolveAreaChangeTicket(
+      ticketId: ticketId,
+      workerId: workerId,
+      isApproved: isApproved,
+      approvedAreas: approvedAreas,
+      remarks: remarks,
+    );
   }
 }

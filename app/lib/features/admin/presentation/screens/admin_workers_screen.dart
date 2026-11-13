@@ -156,6 +156,28 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
   }
 
   Future<void> _approveWorker(WorkerProfile worker) async {
+    if (!_isSuperAdmin) {
+      String wFedId = worker.federationRefId ?? '';
+      if (wFedId.isEmpty) {
+        wFedId = FederationModel.resolveFederation(
+          federationId: worker.federationRefId,
+          federationName: worker.guildName,
+          district: worker.district,
+          city: worker.city,
+          location: worker.serviceLocation,
+          address: worker.address,
+        ).id;
+      }
+      if (!_authorizedFedIds.contains(wFedId)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Access Denied: You can only approve artisans allocated to your cooperative federation.'),
+          ),
+        );
+        return;
+      }
+    }
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -209,6 +231,28 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
   }
 
   Future<void> _rejectWorker(WorkerProfile worker) async {
+    if (!_isSuperAdmin) {
+      String wFedId = worker.federationRefId ?? '';
+      if (wFedId.isEmpty) {
+        wFedId = FederationModel.resolveFederation(
+          federationId: worker.federationRefId,
+          federationName: worker.guildName,
+          district: worker.district,
+          city: worker.city,
+          location: worker.serviceLocation,
+          address: worker.address,
+        ).id;
+      }
+      if (!_authorizedFedIds.contains(wFedId)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: AppColors.error,
+            content: Text('Access Denied: You can only reject artisans allocated to your cooperative federation.'),
+          ),
+        );
+        return;
+      }
+    }
     final reasonController = TextEditingController();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -334,10 +378,18 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
             allWorkers = [];
           } else {
             allWorkers = rawWorkers.where((w) {
-              if (w.federationRefId == null || w.federationRefId!.isEmpty) {
-                return false;
+              String fedId = w.federationRefId ?? '';
+              if (fedId.isEmpty) {
+                fedId = FederationModel.resolveFederation(
+                  federationId: w.federationRefId,
+                  federationName: w.guildName,
+                  district: w.district,
+                  city: w.city,
+                  location: w.serviceLocation,
+                  address: w.address,
+                ).id;
               }
-              return scopedIds.contains(w.federationRefId);
+              return scopedIds.contains(fedId);
             }).toList();
           }
         } else {
@@ -649,7 +701,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                 SizedBox(
                   width: 220,
                   child: DropdownButtonFormField<String?>(
-                    value: _selectedFederationId,
+                    initialValue: _selectedFederationId,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'Cooperative Federation',
@@ -677,7 +729,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                 SizedBox(
                   width: 170,
                   child: DropdownButtonFormField<String?>(
-                    value: _selectedState,
+                    initialValue: _selectedState,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'State / UT',
@@ -711,7 +763,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                 SizedBox(
                   width: 170,
                   child: DropdownButtonFormField<String?>(
-                    value: _selectedDistrict,
+                    initialValue: _selectedDistrict,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'District',
@@ -745,7 +797,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                   SizedBox(
                     width: 160,
                     child: DropdownButtonFormField<String?>(
-                      value: _selectedArea,
+                      initialValue: _selectedArea,
                       isExpanded: true,
                       decoration: InputDecoration(
                         labelText: 'Area / Sub-locality',
@@ -773,7 +825,7 @@ class _AdminWorkersScreenState extends State<AdminWorkersScreen> {
                 SizedBox(
                   width: 190,
                   child: DropdownButtonFormField<String>(
-                    value: _sortBy,
+                    initialValue: _sortBy,
                     isExpanded: true,
                     decoration: InputDecoration(
                       labelText: 'Sort By',

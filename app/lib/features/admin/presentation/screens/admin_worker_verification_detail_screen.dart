@@ -28,6 +28,7 @@ class _AdminWorkerVerificationDetailScreenState
   late WorkerProfile _worker;
   List<Map<String, dynamic>> _documents = [];
   List<WorkerVerificationHistoryItem> _history = [];
+  List<Map<String, dynamic>> _areaTickets = [];
   WorkerInsuranceModel? _insurance;
   bool _isLoading = true;
   bool _isProcessingAction = false;
@@ -52,9 +53,20 @@ class _AdminWorkerVerificationDetailScreenState
         final authIds = scope != null
             ? await scope.getAuthorizedFederationIds()
             : <String>[];
-        final wFedId = _worker.federationRefId;
+        String? wFedId = _worker.federationRefId;
+        if (wFedId == null || wFedId.isEmpty) {
+          final resolved = FederationModel.resolveFederation(
+            federationId: _worker.federationRefId,
+            federationName: _worker.guildName,
+            district: _worker.district,
+            city: _worker.city,
+            location: _worker.serviceLocation,
+            address: _worker.address,
+          );
+          wFedId = resolved.id;
+        }
 
-        final bool isAuthorized = authIds.isNotEmpty && wFedId != null && authIds.contains(wFedId);
+        final bool isAuthorized = authIds.isNotEmpty && wFedId.isNotEmpty && authIds.contains(wFedId);
 
         if (!isAuthorized) {
           if (mounted) {
@@ -76,11 +88,18 @@ class _AdminWorkerVerificationDetailScreenState
         insurance = await DI.adminRepo.getWorkerInsurance(_worker.id);
       } catch (_) {}
 
+      List<Map<String, dynamic>> areaTickets = [];
+      try {
+        final allTickets = await DI.adminRepo.getAreaChangeTickets(federationId: _worker.federationRefId);
+        areaTickets = allTickets.where((t) => t['worker_id'] == _worker.id).toList();
+      } catch (_) {}
+
       if (mounted) {
         setState(() {
           _documents = docs;
           _history = history;
           _insurance = insurance;
+          _areaTickets = areaTickets;
           if (fresh != null) _worker = fresh;
           _isLoading = false;
         });
@@ -100,10 +119,11 @@ class _AdminWorkerVerificationDetailScreenState
       isAdmin: true,
       onApprove: () => _updateDocumentStatus(doc, 'APPROVED'),
       onFlag: () => _updateDocumentStatus(doc, 'FLAGGED'),
+      onResubmit: () => _updateDocumentStatus(doc, 'RESUBMIT'),
     );
   }
 
-  /// Lets admin mark a single document as APPROVED or FLAGGED with optional remarks.
+  /// Lets admin mark a single document as APPROVED, FLAGGED, or RESUBMIT with remarks.
   Future<void> _updateDocumentStatus(Map<String, dynamic> doc, String newStatus) async {
     final docId = doc['id']?.toString() ?? '';
     final docType = (doc['document_type'] ?? 'DOCUMENT').toString().replaceAll('_', ' ');
@@ -115,11 +135,28 @@ class _AdminWorkerVerificationDetailScreenState
         title: Row(
           children: [
             Icon(
-              newStatus == 'APPROVED' ? Icons.check_circle_outline : Icons.flag_outlined,
-              color: newStatus == 'APPROVED' ? const Color(0xFF2E7D32) : AppColors.error,
+              newStatus == 'APPROVED'
+                  ? Icons.check_circle_outline
+                  : newStatus == 'RESUBMIT'
+                      ? Icons.replay_rounded
+                      : Icons.flag_outlined,
+              color: newStatus == 'APPROVED'
+                  ? const Color(0xFF2E7D32)
+                  : newStatus == 'RESUBMIT'
+                      ? AppColors.secondary
+                      : AppColors.error,
             ),
             const SizedBox(width: 8),
-            Expanded(child: Text(newStatus == 'APPROVED' ? 'Approve Document' : 'Flag Document', style: const TextStyle(fontSize: 15))),
+            Expanded(
+              child: Text(
+                newStatus == 'APPROVED'
+                    ? 'Approve Document'
+                    : newStatus == 'RESUBMIT'
+                        ? 'Request Resubmission'
+                        : 'Flag Queries / Issue',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+            ),
           ],
         ),
         content: Column(
@@ -131,11 +168,17 @@ class _AdminWorkerVerificationDetailScreenState
             TextField(
               controller: remarksController,
               decoration: InputDecoration(
-                labelText: newStatus == 'APPROVED' ? 'Remarks (optional)' : 'Reason for flagging *',
+                labelText: newStatus == 'APPROVED'
+                    ? 'Remarks (optional)'
+                    : newStatus == 'RESUBMIT'
+                        ? 'Resubmission Instructions *'
+                        : 'Query / Reason for Flagging *',
                 border: const OutlineInputBorder(),
                 hintText: newStatus == 'APPROVED'
                     ? 'e.g. Identity verified against MSDE register'
-                    : 'e.g. Photo blurry — re-upload required',
+                    : newStatus == 'RESUBMIT'
+                        ? 'e.g. Photo blurry or invalid certificate — upload fresh scan'
+                        : 'e.g. Name mismatch or missing ward detail',
               ),
               maxLines: 2,
             ),
@@ -145,17 +188,35 @@ class _AdminWorkerVerificationDetailScreenState
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: newStatus == 'APPROVED' ? const Color(0xFF2E7D32) : AppColors.error,
+              backgroundColor: newStatus == 'APPROVED'
+                  ? const Color(0xFF2E7D32)
+                  : newStatus == 'RESUBMIT'
+                      ? AppColors.secondary
+                      : AppColors.error,
               foregroundColor: Colors.white,
             ),
             onPressed: () {
-              if (newStatus == 'FLAGGED' && remarksController.text.trim().isEmpty) {
-                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('Please enter a reason for flagging.')));
+              if ((newStatus == 'FLAGGED' || newStatus == 'RESUBMIT') && remarksController.text.trim().isEmpty) {
+                ScaffoldMessenger.of(ctx).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      newStatus == 'RESUBMIT'
+                          ? 'Please provide instructions for resubmission.'
+                          : 'Please enter the query / reason.',
+                    ),
+                  ),
+                );
                 return;
               }
               Navigator.pop(ctx, true);
             },
-            child: Text(newStatus == 'APPROVED' ? 'Approve' : 'Flag'),
+            child: Text(
+              newStatus == 'APPROVED'
+                  ? 'Approve'
+                  : newStatus == 'RESUBMIT'
+                      ? 'Request Resubmit'
+                      : 'Flag Query',
+            ),
           ),
         ],
       ),
@@ -164,15 +225,33 @@ class _AdminWorkerVerificationDetailScreenState
     if (confirmed == true && docId.isNotEmpty) {
       try {
         await DI.adminRepo.updateDocumentStatus(docId, newStatus, remarks: remarksController.text.trim());
-        setState(() {
-          final idx = _documents.indexWhere((d) => d['id'] == docId);
-          if (idx != -1) _documents[idx] = Map<String, dynamic>.from(_documents[idx])..['status'] = newStatus;
-        });
+        final freshDocs = await DI.adminRepo.getWorkerDocuments(_worker.id);
+        final freshHistory = await DI.adminRepo.getVerificationHistory(_worker.id);
+        if (mounted) {
+          setState(() {
+            _documents = freshDocs.isNotEmpty ? freshDocs : _documents;
+            final idx = _documents.indexWhere((d) => d['id'] == docId || d['document_type'] == doc['document_type']);
+            if (idx != -1) {
+              _documents[idx] = Map<String, dynamic>.from(_documents[idx])..['status'] = newStatus;
+            }
+            _history = freshHistory;
+          });
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              backgroundColor: newStatus == 'APPROVED' ? AppColors.onTertiaryContainer : AppColors.error,
-              content: Text(newStatus == 'APPROVED' ? '✓ Document approved.' : '⚑ Document flagged for re-upload.'),
+              backgroundColor: newStatus == 'APPROVED'
+                  ? AppColors.onTertiaryContainer
+                  : newStatus == 'RESUBMIT'
+                      ? AppColors.onSecondaryContainer
+                      : AppColors.error,
+              content: Text(
+                newStatus == 'APPROVED'
+                    ? '✓ Document approved.'
+                    : newStatus == 'RESUBMIT'
+                        ? '⟳ Resubmission requested from artisan.'
+                        : '⚑ Query flagged on document.',
+              ),
             ),
           );
         }
@@ -717,6 +796,8 @@ class _AdminWorkerVerificationDetailScreenState
                           const SizedBox(height: 16),
                           _buildWorkSkillsCard(),
                           const SizedBox(height: 16),
+                          _buildAreaJurisdictionCard(),
+                          const SizedBox(height: 16),
                           _buildCooperativeCard(),
                           const SizedBox(height: 16),
                           _buildInsuranceWelfareCard(),
@@ -1046,9 +1127,339 @@ class _AdminWorkerVerificationDetailScreenState
           _buildInfoRow('Primary Skill', _worker.primarySkill?.isNotEmpty == true ? _worker.primarySkill! : (_worker.skills.isNotEmpty ? _worker.skills.join(', ') : 'Not specified')),
           _buildInfoRow('Proficiency Level', _worker.skillLevel?.isNotEmpty == true ? _worker.skillLevel! : 'Skilled Artisan'),
           _buildInfoRow('Experience', _worker.experience),
-          _buildInfoRow('Service Area / Operational Ward', _worker.serviceLocation),
+          _buildInfoRow(
+            'Service Localities (Max 3)',
+            _worker.serviceAreas.isNotEmpty
+                ? _worker.serviceAreas.join(' • ')
+                : _worker.serviceLocation,
+          ),
           _buildInfoRow('Dispatch Availability', _worker.isAvailable ? 'Available for Bookings' : 'Currently Offline'),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAreaJurisdictionCard() {
+    final activeAreas = _worker.serviceAreas.isNotEmpty ? _worker.serviceAreas : [_worker.serviceLocation];
+    final pendingTicket = _areaTickets.where((t) => t['status'] == 'PENDING').firstOrNull;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: pendingTicket != null ? const Color(0xFFFFB74D) : AppColors.outlineVariant,
+          width: pendingTicket != null ? 1.5 : 1.0,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.map,
+                    size: 20,
+                    color: pendingTicket != null ? const Color(0xFFE65100) : AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Territorial Jurisdiction & Service Areas',
+                    style: AppTypography.titleMd.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: pendingTicket != null ? const Color(0xFFE65100) : AppColors.primary,
+                    ),
+                  ),
+                ],
+              ),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: _handleAdminEditServiceAreas,
+                icon: const Icon(Icons.edit, size: 14),
+                label: const Text('Edit Areas', style: TextStyle(fontSize: 11)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Active Operating Localities
+          const Text('Active Authorized Localities (Max 3):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.outline)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: activeAreas.map((area) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F5E9),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFF81C784)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.place, size: 14, color: Color(0xFF2E7D32)),
+                    const SizedBox(width: 4),
+                    Text(
+                      area,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1B5E20)),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+
+          // Pending Area Change Ticket Card
+          if (pendingTicket != null) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFB74D)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.assignment_late, color: Color(0xFFE65100), size: 18),
+                          SizedBox(width: 6),
+                          Text(
+                            'Pending Area Change Request Ticket',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFBF360C)),
+                          ),
+                        ],
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFE082),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text('PENDING APPROVAL', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFE65100))),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Requested Areas: ${(pendingTicket['requested_areas'] as List?)?.join(', ') ?? 'N/A'}',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.onSurface),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Reason: ${pendingTicket['reason'] ?? 'Not specified'}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2E7D32),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: _isProcessingAction
+                            ? null
+                            : () => _handleResolveAreaTicket(pendingTicket, true),
+                        icon: const Icon(Icons.check_circle, size: 16),
+                        label: const Text('Approve & Apply Areas', style: TextStyle(fontSize: 12)),
+                      ),
+                      const SizedBox(width: 10),
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.error,
+                          side: const BorderSide(color: AppColors.error),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        ),
+                        onPressed: _isProcessingAction
+                            ? null
+                            : () => _handleResolveAreaTicket(pendingTicket, false),
+                        icon: const Icon(Icons.cancel, size: 16),
+                        label: const Text('Reject Request', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleResolveAreaTicket(Map<String, dynamic> ticket, bool isApproved) async {
+    final remarksCtrl = TextEditingController();
+    final ticketId = ticket['id'] as String;
+    final requested = (ticket['requested_areas'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(isApproved ? Icons.check_circle : Icons.cancel, color: isApproved ? const Color(0xFF2E7D32) : AppColors.error),
+            const SizedBox(width: 8),
+            Text(isApproved ? 'Approve Area Transfer' : 'Reject Area Transfer'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(isApproved
+                ? 'Approve requested areas [${requested.join(', ')}] for ${_worker.name}? This will update the artisan\'s operating jurisdiction immediately.'
+                : 'Reject the area change request for ${_worker.name}?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: remarksCtrl,
+              decoration: const InputDecoration(
+                labelText: 'Admin Remarks (Optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isApproved ? const Color(0xFF2E7D32) : AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(isApproved ? 'Confirm Approval' : 'Confirm Rejection'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      setState(() => _isProcessingAction = true);
+      try {
+        await DI.adminRepo.resolveAreaChangeTicket(
+          ticketId: ticketId,
+          workerId: _worker.id,
+          isApproved: isApproved,
+          approvedAreas: requested,
+          remarks: remarksCtrl.text.trim(),
+        );
+        await _loadDetails();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isApproved ? 'Area change request approved and applied!' : 'Area change request rejected.'),
+              backgroundColor: isApproved ? const Color(0xFF2E7D32) : AppColors.error,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to resolve ticket: $e')),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _isProcessingAction = false);
+      }
+    }
+  }
+
+  Future<void> _handleAdminEditServiceAreas() async {
+    final currentAreas = List<String>.from(_worker.serviceAreas.isNotEmpty ? _worker.serviceAreas : [_worker.serviceLocation]);
+    final allDistrictAreas = ['Kothrud, Pune', 'Shivajinagar, Pune', 'Baner & Balewadi, Pune', 'Wakad & Pimple Saudagar, Pune', 'Hinjewadi, Pune', 'Hadapsar, Pune', 'Viman Nagar & Kalyani Nagar, Pune', 'Swargate & Bibwewadi, Pune', 'Pimpri-Chinchwad, Pune', 'Katraj & Dhankawadi, Pune', 'Aundh & Pashan, Pune', 'Kharadi & Wagholi, Pune', 'Bavdhan', 'Karve Nagar', 'Warje', 'Sinhagad Road', 'Deccan Gymkhana', 'Kondhwa'];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.edit_location_alt, color: AppColors.primary),
+              SizedBox(width: 8),
+              Text('Edit Worker Service Areas'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Modify operating localities for ${_worker.name} (Maximum 3):', style: const TextStyle(fontSize: 13)),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: currentAreas.map((a) {
+                  return Chip(
+                    label: Text(a, style: const TextStyle(fontSize: 12)),
+                    deleteIcon: const Icon(Icons.cancel, size: 16),
+                    onDeleted: currentAreas.length <= 1
+                        ? null
+                        : () => setDialogState(() => currentAreas.remove(a)),
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 12),
+              if (currentAreas.length < 3)
+                DropdownButtonFormField<String>(
+                  isExpanded: true,
+                  hint: const Text('Add area...', style: TextStyle(fontSize: 12)),
+                  decoration: const InputDecoration(border: OutlineInputBorder(), contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8)),
+                  items: allDistrictAreas.where((a) => !currentAreas.contains(a)).map((a) => DropdownMenuItem(value: a, child: Text(a, style: const TextStyle(fontSize: 12)))).toList(),
+                  onChanged: (val) {
+                    if (val != null && currentAreas.length < 3) {
+                      setDialogState(() => currentAreas.add(val));
+                    }
+                  },
+                ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              onPressed: () async {
+                Navigator.pop(ctx);
+                setState(() => _isProcessingAction = true);
+                try {
+                  await DI.adminRepo.updateWorkerServiceAreas(_worker.id, currentAreas);
+                  await _loadDetails();
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Worker service areas updated successfully!'), backgroundColor: Color(0xFF2E7D32)),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update areas: $e')),
+                    );
+                  }
+                } finally {
+                  if (mounted) setState(() => _isProcessingAction = false);
+                }
+              },
+              child: const Text('Save Areas'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1309,6 +1720,7 @@ class _AdminWorkerVerificationDetailScreenState
               final isImage = mimeType.startsWith('image/');
               final isApproved = status == 'APPROVED';
               final isFlagged = status == 'FLAGGED';
+              final isResubmit = status == 'RESUBMIT' || status == 'RESUBMISSION_REQUESTED';
 
               Color statusColor;
               Color statusTextColor;
@@ -1321,6 +1733,10 @@ class _AdminWorkerVerificationDetailScreenState
                 statusColor = AppColors.errorContainer;
                 statusTextColor = AppColors.error;
                 statusIcon = Icons.flag;
+              } else if (isResubmit) {
+                statusColor = AppColors.secondaryContainer;
+                statusTextColor = AppColors.onSecondaryContainer;
+                statusIcon = Icons.replay_rounded;
               } else {
                 statusColor = AppColors.warningContainer;
                 statusTextColor = AppColors.onWarningContainer;
@@ -1337,8 +1753,10 @@ class _AdminWorkerVerificationDetailScreenState
                         ? const Color(0xFF81C784)
                         : isFlagged
                             ? AppColors.error.withValues(alpha: 0.5)
-                            : AppColors.outlineVariant,
-                    width: isApproved || isFlagged ? 1.5 : 1,
+                            : isResubmit
+                                ? AppColors.secondary.withValues(alpha: 0.5)
+                                : AppColors.outlineVariant,
+                    width: isApproved || isFlagged || isResubmit ? 1.5 : 1,
                   ),
                 ),
                 child: Column(
@@ -1442,8 +1860,8 @@ class _AdminWorkerVerificationDetailScreenState
                             ),
                           ),
                           const SizedBox(width: 6),
-                          // APPROVE button
-                          if (!isApproved)
+                          // APPROVE button: Shown ONLY when document is NOT approved
+                          if (!isApproved) ...[
                             Expanded(
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(
@@ -1457,22 +1875,39 @@ class _AdminWorkerVerificationDetailScreenState
                                 label: const Text('Approve', style: TextStyle(fontSize: 12)),
                               ),
                             ),
-                          const SizedBox(width: 6),
-                          // FLAG button
-                          if (!isFlagged)
+                            const SizedBox(width: 6),
+                          ],
+                          // RESUBMIT button: Shown when document IS approved (Approve button hidden)
+                          if (isApproved) ...[
                             Expanded(
                               child: OutlinedButton.icon(
                                 style: OutlinedButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(vertical: 8),
-                                  foregroundColor: AppColors.error,
-                                  side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                                  foregroundColor: AppColors.secondary,
+                                  side: BorderSide(color: AppColors.secondary.withValues(alpha: 0.7)),
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
-                                onPressed: () => _updateDocumentStatus(d, 'FLAGGED'),
-                                icon: const Icon(Icons.flag_outlined, size: 14),
-                                label: const Text('Flag', style: TextStyle(fontSize: 12)),
+                                onPressed: () => _updateDocumentStatus(d, 'RESUBMIT'),
+                                icon: const Icon(Icons.replay_rounded, size: 14),
+                                label: const Text('Resubmit', style: TextStyle(fontSize: 12)),
                               ),
                             ),
+                            const SizedBox(width: 6),
+                          ],
+                          // FLAG QUERIES button
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 8),
+                                foregroundColor: AppColors.error,
+                                side: BorderSide(color: AppColors.error.withValues(alpha: 0.5)),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              onPressed: () => _updateDocumentStatus(d, 'FLAGGED'),
+                              icon: const Icon(Icons.flag_outlined, size: 14),
+                              label: const Text('Flag Queries', style: TextStyle(fontSize: 12)),
+                            ),
+                          ),
                         ],
                       ),
                     ),

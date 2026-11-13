@@ -60,10 +60,12 @@ enum BookingStatus {
       case 'accepted':
         return BookingStatus.accepted;
       case 'ontheway':
+      case 'on_the_way':
         return BookingStatus.onTheWay;
       case 'arrived':
         return BookingStatus.arrived;
       case 'inprogress':
+      case 'in_progress':
         return BookingStatus.inProgress;
       case 'completed':
         return BookingStatus.completed;

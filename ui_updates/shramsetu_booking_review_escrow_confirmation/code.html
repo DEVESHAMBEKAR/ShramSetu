@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+  <title>ShramSetu Booking Review & Sovereign Escrow Confirmation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "civic-bg": "#F8F9FA",
+            "primary": "#0D5C5B",
+            "primary-dark": "#0B4F50",
+            "primary-light": "#E0F2F1",
+            "accent-amber": "#D97706",
+            "accent-amber-light": "#FEF3C7",
+            "accent-green": "#16A34A",
+            "accent-green-light": "#DCFCE7",
+            "civic-border": "#E2E8F0",
+            "civic-text-main": "#0F172A",
+            "civic-text-muted": "#475569"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "Inter", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F8F9FA; }
+  </style>
+</head>
+<body class="bg-civic-bg text-civic-text-main flex flex-col min-h-screen">
+  <!-- Top Sovereign Header Bar -->
+  <header class="fixed top-0 w-full z-50 bg-white/95 backdrop-blur-md border-b border-civic-border shadow-xs">
+    <div class="w-full h-1 flex">
+      <div class="h-full flex-1 bg-accent-amber"></div>
+      <div class="h-full flex-1 bg-white"></div>
+      <div class="h-full flex-1 bg-accent-green"></div>
+    </div>
+    <div class="h-16 px-4 flex items-center justify-between gap-3 max-w-xl mx-auto">
+      <div class="flex items-center gap-3">
+        <button class="w-9 h-9 rounded-xl border border-civic-border flex items-center justify-center hover:bg-slate-50 text-slate-600">
+          <span class="material-symbols-outlined text-[20px]">arrow_back</span>
+        </button>
+        <div>
+          <h1 class="text-sm font-extrabold text-primary leading-tight">Review & Confirm Booking</h1>
+          <p class="text-[11px] text-civic-text-muted">Zero Commission Cooperative Escrow</p>
+        </div>
+      </div>
+      <div class="w-8 h-8 rounded-full bg-primary-light text-primary flex items-center justify-center font-bold text-xs">
+        <span class="material-symbols-outlined text-[18px]">verified</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="flex flex-col max-w-xl w-full mx-auto px-4 pt-20 pb-28 space-y-4">
+    <!-- Service Summary Card -->
+    <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+      <div class="flex items-start justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-12 h-12 rounded-xl bg-primary-light text-primary flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-[24px]">power</span>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-[10px] font-bold text-primary bg-primary-light px-2 py-0.5 rounded">Electrical Service</span>
+              <span class="text-[10px] text-accent-green font-bold bg-accent-green-light px-1.5 py-0.5 rounded">Standard Rate</span>
+            </div>
+            <h2 class="text-sm font-extrabold text-civic-text-main mt-0.5">Switchboard Repair & Wiring Check</h2>
+            <p class="text-xs text-civic-text-muted mt-0.5">Today • 10:00 AM - 12:00 PM</p>
+          </div>
+        </div>
+        <button class="text-xs font-bold text-primary hover:underline">Change</button>
+      </div>
+    </div>
+
+    <!-- Delivery Address Card with Edit/CRUD -->
+    <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+      <div class="flex items-center justify-between mb-2">
+        <div class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+          <span class="material-symbols-outlined text-primary text-[18px]">location_on</span>
+          <span>Service Delivery Address</span>
+        </div>
+        <button class="text-xs font-bold text-primary hover:underline">+ Change Address</button>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-xl border border-civic-border text-xs">
+        <div class="flex items-center gap-1.5 font-bold text-civic-text-main">
+          <span>Home</span>
+          <span class="text-[9px] bg-primary text-white px-1.5 py-0.2 rounded font-bold">DEFAULT</span>
+        </div>
+        <p class="text-slate-600 mt-1">Flat 402, Mayur Heights, Paud Road, Kothrud Stand</p>
+        <p class="text-slate-500 font-semibold mt-0.5">Pune, Maharashtra - 411038</p>
+      </div>
+    </div>
+
+    <!-- Assigned Artisan (FairMatch AI Engine) -->
+    <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-xs font-bold text-slate-700">Assigned Trade Artisan (FairMatch)</span>
+        <span class="text-[10px] bg-accent-green-light text-accent-green font-bold px-2 py-0.5 rounded-full">Union Verified</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="w-11 h-11 rounded-full bg-slate-200 border border-civic-border flex items-center justify-center font-bold text-sm text-slate-700">
+          RP
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-1.5">
+            <span class="font-bold text-sm text-civic-text-main">Shri Rahul Patil</span>
+            <span class="text-xs font-bold text-amber-500">4.9 ★</span>
+          </div>
+          <p class="text-xs text-civic-text-muted">Pune District Labour Cooperative • 128 verified jobs</p>
+          <p class="text-[11px] text-slate-500">2.1 km away • Arrives with genuine tool kit</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sovereign Escrow Guarantee Notice -->
+    <div class="bg-primary-light border border-primary/20 p-3.5 rounded-2xl">
+      <div class="flex items-start gap-2.5">
+        <span class="material-symbols-outlined text-primary text-[20px] shrink-0 mt-0.5">lock_person</span>
+        <div>
+          <h4 class="text-xs font-extrabold text-primary">Sovereign Escrow & OTP Protection</h4>
+          <p class="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+            Your payment is held safely in escrow. Funds are transferred to the artisan only when you share your secret 4-digit OTP after verifying completed service work.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pricing Breakdown -->
+    <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs space-y-2 text-xs">
+      <h3 class="font-bold text-slate-800 mb-2">Gazette Standard Fare Breakdown</h3>
+      <div class="flex justify-between text-slate-600">
+        <span>Standard Service Labor Charge</span>
+        <span class="font-semibold text-slate-800">₹399.00</span>
+      </div>
+      <div class="flex justify-between text-slate-600">
+        <span>Union Welfare Cess (2%)</span>
+        <span class="font-semibold text-slate-800">₹7.98</span>
+      </div>
+      <div class="flex justify-between text-slate-600">
+        <span>Platform Commission</span>
+        <span class="font-bold text-accent-green">₹0.00 (Zero Cut)</span>
+      </div>
+      <div class="border-t border-civic-border pt-2 flex justify-between text-sm font-extrabold text-civic-text-main">
+        <span>Total Payable (Escrow Deposit)</span>
+        <span class="text-base text-primary">₹406.98</span>
+      </div>
+    </div>
+
+    <!-- Payment Method Selector -->
+    <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs space-y-2.5 text-xs">
+      <h3 class="font-bold text-slate-800">Select Payment Mode (Test Mode)</h3>
+      <label class="flex items-center justify-between p-3 rounded-xl border-2 border-primary bg-primary-light/30 cursor-pointer">
+        <div class="flex items-center gap-2.5">
+          <input type="radio" name="pay" checked class="text-primary focus:ring-primary"/>
+          <span class="font-bold text-slate-800">UPI (Google Pay / PhonePe / Paytm / BHIM)</span>
+        </div>
+        <span class="text-[10px] bg-accent-green-light text-accent-green font-bold px-1.5 py-0.5 rounded">Instant Escrow</span>
+      </label>
+      <label class="flex items-center justify-between p-3 rounded-xl border border-civic-border hover:bg-slate-50 cursor-pointer">
+        <div class="flex items-center gap-2.5">
+          <input type="radio" name="pay" class="text-primary focus:ring-primary"/>
+          <span class="font-semibold text-slate-700">Cards &amp; NetBanking (Razorpay Test Mode)</span>
+        </div>
+        <span class="text-[10px] text-slate-400 font-semibold">Test Sandbox</span>
+      </label>
+      <label class="flex items-center justify-between p-3 rounded-xl border border-civic-border hover:bg-slate-50 cursor-pointer">
+        <div class="flex items-center gap-2.5">
+          <input type="radio" name="pay" class="text-primary focus:ring-primary"/>
+          <span class="font-semibold text-slate-700">Cash on Completion with Digital Invoice</span>
+        </div>
+        <span class="text-[10px] text-slate-400 font-semibold">Post-Service</span>
+      </label>
+    </div>
+  </main>
+
+  <!-- Sticky Bottom Checkout Bar -->
+  <div class="fixed bottom-0 w-full bg-white border-t border-civic-border p-4 shadow-lg z-50">
+    <div class="max-w-xl mx-auto flex items-center justify-between gap-4">
+      <div>
+        <span class="text-[10px] font-semibold text-civic-text-muted block">TOTAL ESCROW DEPOSIT</span>
+        <span class="text-xl font-black text-primary">₹407.00</span>
+      </div>
+      <button class="h-12 px-6 rounded-xl bg-primary hover:bg-primary-dark text-white font-extrabold text-sm shadow-md transition-all flex items-center gap-2">
+        <span>Confirm &amp; Deposit Escrow</span>
+        <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+      </button>
+    </div>
+  </div>
+</body>
+</html>

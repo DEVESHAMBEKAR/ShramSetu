@@ -285,6 +285,7 @@ class FairMatchResult {
 /// Global FairMatch configuration constants.
 class FairMatchConfig {
   static const String version = 'fairmatch_v1';
+  static const double operationalRadiusKm = 3.5;
   static const double maxDistanceKm = 15.0;
   static const double maxExperienceYears = 10.0;
   static const double maxWorkloadIndex = 10.0;

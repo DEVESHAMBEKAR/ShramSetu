@@ -28,8 +28,27 @@ class AppStrings {
       'Language switched to English': 'Language switched to English',
       'Language set to Marathi': 'भाषा मराठी निवडली आहे (Language set to Marathi)',
       'Language set to Hindi': 'भाषा हिंदी चुनी गई (Language set to Hindi)',
-      'Logout': 'Logout',
       'Sign Out': 'Sign Out',
+
+      // Booking Statuses (Accessible Badges)
+      'Pending': 'Pending',
+      'Accepted': 'Accepted',
+      'On the way': 'On the way',
+      'Arrived': 'Arrived',
+      'In progress': 'In progress',
+      'Completed': 'Completed',
+      'Rejected': 'Rejected',
+      'Cancelled': 'Cancelled',
+
+      // UI States (Loading, Empty, Error, Offline, Retry)
+      'Loading...': 'Loading...',
+      'Unable to Load Data': 'Unable to Load Data',
+      'Try Again': 'Try Again',
+      "You're Currently Offline": "You're Currently Offline",
+      'Please check your internet connection. Saved local data remains accessible.': 'Please check your internet connection. Saved local data remains accessible.',
+      'Retry Connection': 'Retry Connection',
+      'Collapse Sidebar': 'Collapse Sidebar',
+      'Expand Sidebar': 'Expand Sidebar',
 
       // Worker Dashboard & Duty Status
       'Duty Status': 'Duty Status',
@@ -208,8 +227,27 @@ class AppStrings {
       'Language switched to English': 'इंग्रजी भाषा निवडली आहे',
       'Language set to Marathi': 'भाषा मराठी निवडली आहे (Language set to Marathi)',
       'Language set to Hindi': 'भाषा हिंदी चुनी गई (Language set to Hindi)',
-      'Logout': 'बाहेर पडा',
       'Sign Out': 'बाहेर पडा',
+
+      // Booking Statuses (Accessible Badges)
+      'Pending': 'प्रलंबित',
+      'Accepted': 'स्वीकारले',
+      'On the way': 'येत आहेत',
+      'Arrived': 'पोहोचले',
+      'In progress': 'काम सुरू',
+      'Completed': 'पूर्ण झाले',
+      'Rejected': 'नाकारले',
+      'Cancelled': 'रद्द केले',
+
+      // UI States (Loading, Empty, Error, Offline, Retry)
+      'Loading...': 'लोड होत आहे...',
+      'Unable to Load Data': 'डेटा लोड करण्यात अडचण',
+      'Try Again': 'पुन्हा प्रयत्न करा',
+      "You're Currently Offline": 'तुम्ही सध्या ऑफलाइन आहात',
+      'Please check your internet connection. Saved local data remains accessible.': 'कृपया इंटरनेट कनेक्शन तपासा. जतन केलेला स्थानिक डेटा उपलब्ध राहील.',
+      'Retry Connection': 'पुन्हा कनेक्ट करा',
+      'Collapse Sidebar': 'साइडबार लहान करा',
+      'Expand Sidebar': 'साइडबार मोठा करा',
 
       // Worker Dashboard & Duty Status
       'Duty Status': 'कामाची स्थिती',
@@ -388,8 +426,27 @@ class AppStrings {
       'Language switched to English': 'अंग्रेजी भाषा चुनी गई',
       'Language set to Marathi': 'भाषा मराठी निवडली आहे (Language set to Marathi)',
       'Language set to Hindi': 'भाषा हिंदी चुनी गई (Language set to Hindi)',
-      'Logout': 'लॉग आउट',
       'Sign Out': 'लॉग आउट',
+
+      // Booking Statuses (Accessible Badges)
+      'Pending': 'लंबित',
+      'Accepted': 'स्वीकृत',
+      'On the way': 'रास्ते में हैं',
+      'Arrived': 'पहुंच गए',
+      'In progress': 'प्रगति पर',
+      'Completed': 'पूर्ण हुआ',
+      'Rejected': 'अस्वीकृत',
+      'Cancelled': 'रद्द किया गया',
+
+      // UI States (Loading, Empty, Error, Offline, Retry)
+      'Loading...': 'लोड हो रहा है...',
+      'Unable to Load Data': 'डेटा लोड करने में असमर्थ',
+      'Try Again': 'पुनः प्रयास करें',
+      "You're Currently Offline": 'आप वर्तमान में ऑफ़लाइन हैं',
+      'Please check your internet connection. Saved local data remains accessible.': 'कृपया अपना इंटरनेट कनेक्शन जांचें। सहेजा गया स्थानीय डेटा सुलभ रहेगा।',
+      'Retry Connection': 'पुनः कनेक्ट करें',
+      'Collapse Sidebar': 'साइडबार छोटा करें',
+      'Expand Sidebar': 'साइडबार बड़ा करें',
 
       // Worker Dashboard & Duty Status
       'Duty Status': 'कार्य स्थिति',

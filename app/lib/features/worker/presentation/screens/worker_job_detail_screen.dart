@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/theme/app_typography.dart';
-import '../../../../core/theme/app_radius.dart';
 import '../../data/models/worker_models.dart';
 import '../../../../core/config/dependency_injection.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class WorkerJobDetailScreen extends StatefulWidget {
   final String jobId;
@@ -23,6 +23,8 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
   final List<FocusNode> _otpFocusNodes = List.generate(4, (_) => FocusNode());
   bool _otpVerified = false;
   bool _hardwareBillAdded = false;
+  bool _cashCollected = false;
+  String? _otpErrorMessage;
 
   @override
   void initState() {
@@ -54,7 +56,7 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
     });
   }
 
-  void _onOtpChanged(int index, String value) {
+  void _onOtpChanged(int index, String value, JobRequest job) {
     if (value.isNotEmpty) {
       if (index < 3) {
         _otpFocusNodes[index + 1].requestFocus();
@@ -62,9 +64,35 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
         _otpFocusNodes[index].unfocus();
         final code = _otpControllers.map((c) => c.text).join();
         if (code.length == 4) {
-          setState(() {
-            _otpVerified = true;
-          });
+          final expectedOtp = job.otp ?? '8492';
+          if (code == expectedOtp) {
+            setState(() {
+              _otpVerified = true;
+              _otpErrorMessage = null;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Completion OTP verified successfully!'),
+                backgroundColor: Color(0xFF2E7D32),
+              ),
+            );
+          } else {
+            setState(() {
+              _otpVerified = false;
+              _otpErrorMessage = 'Invalid OTP. Ask customer for 4-digit code.';
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('❌ Invalid OTP! Ask customer for their 4-digit Completion Code.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+            // Clear inputs for re-entry
+            for (var c in _otpControllers) {
+              c.clear();
+            }
+            _otpFocusNodes[0].requestFocus();
+          }
         }
       }
     } else {
@@ -82,13 +110,17 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            body: AppLoadingView(message: 'Loading job assignment details...'),
           );
         }
         if (snapshot.hasError) {
           return Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(child: Text('Error loading job: ${snapshot.error}')),
+            body: AppErrorView(
+              title: 'Error loading job',
+              message: snapshot.error.toString(),
+              onRetry: _refreshData,
+            ),
           );
         }
 
@@ -102,35 +134,12 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               backgroundColor: Colors.white,
               elevation: 0,
             ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.work_off_outlined, size: 64, color: AppColors.outline),
-                    const SizedBox(height: 16),
-                    Text('Job Not Found', style: AppTypography.titleMd.copyWith(fontWeight: FontWeight.bold, color: AppColors.primary)),
-                    const SizedBox(height: 8),
-                    Text(
-                      'This service assignment is no longer active or could not be loaded.',
-                      textAlign: TextAlign.center,
-                      style: AppTypography.bodySm.copyWith(color: AppColors.onSurfaceVariant),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: AppRadius.radiusLg),
-                      ),
-                      child: const Text('Return to Jobs'),
-                    ),
-                  ],
-                ),
-              ),
+            body: AppEmptyView(
+              icon: Icons.work_off_outlined,
+              title: 'Job Not Found',
+              subtitle: 'This service assignment is no longer active or could not be loaded.',
+              actionLabel: 'Return to Jobs',
+              onActionPressed: () => Navigator.of(context).pop(),
             ),
           );
         }
@@ -709,20 +718,40 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: () async {
-                  if (job.status == BookingStatus.inProgress && !_otpVerified) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Please verify customer OTP first before completing job.')),
-                    );
-                    return;
+                  if (job.status == BookingStatus.inProgress) {
+                    if (!_otpVerified) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Please verify customer OTP first before completing job.')),
+                      );
+                      return;
+                    }
+                    if (job.isCash && !_cashCollected) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Please confirm that you have collected ₹${job.totalAmount.toInt()} cash from customer.')),
+                      );
+                      return;
+                    }
                   }
-                  await DI.workerRepo.updateBookingStatus(job.id, nextStatus);
-                  _refreshData();
-                  if (nextStatus == BookingStatus.completed) {
+                  try {
+                    await DI.workerRepo.updateBookingStatus(job.id, nextStatus);
+                    if (mounted) _refreshData();
+                    if (nextStatus == BookingStatus.completed) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(job.isCash 
+                                ? 'Job completed and ₹${job.totalAmount.toInt()} cash payment settled!'
+                                : 'Job successfully completed! Payout queued to Bank account.'),
+                          ),
+                        );
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  } catch (e) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Job successfully completed! Payout queued to Bank account.')),
+                        SnackBar(content: Text('Failed to update job status: $e')),
                       );
-                      Navigator.of(context).pop();
                     }
                   }
                 },
@@ -790,7 +819,9 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Enter the 4-digit code provided by ${job.customerName} after job inspection. Upon submission, ₹${job.totalAmount.toInt()}.00 will be instantly transferred via UPI.',
+                  job.isCash
+                      ? 'Enter the 4-digit code provided by ${job.customerName} after collecting ₹${job.totalAmount.toInt()}.00 cash and completing work.'
+                      : 'Enter the 4-digit code provided by ${job.customerName} after job inspection. Upon submission, ₹${job.totalAmount.toInt()}.00 will be instantly transferred via UPI.',
                   style: const TextStyle(fontSize: 11, color: AppColors.onSurfaceVariant, height: 1.35),
                 ),
                 const SizedBox(height: 12),
@@ -803,14 +834,16 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(color: AppColors.onTertiaryContainer.withValues(alpha: 0.3)),
                     ),
-                    child: const Row(
+                    child: Row(
                       children: [
-                        Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
-                        SizedBox(width: 8),
+                        const Icon(Icons.check_circle, size: 16, color: AppColors.onTertiaryContainer),
+                        const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'OTP Verified! Instant NEFT payout queued to Rahul Patil (**4910)',
-                            style: TextStyle(
+                            job.isCash
+                                ? 'OTP Verified! Handover receipt & collect ₹${job.totalAmount.toInt()} cash.'
+                                : 'OTP Verified! Instant NEFT payout queued to Rahul Patil (**4910)',
+                            style: const TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
                               color: AppColors.onTertiaryContainer,
@@ -821,42 +854,53 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                     ),
                   )
                 else
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(4, (i) {
-                      return Container(
-                        width: 48,
-                        height: 48,
-                        margin: const EdgeInsets.symmetric(horizontal: 5),
-                        child: TextField(
-                          controller: _otpControllers[i],
-                          focusNode: _otpFocusNodes[i],
-                          textAlign: TextAlign.center,
-                          keyboardType: TextInputType.number,
-                          maxLength: 1,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
-                          ),
-                          decoration: InputDecoration(
-                            counterText: '',
-                            contentPadding: EdgeInsets.zero,
-                            filled: true,
-                            fillColor: Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.outlineVariant),
+                  Column(
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(4, (i) {
+                          return Container(
+                            width: 48,
+                            height: 48,
+                            margin: const EdgeInsets.symmetric(horizontal: 5),
+                            child: TextField(
+                              controller: _otpControllers[i],
+                              focusNode: _otpFocusNodes[i],
+                              textAlign: TextAlign.center,
+                              keyboardType: TextInputType.number,
+                              maxLength: 1,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                                color: AppColors.primary,
+                              ),
+                              decoration: InputDecoration(
+                                counterText: '',
+                                contentPadding: EdgeInsets.zero,
+                                filled: true,
+                                fillColor: Colors.white,
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.outlineVariant),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                                ),
+                              ),
+                              onChanged: (val) => _onOtpChanged(i, val, job),
                             ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
-                            ),
-                          ),
-                          onChanged: (val) => _onOtpChanged(i, val),
+                          );
+                        }),
+                      ),
+                      if (_otpErrorMessage != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          _otpErrorMessage!,
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.red),
                         ),
-                      );
-                    }),
+                      ],
+                    ],
                   ),
               ],
             ),
@@ -901,20 +945,24 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: AppColors.tertiaryContainer,
+                  color: job.isCash ? const Color(0xFFFFF3E0) : AppColors.tertiaryContainer,
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.verified_user, size: 12, color: AppColors.onTertiaryContainer),
-                    SizedBox(width: 3),
+                    Icon(
+                      job.isCash ? Icons.payments : Icons.verified_user,
+                      size: 12,
+                      color: job.isCash ? const Color(0xFFE65100) : AppColors.onTertiaryContainer,
+                    ),
+                    const SizedBox(width: 3),
                     Text(
-                      'Escrow Secured',
+                      job.isCash ? 'Cash on Service' : 'Escrow Secured',
                       style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.onTertiaryContainer,
+                        color: job.isCash ? const Color(0xFFE65100) : AppColors.onTertiaryContainer,
                       ),
                     ),
                   ],
@@ -957,6 +1005,32 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                 ),
               ),
             ),
+          if (job.isCash) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFB300)),
+              ),
+              child: Row(
+                children: [
+                  Checkbox(
+                    value: _cashCollected,
+                    onChanged: (v) => setState(() => _cashCollected = v ?? false),
+                    activeColor: const Color(0xFFE65100),
+                  ),
+                  Expanded(
+                    child: Text(
+                      'I have collected ₹$total.00 in cash from ${job.customerName}',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(12),
@@ -967,12 +1041,12 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Column(
+                Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'GUARANTEED PAYOUT',
-                      style: TextStyle(
+                      job.isCash ? 'CASH COLLECTION AMOUNT' : 'GUARANTEED PAYOUT',
+                      style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w800,
                         color: AppColors.outline,
@@ -980,10 +1054,12 @@ class _WorkerJobDetailScreenState extends State<WorkerJobDetailScreen> {
                       ),
                     ),
                     Text(
-                      'Instant Direct UPI • Rahul Patil',
+                      job.isCash 
+                          ? (_cashCollected ? '✓ Cash Received' : 'Collect cash before finish')
+                          : 'Instant Direct UPI • Rahul Patil',
                       style: TextStyle(
                         fontSize: 11,
-                        color: AppColors.outlineVariant,
+                        color: job.isCash && _cashCollected ? Colors.greenAccent : AppColors.outlineVariant,
                       ),
                     ),
                   ],

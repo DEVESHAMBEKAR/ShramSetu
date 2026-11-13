@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import '../config/dependency_injection.dart';
+import '../config/firebase_options.dart';
 import '../../features/customer/presentation/screens/customer_live_tracking_screen.dart';
 import '../../features/worker/presentation/screens/worker_job_detail_screen.dart';
 
@@ -38,7 +39,12 @@ class NotificationService {
     if (!kIsWeb) {
       try {
         if (Firebase.apps.isEmpty) {
-          await Firebase.initializeApp();
+          final options = DefaultFirebaseOptions.currentPlatform;
+          if (options != null) {
+            await Firebase.initializeApp(options: options);
+          } else {
+            await Firebase.initializeApp();
+          }
         }
         _isFirebaseAvailable = true;
 
@@ -57,7 +63,12 @@ class NotificationService {
       // On web: attempt foreground-only Firebase (no background handler)
       try {
         if (Firebase.apps.isEmpty) {
-          await Firebase.initializeApp();
+          final options = DefaultFirebaseOptions.currentPlatform;
+          if (options != null) {
+            await Firebase.initializeApp(options: options);
+          } else {
+            await Firebase.initializeApp();
+          }
         }
         _isFirebaseAvailable = true;
         _setupMessageListeners();

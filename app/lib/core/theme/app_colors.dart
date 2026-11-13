@@ -6,98 +6,128 @@ import '../models/booking_status.dart';
 /// Deep Sovereign Navy (#001026), Civic Navy Blue (#0B2545), Bharat Saffron (#A83900 & #FC6018),
 /// and Ashoka / Tricolor Civic Green (#001405 & #3A9E58).
 class AppColors {
-  // Primary - Deep Sovereign Navy / India Ink (#001026)
-  static const Color primary = Color(0xFF001026);
-  static const Color onPrimary = Color(0xFFFFFFFF);
-  static const Color primaryContainer = Color(0xFF0B2545);
-  static const Color onPrimaryContainer = Color(0xFF778DB2);
-  static const Color primaryFixed = Color(0xFFD5E3FF);
-  static const Color primaryFixedDim = Color(0xFFB1C7F0);
-  static const Color onPrimaryFixed = Color(0xFF001C3B);
-  static const Color onPrimaryFixedVariant = Color(0xFF314769);
+  // ──────────────── Core Suggested Color Palette ────────────────
+  /// Deep teal - Primary actions (#0D5C5B)
+  static const Color deepTeal = Color(0xFF0D5C5B);
+  static const Color onDeepTeal = Color(0xFFFFFFFF);
+  static const Color deepTealContainer = Color(0xFFE0F2F1);
+  static const Color onDeepTealContainer = Color(0xFF00363A);
+  static const Color primaryAction = deepTeal;
+  static const Color onPrimaryAction = onDeepTeal;
+  static const Color primaryActionContainer = deepTealContainer;
+  static const Color onPrimaryActionContainer = onDeepTealContainer;
 
-  // Secondary - Sovereign Saffron Ochre & Vibrant Bharat Saffron (#A83900 & #FC6018)
-  static const Color secondary = Color(0xFFA83900);
-  static const Color onSecondary = Color(0xFFFFFFFF);
-  static const Color secondaryContainer = Color(0xFFFC6018);
-  static const Color onSecondaryContainer = Color(0xFF531800);
-  static const Color secondaryFixed = Color(0xFFFFDBCF);
-  static const Color secondaryFixedDim = Color(0xFFFFB59A);
-  static const Color onSecondaryFixed = Color(0xFF380D00);
-  static const Color onSecondaryFixedVariant = Color(0xFF802A00);
+  /// Soft white - Page background (#F8F9FA)
+  static const Color softWhite = Color(0xFFF8F9FA);
+  static const Color pageBackground = softWhite;
 
-  // Tertiary - Ashoka / Tricolor Civic Green (#001405 & #3A9E58)
-  static const Color tertiary = Color(0xFF001405);
-  static const Color onTertiary = Color(0xFFFFFFFF);
-  static const Color tertiaryContainer = Color(0xFF002C10);
-  static const Color onTertiaryContainer = Color(0xFF3A9E58);
-  static const Color tertiaryFixed = Color(0xFF93F8A8);
-  static const Color tertiaryFixedDim = Color(0xFF77DB8E);
-  static const Color onTertiaryFixed = Color(0xFF00210B);
-  static const Color onTertiaryFixedVariant = Color(0xFF005224);
+  /// Warm amber - Highlights (#D97706)
+  static const Color warmAmber = Color(0xFFD97706);
+  static const Color onWarmAmber = Color(0xFFFFFFFF);
+  static const Color warmAmberContainer = Color(0xFFFEF3C7);
+  static const Color onWarmAmberContainer = Color(0xFF78350F);
+  static const Color highlight = warmAmber;
+  static const Color highlightContainer = warmAmberContainer;
+  static const Color onHighlightContainer = onWarmAmberContainer;
+
+  /// Green - Success states (#16A34A)
+  static const Color successGreen = Color(0xFF16A34A);
+  static const Color onSuccessGreen = Color(0xFFFFFFFF);
+  static const Color successGreenContainer = Color(0xFFDCFCE7);
+  static const Color onSuccessGreenContainer = Color(0xFF14532D);
+
+  // Primary - Deep Teal (#0D5C5B)
+  static const Color primary = deepTeal;
+  static const Color onPrimary = onDeepTeal;
+  static const Color primaryContainer = deepTealContainer;
+  static const Color onPrimaryContainer = onDeepTealContainer;
+  static const Color primaryFixed = Color(0xFFE0F2F1);
+  static const Color primaryFixedDim = Color(0xFFB2DFDB);
+  static const Color onPrimaryFixed = Color(0xFF00363A);
+  static const Color onPrimaryFixedVariant = Color(0xFF0D5C5B);
+
+  // Secondary - Warm Amber (#D97706)
+  static const Color secondary = warmAmber;
+  static const Color onSecondary = onWarmAmber;
+  static const Color secondaryContainer = warmAmberContainer;
+  static const Color onSecondaryContainer = onWarmAmberContainer;
+  static const Color secondaryFixed = Color(0xFFFEF3C7);
+  static const Color secondaryFixedDim = Color(0xFFFDE68A);
+  static const Color onSecondaryFixed = Color(0xFF78350F);
+  static const Color onSecondaryFixedVariant = Color(0xFFB45309);
+
+  // Tertiary - Ashoka / Trust Green (#16A34A)
+  static const Color tertiary = successGreen;
+  static const Color onTertiary = onSuccessGreen;
+  static const Color tertiaryContainer = successGreenContainer;
+  static const Color onTertiaryContainer = onSuccessGreenContainer;
+  static const Color tertiaryFixed = Color(0xFFDCFCE7);
+  static const Color tertiaryFixedDim = Color(0xFFBBF7D0);
+  static const Color onTertiaryFixed = Color(0xFF14532D);
+  static const Color onTertiaryFixedVariant = Color(0xFF16A34A);
 
   // Error - Clean Crimson
-  static const Color error = Color(0xFFBA1A1A);
+  static const Color error = Color(0xFFDC2626);
   static const Color onError = Color(0xFFFFFFFF);
-  static const Color errorContainer = Color(0xFFFFDAD6);
-  static const Color onErrorContainer = Color(0xFF93000A);
+  static const Color errorContainer = Color(0xFFFEE2E2);
+  static const Color onErrorContainer = Color(0xFF991B1B);
 
-  // Surface & Background - Sovereign Light Civic (#F7F9FC)
-  static const Color background = Color(0xFFF7F9FC);
-  static const Color onBackground = Color(0xFF191C1E);
-  static const Color surface = Color(0xFFF7F9FC);
-  static const Color onSurface = Color(0xFF191C1E);
-  static const Color surfaceVariant = Color(0xFFE0E3E6);
-  static const Color onSurfaceVariant = Color(0xFF44474E);
+  // Surface & Background - Soft White (#F8F9FA) & Light Neutral Surfaces (#F1F5F9)
+  static const Color background = softWhite;
+  static const Color onBackground = Color(0xFF0F172A);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color onSurface = Color(0xFF0F172A);
+  static const Color surfaceVariant = Color(0xFFF1F5F9);
+  static const Color onSurfaceVariant = Color(0xFF475569);
   
   static const Color surfaceContainerLowest = Color(0xFFFFFFFF);
-  static const Color surfaceContainerLow = Color(0xFFF2F4F7);
-  static const Color surfaceContainer = Color(0xFFECEEF1);
-  static const Color surfaceContainerHigh = Color(0xFFE6E8EB);
-  static const Color surfaceContainerHighest = Color(0xFFE0E3E6);
+  static const Color surfaceContainerLow = Color(0xFFF8FAFC);
+  static const Color surfaceContainer = Color(0xFFF1F5F9);
+  static const Color surfaceContainerHigh = Color(0xFFE2E8F0);
+  static const Color surfaceContainerHighest = Color(0xFFCBD5E1);
   
-  static const Color surfaceBright = Color(0xFFF7F9FC);
-  static const Color surfaceDim = Color(0xFFD8DADD);
-  static const Color surfaceTint = Color(0xFF495F82);
+  static const Color surfaceBright = Color(0xFFFFFFFF);
+  static const Color surfaceDim = Color(0xFFE2E8F0);
+  static const Color surfaceTint = deepTeal;
 
   // Outline - Subtle Civic Borders
-  static const Color outline = Color(0xFF74777F);
-  static const Color outlineVariant = Color(0xFFC4C6CF);
+  static const Color outline = Color(0xFF64748B);
+  static const Color outlineVariant = Color(0xFFE2E8F0);
 
-  // Warning - Warm Saffron Amber
-  static const Color warning = Color(0xFFB54708);
-  static const Color onWarning = Color(0xFFFFFFFF);
-  static const Color warningContainer = Color(0xFFFEF0C7);
-  static const Color onWarningContainer = Color(0xFF7A4100);
+  // Warning - Warm Amber
+  static const Color warning = warmAmber;
+  static const Color onWarning = onWarmAmber;
+  static const Color warningContainer = warmAmberContainer;
+  static const Color onWarningContainer = onWarmAmberContainer;
 
-  // Success - Ashoka Green
-  static const Color success = Color(0xFF3A9E58);
-  static const Color onSuccess = Color(0xFFFFFFFF);
-  static const Color successContainer = Color(0xFFE6F7EC);
-  static const Color onSuccessContainer = Color(0xFF005224);
+  // Success - Ashoka Green (#16A34A)
+  static const Color success = successGreen;
+  static const Color onSuccess = onSuccessGreen;
+  static const Color successContainer = successGreenContainer;
+  static const Color onSuccessContainer = onSuccessGreenContainer;
 
-  // Info - Deep Civic Blue
-  static const Color info = Color(0xFF0B2545);
+  // Info - Deep Civic Blue / Sky
+  static const Color info = Color(0xFF0284C7);
   static const Color onInfo = Color(0xFFFFFFFF);
-  static const Color infoContainer = Color(0xFFD5E3FF);
-  static const Color onInfoContainer = Color(0xFF001C3B);
+  static const Color infoContainer = Color(0xFFE0F2FE);
+  static const Color onInfoContainer = Color(0xFF0369A1);
 
   // Semantic UI Aliases
-  static const Color textPrimary = primary;
+  static const Color textPrimary = Color(0xFF0F172A);
   static const Color textSecondary = onSurfaceVariant;
   static const Color textTertiary = outline;
   static const Color border = outlineVariant;
   static const Color divider = outlineVariant;
   static const Color cardBackground = surfaceContainerLowest;
-  static const Color starRating = Color(0xFFFC6018);
-  static const Color disabled = Color(0xFF9E9E9E);
+  static const Color starRating = warmAmber;
+  static const Color disabled = Color(0xFF94A3B8);
   static const Color disabledContainer = surfaceContainerLow;
 
   // National Identity & Civic Indicators (Tricolor)
-  static const Color flagSaffron = Color(0xFFFC6018);
-  static const Color flagNavy = Color(0xFF0B2545);
-  static const Color flagGreen = Color(0xFF3A9E58);
-  static const Color civicVerifiedGreen = Color(0xFF3A9E58);
+  static const Color flagSaffron = warmAmber;
+  static const Color flagNavy = deepTeal;
+  static const Color flagGreen = successGreen;
+  static const Color civicVerifiedGreen = successGreen;
   static const Color tertiaryFixedVariant = onTertiaryFixedVariant;
 
   // ──────────────── Status Visual Helpers ────────────────
@@ -110,7 +140,7 @@ class AppColors {
       case BookingStatus.onTheWay:
       case BookingStatus.arrived:
       case BookingStatus.inProgress:
-        return secondary;
+        return primary;
       case BookingStatus.completed:
         return success;
       case BookingStatus.rejected:
@@ -127,7 +157,7 @@ class AppColors {
       case BookingStatus.onTheWay:
       case BookingStatus.arrived:
       case BookingStatus.inProgress:
-        return secondaryFixed;
+        return primaryContainer;
       case BookingStatus.completed:
         return successContainer;
       case BookingStatus.rejected:
@@ -144,7 +174,7 @@ class AppColors {
       case BookingStatus.onTheWay:
       case BookingStatus.arrived:
       case BookingStatus.inProgress:
-        return onSecondaryFixed;
+        return onPrimaryContainer;
       case BookingStatus.completed:
         return onSuccessContainer;
       case BookingStatus.rejected:
@@ -165,7 +195,7 @@ class AppColors {
       case 'arrived':
       case 'inprogress':
       case 'in_progress':
-        return secondary;
+        return primary;
       case 'completed':
       case 'paid':
       case 'resolved':
@@ -197,7 +227,7 @@ class AppColors {
       case 'arrived':
       case 'inprogress':
       case 'in_progress':
-        return secondaryFixed;
+        return primaryContainer;
       case 'completed':
       case 'paid':
       case 'resolved':
@@ -229,7 +259,7 @@ class AppColors {
       case 'arrived':
       case 'inprogress':
       case 'in_progress':
-        return onSecondaryFixed;
+        return onPrimaryContainer;
       case 'completed':
       case 'paid':
       case 'resolved':

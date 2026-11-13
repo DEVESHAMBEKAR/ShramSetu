@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../../../worker/data/models/worker_models.dart';
+import '../../../worker/presentation/screens/worker_registration_screen.dart';
 import '../../../../core/utils/phone_number_util.dart';
 import '../../../../shared/widgets/google_sign_in_button.dart';
 import '../../data/repositories/mock_auth_repository.dart';
@@ -106,18 +107,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
           final WorkerProfile profile = await DI.workerRepo.getWorkerProfile(userId);
           final docs = await DI.workerRepo.getVerificationDocuments(profile.id);
 
-          final hasCompletedRegistration = profile.name.isNotEmpty &&
-              !profile.name.startsWith('Artisan (') &&
-              !profile.name.startsWith('User ') &&
-              docs.isNotEmpty;
-
-          if (mounted) {
-            if (!hasCompletedRegistration) {
-              Navigator.of(context).pushReplacementNamed('/worker/registration');
-            } else {
-              Navigator.of(context).pushReplacementNamed('/worker/dashboard');
-            }
-          }
+          _routeWorkerAfterAuth(profile, docs);
         } else {
           throw Exception('Invalid OTP. Please check the code sent to your number.');
         }
@@ -127,6 +117,35 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
         _errorMessage = e.toString().replaceAll('Exception: ', '');
         _isLoading = false;
       });
+    }
+  }
+
+  void _routeWorkerAfterAuth(WorkerProfile profile, List<dynamic> docs) {
+    if (!mounted) return;
+
+    final hasCompletedRegistration = profile.name.isNotEmpty &&
+        !profile.name.startsWith('Artisan (') &&
+        !profile.name.startsWith('User ') &&
+        docs.isNotEmpty;
+
+    if (!hasCompletedRegistration) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);
+    } else if (profile.verificationStatus == VerificationStatus.approved) {
+      Navigator.of(context).pushNamedAndRemoveUntil('/worker/dashboard', (route) => false);
+    } else if (profile.verificationStatus == VerificationStatus.changesRequired) {
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => WorkerRegistrationScreen(
+            isResubmission: true,
+            changeRequestReason: profile.verificationRemarks ?? profile.rejectionReason ?? 'Federation administrator requested updates to your documents.',
+          ),
+        ),
+        (route) => false,
+      );
+    } else {
+      // Pending review, in-queue, underReview, or rejected/suspended:
+      // Strictly gate unapproved workers to under-verification screen
+      Navigator.of(context).pushNamedAndRemoveUntil('/worker/under-verification', (route) => false);
     }
   }
 
@@ -182,18 +201,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
         final WorkerProfile worker = await DI.workerRepo.getWorkerProfile(userId);
         final docs = await DI.workerRepo.getVerificationDocuments(worker.id);
 
-        final hasCompletedRegistration = worker.name.isNotEmpty &&
-            !worker.name.startsWith('Artisan (') &&
-            !worker.name.startsWith('User ') &&
-            docs.isNotEmpty;
-
-        if (!mounted) return;
-
-        if (!hasCompletedRegistration) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);
-        } else {
-          Navigator.of(context).pushNamedAndRemoveUntil('/worker/dashboard', (route) => false);
-        }
+        _routeWorkerAfterAuth(worker, docs);
       }
     } catch (e) {
       if (mounted) {
@@ -311,18 +319,7 @@ class _WorkerLoginScreenState extends State<WorkerLoginScreen> {
         final WorkerProfile worker = await DI.workerRepo.getWorkerProfile(userId);
         final docs = await DI.workerRepo.getVerificationDocuments(worker.id);
 
-        final hasCompletedRegistration = worker.name.isNotEmpty &&
-            !worker.name.startsWith('Artisan (') &&
-            !worker.name.startsWith('User ') &&
-            docs.isNotEmpty;
-
-        if (!mounted) return;
-
-        if (!hasCompletedRegistration) {
-          Navigator.of(context).pushNamedAndRemoveUntil('/worker/registration', (route) => false);
-        } else {
-          Navigator.of(context).pushNamedAndRemoveUntil('/worker/dashboard', (route) => false);
-        }
+        _routeWorkerAfterAuth(worker, docs);
       }
     } catch (e) {
       if (mounted) {

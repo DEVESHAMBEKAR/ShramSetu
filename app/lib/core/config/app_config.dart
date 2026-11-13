@@ -95,6 +95,25 @@ class AppConfig {
     return useMockData ? 'MOCK / TESTING' : 'LIVE';
   }
 
+  static String get otpProvider {
+    if (dotenv.isInitialized && dotenv.env['OTP_PROVIDER'] != null) {
+      return dotenv.env['OTP_PROVIDER']!.toLowerCase().trim();
+    }
+    const envVal = String.fromEnvironment('OTP_PROVIDER', defaultValue: 'firebase');
+    return envVal.toLowerCase().trim();
+  }
+
+  static bool get isFirebaseOtpEnabled => otpProvider == 'firebase';
+
+  /// Whether to disable reCAPTCHA app verification on Web (uses Firebase Test Phone Numbers)
+  static bool get disableFirebaseRecaptcha {
+    if (dotenv.isInitialized && dotenv.env['FIREBASE_DISABLE_RECAPTCHA'] != null) {
+      return dotenv.env['FIREBASE_DISABLE_RECAPTCHA'] == 'true';
+    }
+    const envVal = String.fromEnvironment('FIREBASE_DISABLE_RECAPTCHA', defaultValue: 'true');
+    return envVal == 'true' || kDebugMode;
+  }
+
   static SupabaseClient get supabaseClient {
     return Supabase.instance.client;
   }

@@ -8,6 +8,7 @@ import '../../../../core/config/dependency_injection.dart';
 import '../../../../core/config/app_config.dart';
 import '../../../../core/services/registered_worker_store.dart';
 import '../../../../core/utils/distance_calculator.dart';
+import '../../../../core/services/shared_booking_store.dart';
 import '../models/customer_models.dart';
 import 'mock_customer_repository.dart';
 
@@ -469,19 +470,33 @@ class SupabaseCustomerRepository implements ICustomerRepository {
     String? addressId,
     String? notes,
     String bookingType = 'NORMAL',
+    String paymentMethod = 'RAZORPAY',
   }) async {
     try {
       final customerId = _client.auth.currentUser?.id;
       if (customerId == null) throw Exception('Customer not authenticated');
 
       // 1. Resolve and validate workerId to a valid UUID
-      String finalWorkerId = workerId;
+      String? finalWorkerId = workerId;
       final uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
       if (!uuidRegex.hasMatch(finalWorkerId)) {
         try {
           final firstWorker = await _client.from('workers').select('id').eq('worker_status', 'ACTIVE').limit(1).maybeSingle();
           if (firstWorker != null && firstWorker['id'] != null) {
             finalWorkerId = firstWorker['id'] as String;
+          } else {
+            final anyWorker = await _client.from('workers').select('id').limit(1).maybeSingle();
+            finalWorkerId = anyWorker?['id'] as String?;
+          }
+        } catch (_) {
+          finalWorkerId = null;
+        }
+      } else {
+        try {
+          final exists = await _client.from('workers').select('id').eq('id', finalWorkerId).maybeSingle();
+          if (exists == null) {
+            final firstWorker = await _client.from('workers').select('id').limit(1).maybeSingle();
+            finalWorkerId = firstWorker?['id'] as String?;
           }
         } catch (_) {}
       }
@@ -513,21 +528,27 @@ class SupabaseCustomerRepository implements ICustomerRepository {
       final normalizedTime = normalizeScheduledTime(scheduledTime);
 
       // Double-booking check
-      final existing = await _client
-          .from('bookings')
-          .select('id')
-          .eq('worker_id', finalWorkerId)
-          .eq('scheduled_date', normalizedDate)
-          .eq('scheduled_time', normalizedTime)
-          .inFilter('status', ['pending', 'accepted', 'inProgress']);
+      if (finalWorkerId != null) {
+        try {
+          final existing = await _client
+              .from('bookings')
+              .select('id')
+              .eq('worker_id', finalWorkerId)
+              .eq('scheduled_date', normalizedDate)
+              .eq('scheduled_time', normalizedTime)
+              .inFilter('status', ['pending', 'accepted', 'inProgress']);
 
-      if (existing.isNotEmpty) {
-        throw Exception('Worker is already booked for this time slot.');
+          if (existing.isNotEmpty) {
+            throw Exception('Worker is already booked for this time slot.');
+          }
+        } catch (e) {
+          if (e.toString().contains('already booked')) rethrow;
+        }
       }
 
-      // Determine default address if none provided
+      // Determine default address if none provided or invalid
       String finalAddressId = addressId ?? '';
-      if (finalAddressId.isEmpty) {
+      if (finalAddressId.isEmpty || !uuidRegex.hasMatch(finalAddressId)) {
         final addrResponse = await _client
             .from('addresses')
             .select('id')
@@ -539,9 +560,9 @@ class SupabaseCustomerRepository implements ICustomerRepository {
           final newAddr = await _client.from('addresses').insert({
             'user_id': customerId,
             'address_line': 'Service Location',
-            'city': 'Customer City',
+            'city': 'Pune',
             'state': 'Maharashtra',
-            'postal_code': '400001',
+            'postal_code': '411001',
             'is_default': true,
           }).select('id').single();
           finalAddressId = newAddr['id'];
@@ -573,7 +594,6 @@ class SupabaseCustomerRepository implements ICustomerRepository {
 
       final payload = <String, dynamic>{
         'customer_id': customerId,
-        'worker_id': finalWorkerId,
         'service_id': finalServiceId,
         'address_id': finalAddressId,
         'scheduled_date': normalizedDate,
@@ -584,7 +604,11 @@ class SupabaseCustomerRepository implements ICustomerRepository {
         'status': 'pending',
         'otp': randomOtp,
         'notes': notes ?? '',
+        'payment_method': paymentMethod,
       };
+      if (finalWorkerId != null) {
+        payload['worker_id'] = finalWorkerId;
+      }
       if (bookingType != 'NORMAL') {
         payload['booking_type'] = bookingType;
       }
@@ -593,29 +617,54 @@ class SupabaseCustomerRepository implements ICustomerRepository {
       try {
         bookingResult = await _client.from('bookings').insert(payload).select('id').single();
       } catch (err) {
-        // If booking_type column does not exist on remote schema, retry without it
+        // Fallback gracefully if payment_method or booking_type column not on remote schema
+        if (payload.containsKey('payment_method')) {
+          payload.remove('payment_method');
+        }
         if (payload.containsKey('booking_type')) {
           payload.remove('booking_type');
-          bookingResult = await _client.from('bookings').insert(payload).select('id').single();
-        } else {
-          rethrow;
         }
+        bookingResult = await _client.from('bookings').insert(payload).select('id').single();
       }
 
       final newBookingId = bookingResult['id'] as String;
 
+      // Sync to local SharedBookingStore for immediate cross-screen reactivity
       try {
-        DI.notificationRepo.sendPushNotification(
-          recipientUserId: finalWorkerId,
-          type: 'booking_requested',
-          title: 'New Service Request',
-          body: 'You have a new booking request for $scheduledDate at $scheduledTime.',
-          data: {
-            'bookingId': newBookingId,
-            'status': 'pending',
-          },
-        );
+        SharedBookingStore.instance.addExternalBooking({
+          'id': newBookingId,
+          'customer_id': customerId,
+          'worker_id': finalWorkerId,
+          'service_id': finalServiceId,
+          'address_id': finalAddressId,
+          'scheduled_date': normalizedDate,
+          'scheduled_time': normalizedTime,
+          'amount': amount,
+          'base_amount': amount,
+          'labor_allowance': 35.0,
+          'distance_km': distanceKm,
+          'status': 'pending',
+          'otp': randomOtp,
+          'payment_method': paymentMethod,
+          'notes': notes ?? '',
+          'created_at': DateTime.now().toIso8601String(),
+        });
       } catch (_) {}
+
+      if (finalWorkerId != null) {
+        try {
+          DI.notificationRepo.sendPushNotification(
+            recipientUserId: finalWorkerId,
+            type: 'booking_requested',
+            title: 'New Service Request',
+            body: 'You have a new booking request for $scheduledDate at $scheduledTime.',
+            data: {
+              'bookingId': newBookingId,
+              'status': 'pending',
+            },
+          );
+        } catch (_) {}
+      }
 
       return newBookingId;
     } catch (e) {
@@ -653,8 +702,14 @@ class SupabaseCustomerRepository implements ICustomerRepository {
           .eq('customer_id', customerId)
           .order('created_at', ascending: false);
 
-      return (response as List).cast<Map<String, dynamic>>();
+      final list = (response as List).cast<Map<String, dynamic>>();
+      if (list.isNotEmpty || !AppConfig.useMockData) return list;
+      return SharedBookingStore.instance.getCustomerBookings(customerId: customerId);
     } catch (e) {
+      debugPrint('[SupabaseCustomerRepo] getCustomerBookings fallback: $e');
+      if (AppConfig.useMockData) {
+        return SharedBookingStore.instance.getCustomerBookings(customerId: customerId);
+      }
       return [];
     }
   }

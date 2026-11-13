@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+  <title>ShramSetu Federation Admin — Operational Governance Console</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script id="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "civic-bg": "#F8F9FA",
+            "primary": "#0D5C5B",
+            "primary-dark": "#0B4F50",
+            "primary-light": "#E0F2F1",
+            "accent-amber": "#D97706",
+            "accent-amber-light": "#FEF3C7",
+            "accent-green": "#16A34A",
+            "accent-green-light": "#DCFCE7",
+            "civic-border": "#E2E8F0",
+            "civic-text-main": "#0F172A",
+            "civic-text-muted": "#475569"
+          },
+          fontFamily: {
+            sans: ["Plus Jakarta Sans", "Inter", "sans-serif"]
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #F8F9FA; }
+  </style>
+</head>
+<body class="bg-civic-bg text-civic-text-main flex min-h-screen">
+  <!-- Desktop Left Sidebar -->
+  <aside class="w-64 bg-white border-r border-civic-border flex flex-col shrink-0 shadow-xs hidden md:flex">
+    <div class="p-4 border-b border-civic-border flex items-center gap-2.5">
+      <div class="w-9 h-9 rounded-xl bg-primary text-white flex items-center justify-center font-bold text-sm shadow-xs">
+        SS
+      </div>
+      <div>
+        <h1 class="text-sm font-extrabold text-primary leading-tight">श्रमसेतू संघ</h1>
+        <p class="text-[10px] text-civic-text-muted font-semibold">Federation Admin Console</p>
+      </div>
+    </div>
+
+    <div class="p-3">
+      <div class="bg-slate-50 p-2.5 rounded-xl border border-civic-border mb-3">
+        <span class="text-[10px] font-bold text-accent-amber uppercase tracking-wider block">Assigned Jurisdiction</span>
+        <p class="text-xs font-bold text-slate-800 mt-0.5 truncate">Pune District Labour Cooperative</p>
+        <p class="text-[10px] text-slate-500">Reg #PNE-COOP-492 • Cluster #12</p>
+      </div>
+
+      <nav class="space-y-1">
+        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-primary text-white text-xs font-bold shadow-xs">
+          <span class="material-symbols-outlined text-[18px]">dashboard</span>
+          Operational Overview
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 text-xs font-semibold">
+          <span class="material-symbols-outlined text-[18px]">how_to_reg</span>
+          Artisan Verification Queue
+          <span class="ml-auto bg-accent-amber-light text-accent-amber text-[10px] font-bold px-1.5 py-0.2 rounded-full">14</span>
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 text-xs font-semibold">
+          <span class="material-symbols-outlined text-[18px]">local_shipping</span>
+          Live Dispatch Monitor
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 text-xs font-semibold">
+          <span class="material-symbols-outlined text-[18px]">payments</span>
+          Escrow & Settlements
+        </a>
+        <a href="#" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-50 text-xs font-semibold">
+          <span class="material-symbols-outlined text-[18px]">gavel</span>
+          Member Grievances
+          <span class="ml-auto bg-rose-100 text-rose-700 text-[10px] font-bold px-1.5 py-0.2 rounded-full">1</span>
+        </a>
+      </nav>
+    </div>
+
+    <div class="mt-auto p-4 border-t border-civic-border">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-full bg-primary text-white flex items-center justify-center font-bold text-xs">
+          FA
+        </div>
+        <div class="min-w-0">
+          <p class="text-xs font-bold truncate">Shri Dilip Gaikwad</p>
+          <p class="text-[10px] text-slate-500 truncate">District General Secretary</p>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Operational Canvas -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- Top Action Bar -->
+    <header class="h-16 bg-white border-b border-civic-border px-6 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <h2 class="text-base font-extrabold text-civic-text-main">Pune District Federation Command Center</h2>
+        <span class="text-[11px] bg-accent-green-light text-accent-green font-bold px-2 py-0.5 rounded-full border border-accent-green/30">Node Active</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <div class="relative">
+          <input type="text" placeholder="Search artisan by name, trade or Aadhaar..." class="text-xs h-9 w-64 rounded-xl border border-civic-border bg-slate-50 pl-8 pr-3"/>
+          <span class="material-symbols-outlined text-[16px] text-slate-400 absolute left-2.5 top-2.5">search</span>
+        </div>
+        <button class="h-9 px-3 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary-dark transition-colors flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-[16px]">file_download</span>
+          Export Union Audit
+        </button>
+      </div>
+    </header>
+
+    <main class="p-6 space-y-6">
+      <!-- KPI Metric Blocks -->
+      <section class="grid grid-cols-2 md:grid-cols-5 gap-3.5">
+        <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+          <span class="text-xs font-semibold text-civic-text-muted">Verified Artisans</span>
+          <p class="text-2xl font-black text-civic-text-main mt-1">248</p>
+          <span class="text-[10px] text-accent-green font-bold mt-1 inline-block">+12 this week</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-accent-amber/50 bg-amber-50/20 shadow-2xs">
+          <span class="text-xs font-semibold text-accent-amber">Pending KYC Queue</span>
+          <p class="text-2xl font-black text-accent-amber mt-1">14</p>
+          <span class="text-[10px] text-accent-amber font-bold mt-1 inline-block">Action Required</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+          <span class="text-xs font-semibold text-civic-text-muted">Active Jobs Today</span>
+          <p class="text-2xl font-black text-primary mt-1">67</p>
+          <span class="text-[10px] text-slate-500 font-semibold mt-1 inline-block">100% Zero Commission</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+          <span class="text-xs font-semibold text-civic-text-muted">Escrow Settled</span>
+          <p class="text-2xl font-black text-civic-text-main mt-1">₹2,48,500</p>
+          <span class="text-[10px] text-accent-green font-bold mt-1 inline-block">Direct Member UPI</span>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl border border-civic-border shadow-2xs">
+          <span class="text-xs font-semibold text-civic-text-muted">Dispute Cases</span>
+          <p class="text-2xl font-black text-slate-700 mt-1">1</p>
+          <span class="text-[10px] text-slate-500 font-semibold mt-1 inline-block">Under Mediation</span>
+        </div>
+      </section>
+
+      <!-- ARTISAN VERIFICATION QUEUE TABLE -->
+      <section class="bg-white rounded-2xl border border-civic-border shadow-2xs overflow-hidden">
+        <div class="p-4 border-b border-civic-border flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-extrabold text-civic-text-main">Artisan Registration & Document Verification Queue</h3>
+            <p class="text-xs text-civic-text-muted">Review government identity, skill certificates, and union membership before approving app access.</p>
+          </div>
+          <div class="flex gap-2">
+            <button class="text-xs font-bold text-primary bg-primary-light px-3 py-1.5 rounded-lg border border-primary/20">All (14)</button>
+            <button class="text-xs font-semibold text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded-lg">Electrical (4)</button>
+            <button class="text-xs font-semibold text-slate-600 hover:bg-slate-50 px-3 py-1.5 rounded-lg">Plumbing (6)</button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse text-xs">
+            <thead>
+              <tr class="bg-slate-50 border-b border-civic-border text-slate-600 font-bold uppercase tracking-wider text-[10px]">
+                <th class="p-3.5">Artisan Name & Contact</th>
+                <th class="p-3.5">Trade & Level</th>
+                <th class="p-3.5">Assigned Cluster</th>
+                <th class="p-3.5">KYC Document Status</th>
+                <th class="p-3.5">Status</th>
+                <th class="p-3.5 text-right">Verification Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-civic-border">
+              <!-- Row 1 -->
+              <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="p-3.5">
+                  <p class="font-extrabold text-civic-text-main text-xs">Ganesh V. Shinde</p>
+                  <p class="text-slate-500 text-[11px]">+91 98220 48192</p>
+                </td>
+                <td class="p-3.5">
+                  <span class="bg-primary-light text-primary font-bold px-2 py-0.5 rounded text-[10px]">Electrician</span>
+                  <p class="text-slate-500 text-[11px] mt-0.5">8 Yrs Exp • Master</p>
+                </td>
+                <td class="p-3.5 font-medium text-slate-700">Kothrud Stand & Paud Road</td>
+                <td class="p-3.5">
+                  <span class="text-accent-green font-bold flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                    Aadhaar + ITI Trade Cert
+                  </span>
+                </td>
+                <td class="p-3.5">
+                  <span class="bg-accent-amber-light text-accent-amber font-bold px-2 py-0.5 rounded-full text-[10px] border border-accent-amber/30">PENDING REVIEW</span>
+                </td>
+                <td class="p-3.5 text-right">
+                  <div class="inline-flex gap-1.5">
+                    <button class="h-8 px-2.5 rounded-lg border border-civic-border text-slate-600 font-bold hover:bg-slate-100">Inspect Docs</button>
+                    <button class="h-8 px-3 rounded-lg bg-primary text-white font-bold hover:bg-primary-dark">Approve Pro</button>
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Row 2 -->
+              <tr class="hover:bg-slate-50/80 transition-colors">
+                <td class="p-3.5">
+                  <p class="font-extrabold text-civic-text-main text-xs">Prakash S. Kulkarni</p>
+                  <p class="text-slate-500 text-[11px]">+91 94230 11928</p>
+                </td>
+                <td class="p-3.5">
+                  <span class="bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded text-[10px]">Plumbing</span>
+                  <p class="text-slate-500 text-[11px] mt-0.5">5 Yrs Exp • Senior</p>
+                </td>
+                <td class="p-3.5 font-medium text-slate-700">Shivajinagar & FC Road</td>
+                <td class="p-3.5">
+                  <span class="text-amber-600 font-bold flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">flag</span>
+                    Trade Certificate Re-upload
+                  </span>
+                </td>
+                <td class="p-3.5">
+                  <span class="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full text-[10px] border border-amber-300">CHANGES REQUIRED</span>
+                </td>
+                <td class="p-3.5 text-right">
+                  <div class="inline-flex gap-1.5">
+                    <button class="h-8 px-2.5 rounded-lg border border-civic-border text-slate-600 font-bold hover:bg-slate-100">View Remarks</button>
+                    <button class="h-8 px-3 rounded-lg bg-slate-200 text-slate-500 font-bold cursor-not-allowed">Approve Pro</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

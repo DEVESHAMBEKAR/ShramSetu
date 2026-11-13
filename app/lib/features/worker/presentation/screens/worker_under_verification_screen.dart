@@ -9,6 +9,7 @@ import '../../data/models/worker_models.dart';
 import '../../../../core/models/federation_models.dart';
 import 'worker_kyc_screen.dart';
 import 'worker_registration_screen.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class WorkerUnderVerificationScreen extends StatefulWidget {
   final VoidCallback? onVerified;
@@ -319,7 +320,7 @@ class _WorkerUnderVerificationScreenState
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
+          ? const AppLoadingView(message: 'Checking cooperative verification status...')
           : Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 720),

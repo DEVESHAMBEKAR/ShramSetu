@@ -911,21 +911,24 @@ class _SuperAdminFederationsScreenState extends State<SuperAdminFederationsScree
                     ),
                   ),
                   const SizedBox(height: 14),
-                  CheckboxListTile(
-                    value: requirePasswordChange,
-                    onChanged: (val) => setDialogState(() => requirePasswordChange = val ?? true),
-                    contentPadding: EdgeInsets.zero,
-                    dense: true,
-                    activeColor: AppColors.secondaryContainer,
-                    title: const Text(
-                      'Require password change upon next login',
-                      style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                  Material(
+                    color: Colors.transparent,
+                    child: CheckboxListTile(
+                      value: requirePasswordChange,
+                      onChanged: (val) => setDialogState(() => requirePasswordChange = val ?? true),
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                      activeColor: AppColors.secondaryContainer,
+                      title: const Text(
+                        'Require password change upon next login',
+                        style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w500),
+                      ),
+                      subtitle: const Text(
+                        'The administrator will be prompted to set their own password immediately after signing in.',
+                        style: TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                      controlAffinity: ListTileControlAffinity.leading,
                     ),
-                    subtitle: const Text(
-                      'The administrator will be prompted to set their own password immediately after signing in.',
-                      style: TextStyle(color: Colors.white54, fontSize: 10),
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
                   ),
                 ],
               ),

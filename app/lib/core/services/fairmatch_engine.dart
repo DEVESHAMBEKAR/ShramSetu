@@ -86,7 +86,11 @@ class FairMatchEngine {
 
     if (features.skillScore >= 0.9) tags.add('Verified Skill');
     if (features.availabilityScore >= 0.9) tags.add('Available Now');
-    if (features.distanceScore >= 0.6) tags.add('Nearby');
+    if (candidate.distanceKm != null && candidate.distanceKm! <= FairMatchConfig.operationalRadiusKm) {
+      tags.add('Nearby');
+    } else if (features.distanceScore >= 0.6) {
+      tags.add('Nearby');
+    }
     if (candidate.rating >= 4.5 && candidate.reviewCount >= 1) {
       tags.add('Top Rated');
     } else if (features.ratingScore >= 0.6) {

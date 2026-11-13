@@ -1441,8 +1441,10 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         final categoryId = bookingFlowState.selectedCategory?.id ?? 'c2';
                         final date = bookingFlowState.selectedDate ?? DateTime.now().toIso8601String().split('T').first;
                         final time = bookingFlowState.selectedTime ?? '10:00 AM';
+                        final isCash = _paymentMode == 'cash';
+                        final paymentMethod = isCash ? 'CASH' : 'RAZORPAY';
 
-                        // Step 1: Create the booking record
+                        // Step 1: Create the booking record with decided area tariff and payment method
                         final newBookingId = await DI.customerRepo.createBooking(
                           workerId: workerId,
                           serviceId: categoryId,
@@ -1451,6 +1453,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                           amount: total.toDouble(),
                           addressId: _customerAddressId ?? bookingFlowState.addressId,
                           bookingType: bookingFlowState.bookingType,
+                          paymentMethod: paymentMethod,
                         );
 
                         if (newBookingId == null) {
@@ -1459,7 +1462,18 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
                         _pendingBookingId = newBookingId;
 
-                        if (kIsWeb) {
+                        if (isCash) {
+                          // Cash on Service: No Razorpay checkout needed; route directly to confirmation
+                          if (!mounted) return;
+                          final bookingId = _pendingBookingId!;
+                          _pendingBookingId = null;
+                          Navigator.of(context).pushAndRemoveUntil(
+                            MaterialPageRoute(
+                              builder: (_) => BookingConfirmationScreen(bookingId: bookingId),
+                            ),
+                            (route) => false,
+                          );
+                        } else if (kIsWeb) {
                           // Web: Razorpay SDK not supported — proceed directly to confirmation
                           if (!mounted) return;
                           final bookingId = _pendingBookingId!;
@@ -1491,7 +1505,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         _pendingBookingId = null;
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to initiate payment: $e')),
+                            SnackBar(content: Text('Failed to initiate booking: $e')),
                           );
                           setState(() => _isSubmitting = false);
                         }
@@ -1508,7 +1522,9 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          'Contacting Co-op Escrow Vault...',
+                          _paymentMode == 'cash'
+                              ? 'Confirming Cash Booking with Artisan...'
+                              : 'Contacting Co-op Escrow Vault...',
                           style: AppTypography.labelMd.copyWith(color: AppColors.onPrimary, fontWeight: FontWeight.bold),
                         ),
                       ],
@@ -1516,11 +1532,17 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                   : Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        const Icon(Icons.lock, size: 18, color: AppColors.tertiaryFixed),
+                        Icon(
+                          _paymentMode == 'cash' ? Icons.payments_outlined : Icons.lock,
+                          size: 18,
+                          color: AppColors.tertiaryFixed,
+                        ),
                         const SizedBox(width: 8),
                         Flexible(
                           child: Text(
-                            'Lock ₹$total in Sovereign Escrow (सुरक्षित एस्क्रॉ)',
+                            _paymentMode == 'cash'
+                                ? 'Confirm Booking (Pay ₹$total Cash to Partner)'
+                                : 'Lock ₹$total in Sovereign Escrow (सुरक्षित एस्क्रॉ)',
                             style: AppTypography.labelMd.copyWith(
                               color: AppColors.onPrimary,
                               fontWeight: FontWeight.bold,

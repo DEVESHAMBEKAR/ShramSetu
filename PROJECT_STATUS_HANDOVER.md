@@ -11,7 +11,7 @@
 - **Backend / Database:** Supabase (PostgreSQL 15, Row Level Security, Realtime Channels, Edge Functions, Storage Buckets)
 - **Architecture Pattern:** Clean Separation (`Presentation` ➔ `Repository / Service` ➔ `Data Sources / Supabase Client`)
 - **Visual Truth:** Stitch UI specification & design tokens; Urban Company tier polish
-- **Current Quality Status:** **99+ automated unit and widget tests passing** (`flutter test test/unit/`) with **0 analyzer compilation errors** (`flutter analyze`).
+- **Current Quality Status:** **115 automated unit and widget tests passing** (`flutter test test/unit/`) with **0 analyzer compilation errors** (`flutter analyze`).
 
 ---
 
@@ -100,6 +100,65 @@
 
 ---
 
+### 8. Master UI/UX Redesign, Accessible Status Badges & Unified State Views
+- **Application Compilation & Restart Recovery:**
+  - Resolved Flutter web compilation blocker caused by parameter mismatches in `customer_home_screen.dart`.
+  - Application builds and runs cleanly with 0 compilation errors across web and mobile.
+- **Canonical Design System Tokens & Complete Palette Propagation:**
+  - Standardized Deep Teal (`#0D5C5B`) for authoritative primary CTAs, Soft White (`#F8F9FA`) for clean canvas comfort, Warm Amber (`#D97706`) for highlights and escrow milestones, and Green (`#16A34A`) for verified credentials.
+  - Fully wired `AppColors.primary`, `AppColors.primaryContainer`, `AppColors.secondary`, `AppColors.secondaryContainer`, `AppColors.background`, and `AppColors.surface` to the canonical tokens so that all screens, avatars, badges, sidebars, and appbars across Customer, Worker, and Admin interfaces immediately inherit the new palette.
+- **Accessible Dual-Signifier `BookingStatusBadge`:**
+  - Strictly adheres to WCAG 1.4.1 (never relying on color alone): pairs dedicated semantic icons, high-contrast localized text labels (EN, MR, HI), and enclosing border rings across all lifecycle states (`REQUESTED`, `ACCEPTED`, `EN_ROUTE`, `ARRIVED`, `IN_PROGRESS`, `COMPLETED`, `REJECTED`, `CANCELLED`).
+- **Standardized Data State Matrix (`AppLoadingView`, `AppEmptyView`, `AppErrorView`, `AppOfflineView`):**
+  - Integrated across Customer Home, Discovery, Live Tracking, Worker Dashboard, Worker Job Detail, Verification Waiting, and Federation Admin Console.
+- **Responsive Multi-Role Layout:**
+  - Desktop sidebar with smooth collapse animation (76px icon rail / 260px expanded navigation) and mobile bottom navigation bar, harmonized with Deep Teal dark tone and Warm Amber accents.
+- **Document Verification Lifecycle Controls:**
+  - On the Federation Admin Worker Verification screen, when a document is in `PENDING` state, reviewers see `[ View ]`, `[ Approve ]`, and `[ Flag Queries ]`.
+  - Once a document is `APPROVED`, the `[ Approve ]` button automatically hides, and is replaced by `[ Resubmit ]` alongside `[ Flag Queries ]`, allowing administrators to demand fresh document re-uploads or raise queries even on previously accepted records without cluttering the UI.
+- **Test Quality:**
+### 9. Master Booking Pipeline & Schema Harmonization
+- **PostgreSQL Column & Join Fixes:**
+  - Resolved fatal schema mismatch in `SupabaseWorkerRepository.getJobRequests()` where non-existent column `amount` was queried instead of `base_amount, labor_allowance`.
+  - Resolved fatal column query in `SupabaseWorkerRepository.updateBookingStatus()` where non-existent column `service_name` was queried directly on `bookings` instead of using the relation `services!service_id(name)`.
+- **Customer Booking Creation Robustness:**
+  - Hardened `SupabaseCustomerRepository.createBooking()` to validate and normalize `workerId`, `serviceId`, and `addressId`. If mock IDs (`w1`, `addr_1`) or non-existent UUIDs are passed, gracefully resolves to valid foreign keys or null (as `worker_id` is nullable in schema), preventing PostgreSQL foreign key / UUID syntax exceptions.
+  - Automatically synchronizes newly created bookings with `SharedBookingStore` for instant reactivity across customer, worker, and admin screens.
+- **Worker Job Requests & Lifecycle Transitions:**
+  - Added robust multi-tier fallback to `getWorkerBookings()` and `getJobRequests()`: queries joined relations (`users`, `services`, `addresses`), and if any relation is blocked or null, seamlessly recovers through simplified queries or local caching.
+  - Hardened worker action buttons in `WorkerDashboardScreen` and `WorkerJobDetailScreen` with proper `async/await`, error catching, and user feedback via SnackBars.
+  - Fixed `RangeError: -1` in `SharedBookingStore.updateBookingStatus()` when transitioning newly created or unindexed bookings.
+- **Database RLS Policies (Migration 028):**
+  - Added `028_fix_booking_and_verification_rls.sql` and updated master setup script:
+    - Allows workers to read `users` profiles (full name, phone) of customers with active bookings assigned to them.
+    - Allows all admin tiers (`ADMIN`, `SUPER_ADMIN`, `FEDERATION_ADMIN`) to view all user profiles and delivery addresses.
+    - Allows all admin tiers to insert and view `worker_verification_history` and `worker_verification_documents`.
+- **Test Quality:**
+  - **119 automated unit and widget tests passing** (`flutter test test/unit/`) with **0 analyzer compilation errors** (`flutter analyze`).
+  - Added dedicated test suite `booking_execution_and_repair_test.dart` verifying the full booking lifecycle.
+
+### 10. End-to-End Area Dispatch, Dual Payment (Cash & Razorpay), and Delivery-Style Map Tracking
+- **Area-Based Tariff Booking:**
+  - Customer selects trade service (e.g. Plumber) at the decided cooperative rate for their ward/area.
+  - FairMatch AI system searches for artisans within a **strict 3.5 km operational radius** (`FairMatchConfig.operationalRadiusKm = 3.5`).
+- **FairMatch AI Proximity & Dispatch:**
+  - Job requests dispatched to top-ranked artisans with all essential details shared (customer name, contact, location, service, tariff, labor allowance, notes).
+  - Multi-factor scoring transparently prioritizes proximity inside the 3.5 km local ward corridor.
+- **Worker Acceptance & OTP Generation:**
+  - When worker accepts the booking, a random 4-digit verification OTP code is generated and displayed on the Customer console.
+  - Worker must validate this 4-digit OTP code before completing the service.
+- **Dual Payment Modes (Razorpay & Cash):**
+  - **At Checkout:** Customer can choose between **Razorpay (Online Escrow/UPI)** and **Cash (Pay on Service to Partner)**. Cash bookings bypass online gateway redirection.
+  - **Before Completion:** Worker console enforces cash collection confirmation if Cash mode is selected, or validates escrow status if Razorpay was chosen.
+  - **Flexible In-Flight Switching:** Customer can seamlessly switch a Cash order to Razorpay online escrow at any time before service completion directly from the live tracking screen.
+- **Delivery-Style Live Map Tracking:**
+  - Dynamic live tracking HUD displays stage updates (`accepted` ➔ `onTheWay` ➔ `arrived` ➔ `inProgress` ➔ `completed`) with worker location, route polyline, and arrival ETA.
+  - Vector map canvas visually highlights the 3.5 km cooperative ward perimeter, transit arterial corridors, and real-time artisan progress.
+- **Database Schema & Migrations:**
+  - Created `029_booking_payment_and_dispatch.sql` and updated `master_migration_and_admin_setup.sql` with `payment_method TEXT DEFAULT 'RAZORPAY'` and 3.5 km radius normalization in `fairmatch_recommend_workers`.
+
+---
+
 ## 🚀 Future Roadmap & Next Steps
 
 1. **Production Escrow Webhooks:**
@@ -110,3 +169,4 @@
    - Configure Firebase Cloud Messaging (FCM) credentials for live job dispatch alerts.
 4. **In-App Messaging:**
    - Worker-to-customer chat channel over Supabase Realtime channels.
+

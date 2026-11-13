@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 // geocoding has no web support — imported only on non-web platforms
 import 'package:geocoding/geocoding.dart' if (dart.library.html) 'package:app/core/services/geocoding_web_stub.dart';
 
@@ -222,42 +224,77 @@ class LocationService implements ILocationService {
   Future<GeoAddress?> reverseGeocode(double latitude, double longitude) async {
     try {
       final placemarks = await placemarkFromCoordinates(latitude, longitude);
-      if (placemarks.isEmpty) return null;
+      if (placemarks.isNotEmpty) {
+        final p = placemarks.first;
+        
+        // Compose clean addressLine from street, name, or subThoroughfare + thoroughfare
+        final streetParts = [
+          if (p.subThoroughfare != null && p.subThoroughfare!.isNotEmpty) p.subThoroughfare,
+          if (p.thoroughfare != null && p.thoroughfare!.isNotEmpty) p.thoroughfare,
+        ];
+        final addressLine = streetParts.isNotEmpty
+            ? streetParts.join(' ')
+            : (p.street?.isNotEmpty == true ? p.street! : (p.name ?? ''));
 
-      final p = placemarks.first;
-      
-      // Compose clean addressLine from street, name, or subThoroughfare + thoroughfare
-      final streetParts = [
-        if (p.subThoroughfare != null && p.subThoroughfare!.isNotEmpty) p.subThoroughfare,
-        if (p.thoroughfare != null && p.thoroughfare!.isNotEmpty) p.thoroughfare,
-      ];
-      final addressLine = streetParts.isNotEmpty
-          ? streetParts.join(' ')
-          : (p.street?.isNotEmpty == true ? p.street! : (p.name ?? ''));
+        final area = p.subLocality?.isNotEmpty == true
+            ? p.subLocality!
+            : (p.subAdministrativeArea ?? '');
 
-      final area = p.subLocality?.isNotEmpty == true
-          ? p.subLocality!
-          : (p.subAdministrativeArea ?? '');
+        final city = p.locality?.isNotEmpty == true
+            ? p.locality!
+            : (p.subAdministrativeArea ?? 'Pune');
 
-      final city = p.locality?.isNotEmpty == true
-          ? p.locality!
-          : (p.subAdministrativeArea ?? 'Pune');
+        final state = p.administrativeArea?.isNotEmpty == true
+            ? p.administrativeArea!
+            : 'Maharashtra';
 
-      final state = p.administrativeArea?.isNotEmpty == true
-          ? p.administrativeArea!
-          : 'Maharashtra';
+        final postalCode = p.postalCode?.isNotEmpty == true
+            ? p.postalCode!
+            : '';
 
-      final postalCode = p.postalCode?.isNotEmpty == true
-          ? p.postalCode!
-          : '';
+        return GeoAddress(
+          addressLine: addressLine,
+          area: area,
+          city: city,
+          state: state,
+          postalCode: postalCode,
+        );
+      }
 
-      return GeoAddress(
-        addressLine: addressLine,
-        area: area,
-        city: city,
-        state: state,
-        postalCode: postalCode,
-      );
+      // Web & fallback: Query OpenStreetMap Nominatim reverse geocode
+      try {
+        final uri = Uri.parse(
+          'https://nominatim.openstreetmap.org/reverse?format=json&lat=$latitude&lon=$longitude&zoom=18&addressdetails=1',
+        );
+        final response = await http.get(uri, headers: {
+          'User-Agent': 'ShramSetu-App/1.0',
+        }).timeout(const Duration(seconds: 4));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final addr = data['address'] as Map<String, dynamic>? ?? {};
+          final road = addr['road'] ?? addr['suburb'] ?? addr['neighbourhood'] ?? addr['residential'] ?? '';
+          final area = addr['suburb'] ?? addr['neighbourhood'] ?? addr['residential'] ?? addr['subdistrict'] ?? '';
+          final city = addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['county'] ?? 'Pune';
+          final state = addr['state'] ?? 'Maharashtra';
+          final rawPostcode = (addr['postcode'] as String?)?.replaceAll(RegExp(r'\D'), '') ?? '';
+          final displayName = data['display_name'] as String? ?? '';
+
+          return GeoAddress(
+            addressLine: road.toString().isNotEmpty
+                ? road.toString()
+                : (displayName.split(',').take(2).join(', ')),
+            area: area.toString().isNotEmpty ? area.toString() : city.toString(),
+            city: city.toString(),
+            state: state.toString(),
+            postalCode: rawPostcode.length >= 6 ? rawPostcode.substring(0, 6) : rawPostcode,
+          );
+        }
+      } catch (netErr) {
+        debugPrint('LocationService online reverseGeocode note: $netErr');
+      }
+
+      return null;
     } catch (e) {
       debugPrint('LocationService reverseGeocode error: $e');
       // Graceful fallback — reverse geocoding failure must never crash the app

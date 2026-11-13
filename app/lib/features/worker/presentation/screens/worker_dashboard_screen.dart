@@ -8,6 +8,7 @@ import 'worker_job_detail_screen.dart';
 import '../widgets/worker_top_app_bar_actions.dart';
 import '../../../../core/localization/locale_controller.dart';
 import '../../../../core/localization/app_strings.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class WorkerDashboardScreen extends StatefulWidget {
   const WorkerDashboardScreen({super.key});
@@ -62,28 +63,16 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(
-              child: CircularProgressIndicator(color: AppColors.primary),
-            ),
+            body: AppLoadingView(message: 'Loading partner dashboard...'),
           );
         }
         if (snapshot.hasError) {
           return Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.spacingLg),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                    const SizedBox(height: 12),
-                    Text('Failed to load dashboard: ${snapshot.error}', textAlign: TextAlign.center),
-                    const SizedBox(height: 16),
-                    ElevatedButton(onPressed: _refreshData, child: const Text('Retry')),
-                  ],
-                ),
-              ),
+            body: AppErrorView(
+              title: 'Unable to Load Dashboard',
+              message: snapshot.error.toString(),
+              onRetry: _refreshData,
             ),
           );
         }
@@ -702,15 +691,23 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
             width: double.infinity,
             height: 48,
             child: ElevatedButton(
-              onPressed: () {
-                () async {
+              onPressed: () async {
+                try {
                   await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.accepted);
+                  if (!context.mounted) return;
                   _refreshData();
-                }();
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => WorkerJobDetailScreen(jobId: request.id)),
-                );
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => WorkerJobDetailScreen(jobId: request.id)),
+                  );
+                  if (mounted) _refreshData();
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to accept job: $e')),
+                    );
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -739,8 +736,16 @@ class _WorkerDashboardScreenState extends State<WorkerDashboardScreen> {
                   height: 40,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected);
-                      _refreshData();
+                      try {
+                        await DI.workerRepo.updateBookingStatus(request.id, BookingStatus.rejected);
+                        if (mounted) _refreshData();
+                      } catch (e) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to update status: $e')),
+                          );
+                        }
+                      }
                     },
                     icon: const Icon(Icons.redo, size: 15, color: AppColors.onSurfaceVariant),
                     label: Text(

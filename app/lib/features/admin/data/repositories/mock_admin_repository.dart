@@ -5,6 +5,7 @@ import '../../../../core/models/federation_models.dart';
 import '../../../../core/config/dependency_injection.dart';
 import '../models/admin_models.dart';
 import '../../../worker/data/models/worker_models.dart';
+import '../../../worker/data/repositories/mock_worker_repository.dart';
 import '../../../customer/data/models/customer_models.dart';
 import '../../../customer/data/repositories/mock_customer_repository.dart';
 
@@ -630,11 +631,16 @@ class MockAdminRepository implements IAdminRepository {
     }
   }
 
+  final Map<String, List<Map<String, dynamic>>> _mockDocsMap = {};
+
   @override
   Future<List<Map<String, dynamic>>> getWorkerDocuments(String workerId) async {
-    return [
+    if (_mockDocsMap.containsKey(workerId)) {
+      return _mockDocsMap[workerId]!;
+    }
+    final docs = [
       {
-        'id': 'doc_01',
+        'id': 'doc_${workerId}_01',
         'worker_id': workerId,
         'document_type': 'IDENTITY',
         'file_name': 'aadhaar_card_${workerId.toLowerCase()}.pdf',
@@ -645,7 +651,7 @@ class MockAdminRepository implements IAdminRepository {
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
       {
-        'id': 'doc_02',
+        'id': 'doc_${workerId}_02',
         'worker_id': workerId,
         'document_type': 'ADDRESS',
         'file_name': 'electricity_bill_pune.jpg',
@@ -656,7 +662,7 @@ class MockAdminRepository implements IAdminRepository {
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
       {
-        'id': 'doc_03',
+        'id': 'doc_${workerId}_03',
         'worker_id': workerId,
         'document_type': 'SKILL_CERTIFICATE',
         'file_name': 'iti_trade_certificate.pdf',
@@ -667,12 +673,37 @@ class MockAdminRepository implements IAdminRepository {
         'created_at': DateTime.now().subtract(const Duration(hours: 3)).toIso8601String(),
       },
     ];
+    _mockDocsMap[workerId] = docs;
+    return docs;
   }
 
   @override
   Future<void> updateDocumentStatus(String documentId, String status, {String? remarks}) async {
-    // Mock: no persistent state — documents regenerated fresh per getWorkerDocuments() call.
-    await Future.delayed(const Duration(milliseconds: 200));
+    String? matchedWorkerId;
+    String? docType;
+    for (final entry in _mockDocsMap.entries) {
+      final docList = entry.value;
+      final idx = docList.indexWhere((d) => d['id'] == documentId);
+      if (idx != -1) {
+        matchedWorkerId = entry.key;
+        docType = docList[idx]['document_type']?.toString();
+        docList[idx]['status'] = status;
+        if (remarks != null) {
+          docList[idx]['admin_remarks'] = remarks;
+          docList[idx]['rejection_reason'] = remarks;
+        }
+        break;
+      }
+    }
+    if (matchedWorkerId != null) {
+      final action = status == 'APPROVED'
+          ? 'DOCUMENT_APPROVED'
+          : status == 'RESUBMIT'
+              ? 'DOCUMENT_RESUBMISSION_REQUESTED'
+              : 'DOCUMENT_FLAGGED';
+      _recordHistory(matchedWorkerId, 'PENDING', status, action, remarks ?? 'Document ${docType ?? ''} status changed to $status');
+    }
+    await Future.delayed(const Duration(milliseconds: 100));
   }
 
   static final WorkerInsuranceModel _samplePolicy = WorkerInsuranceModel(
@@ -931,6 +962,51 @@ class MockAdminRepository implements IAdminRepository {
         if (phone != null) 'phone': phone.trim(),
         'updated_at': DateTime.now().toIso8601String(),
       };
+    }
+  }
+
+  @override
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas) async {
+    final index = _workers.indexWhere((w) => w.id == workerId);
+    final firstLoc = serviceAreas.isNotEmpty ? serviceAreas.first : 'Pune';
+    if (index != -1) {
+      _workers[index] = _workers[index].copyWith(
+        serviceAreas: serviceAreas,
+        serviceLocation: firstLoc,
+      );
+    }
+    await MockWorkerRepository().updateWorkerServiceAreas(workerId, serviceAreas);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets({String? federationId}) async {
+    final all = MockWorkerRepository.mockAreaTickets;
+    if (federationId != null && federationId.isNotEmpty) {
+      return all.where((t) => t['federation_id'] == federationId).toList();
+    }
+    return List<Map<String, dynamic>>.from(all);
+  }
+
+  @override
+  Future<void> resolveAreaChangeTicket({
+    required String ticketId,
+    required String workerId,
+    required bool isApproved,
+    required List<String> approvedAreas,
+    String? remarks,
+  }) async {
+    final tickets = MockWorkerRepository.mockAreaTickets;
+    final index = tickets.indexWhere((t) => t['id'] == ticketId);
+    if (index != -1) {
+      tickets[index] = {
+        ...tickets[index],
+        'status': isApproved ? 'APPROVED' : 'REJECTED',
+        'admin_remarks': remarks,
+        'resolved_at': DateTime.now().toIso8601String(),
+      };
+    }
+    if (isApproved && approvedAreas.isNotEmpty) {
+      await updateWorkerServiceAreas(workerId, approvedAreas);
     }
   }
 }

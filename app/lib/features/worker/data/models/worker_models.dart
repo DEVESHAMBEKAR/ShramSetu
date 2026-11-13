@@ -144,6 +144,7 @@ class WorkerProfile {
   final VerificationStatus verificationStatus;
   final bool isAvailable;
   final String serviceLocation;
+  final List<String> serviceAreas;
   final String guildName;
   final String guildId;
   final double? latitude;
@@ -170,6 +171,7 @@ class WorkerProfile {
 
   String get federationName => guildName;
   String? get pincode => pinCode;
+  String? get rejectionReason => verificationRemarks;
 
   WorkerProfile({
     required this.id,
@@ -187,6 +189,7 @@ class WorkerProfile {
     required this.verificationStatus,
     required this.isAvailable,
     required this.serviceLocation,
+    this.serviceAreas = const [],
     required this.guildName,
     required this.guildId,
     this.latitude,
@@ -228,6 +231,7 @@ class WorkerProfile {
     VerificationStatus? verificationStatus,
     bool? isAvailable,
     String? serviceLocation,
+    List<String>? serviceAreas,
     String? guildName,
     String? guildId,
     double? latitude,
@@ -266,6 +270,7 @@ class WorkerProfile {
       verificationStatus: verificationStatus ?? this.verificationStatus,
       isAvailable: isAvailable ?? this.isAvailable,
       serviceLocation: serviceLocation ?? this.serviceLocation,
+      serviceAreas: serviceAreas ?? this.serviceAreas,
       guildName: guildName ?? this.guildName,
       guildId: guildId ?? this.guildId,
       latitude: latitude ?? this.latitude,
@@ -310,8 +315,11 @@ class JobRequest {
   final String? workerName;
   final String? federationRefId;
   final String? federationName;
+  final String paymentMethod;
+  final String? otp;
 
   double get totalAmount => baseAmount + laborAllowance;
+  bool get isCash => paymentMethod.toUpperCase() == 'CASH';
 
   JobRequest({
     required this.id,
@@ -331,6 +339,8 @@ class JobRequest {
     this.workerName,
     this.federationRefId,
     this.federationName,
+    this.paymentMethod = 'RAZORPAY',
+    this.otp,
   });
 
   JobRequest copyWith({
@@ -351,6 +361,8 @@ class JobRequest {
     String? workerName,
     String? federationRefId,
     String? federationName,
+    String? paymentMethod,
+    String? otp,
   }) {
     return JobRequest(
       id: id ?? this.id,
@@ -370,6 +382,8 @@ class JobRequest {
       workerName: workerName ?? this.workerName,
       federationRefId: federationRefId ?? this.federationRefId,
       federationName: federationName ?? this.federationName,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      otp: otp ?? this.otp,
     );
   }
 }

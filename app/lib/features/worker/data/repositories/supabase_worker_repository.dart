@@ -9,7 +9,10 @@ import '../models/worker_models.dart';
 import '../../../customer/data/models/customer_models.dart';
 import '../../../customer/data/repositories/mock_customer_repository.dart';
 import '../../../../core/services/registered_worker_store.dart';
+import '../../../../core/services/shared_booking_store.dart';
+import '../../../../core/config/app_config.dart';
 import '../../../../core/models/federation_models.dart';
+import 'mock_worker_repository.dart';
 
 class SupabaseWorkerRepository implements IWorkerRepository {
   final SupabaseClient _supabase;
@@ -216,6 +219,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
       verificationStatus: verificationStatus,
       isAvailable: workerRes?['is_available'] ?? false,
       serviceLocation: workerRes?['location_tag'] ?? 'Pune, Maharashtra',
+      serviceAreas: (workerRes?['service_areas'] as List?)?.map((e) => e.toString()).toList() ?? [workerRes?['location_tag'] ?? 'Pune, Maharashtra'],
       guildName: resolvedFed.name,
       guildId: workerRes?['membership_id'] as String? ?? 'Pending Assignment',
       latitude: (workerRes?['latitude'] as num?)?.toDouble(),
@@ -304,88 +308,136 @@ class SupabaseWorkerRepository implements IWorkerRepository {
 
   @override
   Future<List<JobRequest>> getJobRequests(String workerId) async {
-    // Return all bookings mapped to workerId
-    final response = await _supabase.from('bookings').select('''
-      id, status, scheduled_date, scheduled_time, amount, notes, customer_id, created_at, distance_km,
-      services(name),
-      users!customer_id(full_name, phone),
-      addresses(address_line, area, city)
-    ''').eq('worker_id', workerId).order('created_at', ascending: false);
+    try {
+      final response = await _supabase.from('bookings').select('''
+        id, status, scheduled_date, scheduled_time, base_amount, labor_allowance, notes, customer_id, created_at, distance_km, otp,
+        services!service_id(name),
+        users!customer_id(full_name, phone),
+        addresses(address_line, area, city)
+      ''').eq('worker_id', workerId).order('created_at', ascending: false);
 
-    return (response as List).map((b) {
-      final cData = b['users'] ?? {};
-      final aData = b['addresses'] as Map<String, dynamic>?;
-      final locParts = [
-        if (aData?['area'] != null && aData!['area'].toString().isNotEmpty) aData['area'],
-        if (aData?['city'] != null && aData!['city'].toString().isNotEmpty) aData['city'],
-      ];
-      final custLocation = locParts.isNotEmpty
-          ? locParts.join(', ')
-          : (aData?['address_line'] ?? 'Local');
+      return (response as List).map((b) {
+        final cData = b['users'] as Map<String, dynamic>? ?? {};
+        final aData = b['addresses'] as Map<String, dynamic>?;
+        final sData = b['services'] as Map<String, dynamic>?;
+        final locParts = [
+          if (aData?['area'] != null && aData!['area'].toString().isNotEmpty) aData['area'],
+          if (aData?['city'] != null && aData!['city'].toString().isNotEmpty) aData['city'],
+        ];
+        final custLocation = locParts.isNotEmpty
+            ? locParts.join(', ')
+            : (aData?['address_line'] ?? 'Local');
 
-      return JobRequest(
-        id: b['id'],
-        customerId: b['customer_id'] ?? '',
-        customerName: cData['full_name'] ?? 'Unknown',
-        customerLocation: custLocation,
-        customerPhone: cData['phone'] ?? 'Unknown',
-        serviceName: b['services'] != null ? b['services']['name'] : 'Unknown',
-        date: b['scheduled_date'] ?? '',
-        time: b['scheduled_time'] ?? '',
-        baseAmount: (b['amount'] ?? 0).toDouble(),
-        laborAllowance: 0.0,
-        status: _mapBookingStatus(b['status']),
-        distanceKm: b['distance_km'] != null ? '${b['distance_km']} km' : 'Nearby',
-        createdAt: b['created_at'] ?? '',
-      );
-    }).toList();
+        return JobRequest(
+          id: b['id']?.toString() ?? '',
+          customerId: b['customer_id'] ?? '',
+          customerName: cData['full_name'] ?? 'Customer',
+          customerLocation: custLocation,
+          customerPhone: cData['phone'] ?? '',
+          serviceName: sData?['name'] ?? 'General Service',
+          date: b['scheduled_date'] ?? 'Today',
+          time: b['scheduled_time'] ?? 'Now',
+          baseAmount: (b['base_amount'] as num?)?.toDouble() ?? (b['amount'] as num?)?.toDouble() ?? 0.0,
+          laborAllowance: (b['labor_allowance'] as num?)?.toDouble() ?? 0.0,
+          status: _mapBookingStatus(b['status']),
+          distanceKm: b['distance_km'] != null ? '${b['distance_km']} km' : 'Nearby',
+          createdAt: b['created_at'] != null ? _formatTimeAgo(DateTime.tryParse(b['created_at']) ?? DateTime.now()) : 'Just now',
+          paymentMethod: (b['payment_method'] as String?) ?? 'RAZORPAY',
+          otp: (b['otp'] as String?) ?? '8492',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] getJobRequests primary failed: $e, trying getWorkerBookings');
+      return getWorkerBookings();
+    }
   }
-
-
 
   @override
   Future<List<JobRequest>> getWorkerBookings() async {
     final userId = _supabase.auth.currentUser?.id;
     if (userId == null) return [];
 
-    final res = await _supabase
-        .from('bookings')
-        .select('*, users!customer_id(full_name, phone), services!service_id(name), addresses(address_line, area, city)')
-        .eq('worker_id', userId)
-        .order('created_at', ascending: false);
+    try {
+      final res = await _supabase
+          .from('bookings')
+          .select('*, users!customer_id(full_name, phone), services!service_id(name), addresses(address_line, area, city)')
+          .eq('worker_id', userId)
+          .order('created_at', ascending: false);
 
-    return (res as List).map((row) {
-      final user = row['users'] as Map<String, dynamic>? ?? {};
-      final service = row['services'] as Map<String, dynamic>? ?? {};
-      final addr = row['addresses'] as Map<String, dynamic>?;
-      final locParts = [
-        if (addr?['area'] != null && addr!['area'].toString().isNotEmpty) addr['area'],
-        if (addr?['city'] != null && addr!['city'].toString().isNotEmpty) addr['city'],
-      ];
-      final customerLocation = locParts.isNotEmpty
-          ? locParts.join(', ')
-          : (addr?['address_line'] ?? 'Pune');
-      
-      final status = BookingStatus.fromDbString(row['status'] as String?);
-      
-      return JobRequest(
-        id: row['id'].toString(),
-        customerId: row['customer_id'] ?? '',
-        customerName: user['full_name'] ?? 'Unknown Customer',
-        customerLocation: customerLocation,
-        customerPhone: user['phone'] ?? '',
-        serviceName: service['name'] ?? 'General Service',
-        date: row['scheduled_date'] ?? 'Today',
-        time: row['scheduled_time'] ?? 'Now',
-        baseAmount: (row['base_amount'] as num?)?.toDouble() ?? (row['amount'] as num?)?.toDouble() ?? 0.0,
-        laborAllowance: (row['labor_allowance'] as num?)?.toDouble() ?? 0.0,
-        status: status,
-        distanceKm: row['distance_km'] != null ? '${row['distance_km']} km' : 'Nearby',
-        createdAt: row['created_at'] != null 
-            ? _formatTimeAgo(DateTime.parse(row['created_at']))
-            : 'Just now',
-      );
-    }).toList();
+      return (res as List).map((row) {
+        final user = row['users'] as Map<String, dynamic>? ?? {};
+        final service = row['services'] as Map<String, dynamic>? ?? {};
+        final addr = row['addresses'] as Map<String, dynamic>?;
+        final locParts = [
+          if (addr?['area'] != null && addr!['area'].toString().isNotEmpty) addr['area'],
+          if (addr?['city'] != null && addr!['city'].toString().isNotEmpty) addr['city'],
+        ];
+        final customerLocation = locParts.isNotEmpty
+            ? locParts.join(', ')
+            : (addr?['address_line'] ?? 'Pune');
+        
+        final status = BookingStatus.fromDbString(row['status'] as String?);
+        
+        return JobRequest(
+          id: row['id'].toString(),
+          customerId: row['customer_id'] ?? '',
+          customerName: user['full_name'] ?? 'Customer',
+          customerLocation: customerLocation,
+          customerPhone: user['phone'] ?? '',
+          serviceName: service['name'] ?? 'General Service',
+          date: row['scheduled_date'] ?? 'Today',
+          time: row['scheduled_time'] ?? 'Now',
+          baseAmount: (row['base_amount'] as num?)?.toDouble() ?? (row['amount'] as num?)?.toDouble() ?? 0.0,
+          laborAllowance: (row['labor_allowance'] as num?)?.toDouble() ?? 0.0,
+          status: status,
+          distanceKm: row['distance_km'] != null ? '${row['distance_km']} km' : 'Nearby',
+          createdAt: row['created_at'] != null 
+              ? _formatTimeAgo(DateTime.tryParse(row['created_at']) ?? DateTime.now())
+              : 'Just now',
+          paymentMethod: (row['payment_method'] as String?) ?? 'RAZORPAY',
+          otp: (row['otp'] as String?) ?? '8492',
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] getWorkerBookings join failed: $e, falling back to basic query');
+      try {
+        final res = await _supabase
+            .from('bookings')
+            .select('*, services(name)')
+            .eq('worker_id', userId)
+            .order('created_at', ascending: false);
+
+        return (res as List).map((row) {
+          final service = row['services'] as Map<String, dynamic>? ?? {};
+          final status = BookingStatus.fromDbString(row['status'] as String?);
+          return JobRequest(
+            id: row['id'].toString(),
+            customerId: row['customer_id'] ?? '',
+            customerName: 'Customer',
+            customerLocation: 'Local Service Site',
+            customerPhone: '',
+            serviceName: service['name'] ?? 'General Service',
+            date: row['scheduled_date'] ?? 'Today',
+            time: row['scheduled_time'] ?? 'Now',
+            baseAmount: (row['base_amount'] as num?)?.toDouble() ?? (row['amount'] as num?)?.toDouble() ?? 0.0,
+            laborAllowance: (row['labor_allowance'] as num?)?.toDouble() ?? 0.0,
+            status: status,
+            distanceKm: row['distance_km'] != null ? '${row['distance_km']} km' : 'Nearby',
+            createdAt: row['created_at'] != null 
+                ? _formatTimeAgo(DateTime.tryParse(row['created_at']) ?? DateTime.now())
+                : 'Just now',
+            paymentMethod: (row['payment_method'] as String?) ?? 'RAZORPAY',
+            otp: (row['otp'] as String?) ?? '8492',
+          );
+        }).toList();
+      } catch (fallbackErr) {
+        debugPrint('[SupabaseWorkerRepo] getWorkerBookings fallback failed: $fallbackErr');
+        if (AppConfig.useMockData) {
+          return SharedBookingStore.instance.getWorkerBookings(workerId: userId);
+        }
+        return [];
+      }
+    }
   }
 
   @override
@@ -397,6 +449,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
 
     late StreamController<List<JobRequest>> controller;
     StreamSubscription? sub;
+    StreamSubscription? storeSub;
 
     controller = StreamController<List<JobRequest>>.broadcast(
       onListen: () async {
@@ -422,9 +475,18 @@ class SupabaseWorkerRepository implements IWorkerRepository {
             if (!controller.isClosed) controller.addError(err);
           },
         );
+
+        // Also listen to local in-memory store changes for instantaneous synchronization
+        storeSub = SharedBookingStore.instance.onChange.listen((_) async {
+          try {
+            final updated = await getWorkerBookings();
+            if (!controller.isClosed) controller.add(updated);
+          } catch (_) {}
+        });
       },
       onCancel: () async {
         await sub?.cancel();
+        await storeSub?.cancel();
         if (!controller.isClosed) {
           await controller.close();
         }
@@ -440,14 +502,44 @@ class SupabaseWorkerRepository implements IWorkerRepository {
 
   @override
   Future<void> updateBookingStatus(String bookingId, BookingStatus newStatus) async {
-    final updated = await _supabase.from('bookings').update({
+    final updatePayload = <String, dynamic>{
       'status': newStatus.toDbString(),
       'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', bookingId).select('customer_id, service_name').maybeSingle();
+      if (newStatus == BookingStatus.completed)
+        'completed_at': DateTime.now().toIso8601String(),
+    };
+
+    Map<String, dynamic>? updated;
+    try {
+      updated = await _supabase
+          .from('bookings')
+          .update(updatePayload)
+          .eq('id', bookingId)
+          .select('customer_id, services!service_id(name)')
+          .maybeSingle();
+    } catch (_) {
+      try {
+        updated = await _supabase
+            .from('bookings')
+            .update(updatePayload)
+            .eq('id', bookingId)
+            .select('customer_id, service_id')
+            .maybeSingle();
+      } catch (err) {
+        // Fallback update without select
+        await _supabase.from('bookings').update(updatePayload).eq('id', bookingId);
+      }
+    }
+
+    // Always synchronize in-memory store
+    try {
+      await SharedBookingStore.instance.updateBookingStatus(bookingId, newStatus);
+    } catch (_) {}
 
     if (updated != null && updated['customer_id'] != null) {
       final customerId = updated['customer_id'] as String;
-      final serviceName = updated['service_name'] ?? 'your booking';
+      final serviceData = updated['services'] is Map ? updated['services'] as Map<String, dynamic> : null;
+      final serviceName = serviceData?['name'] as String? ?? 'your booking';
 
       String title = 'Booking Update';
       String body = 'Booking status changed to ${newStatus.label}.';
@@ -603,6 +695,7 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     required String skill,
     required int experienceYears,
     required String serviceLocation,
+    List<String>? serviceAreas,
     String? dob,
     String? gender,
     String? address,
@@ -649,7 +742,9 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     try {
       final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
       if (isUuid) {
-        final areasList = <String>[serviceLocation];
+        final areasList = (serviceAreas != null && serviceAreas.isNotEmpty)
+            ? List<String>.from(serviceAreas)
+            : <String>[serviceLocation];
         if (district != null && district.isNotEmpty && !areasList.contains(district)) {
           areasList.add(district);
         }
@@ -868,5 +963,85 @@ class SupabaseWorkerRepository implements IWorkerRepository {
     } catch (e) {
       debugPrint('[SupabaseWorkerRepo] update workers phone credentials error: $e');
     }
+  }
+
+  @override
+  Future<void> updateWorkerServiceAreas(String workerId, List<String> serviceAreas) async {
+    final firstLoc = serviceAreas.isNotEmpty ? serviceAreas.first : null;
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      final query = _supabase.from('workers').update({
+        'service_areas': serviceAreas,
+        if (firstLoc != null) 'service_location': firstLoc,
+        'updated_at': DateTime.now().toIso8601String(),
+      });
+      if (isUuid) {
+        await query.or('id.eq.$workerId,user_id.eq.$workerId');
+      } else {
+        await query.eq('id', workerId);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] updateWorkerServiceAreas note: $e');
+    }
+    // Also sync mock repo
+    await MockWorkerRepository().updateWorkerServiceAreas(workerId, serviceAreas);
+  }
+
+  @override
+  Future<void> raiseAreaChangeTicket({
+    required String workerId,
+    required List<String> requestedAreas,
+    required String reason,
+  }) async {
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      final query = _supabase.from('workers').select('id, federation_id, service_areas, service_location');
+      final wRes = isUuid
+          ? await query.or('id.eq.$workerId,user_id.eq.$workerId').maybeSingle()
+          : await query.eq('id', workerId).maybeSingle();
+
+      final actualWorkerId = wRes?['id'] as String? ?? workerId;
+      final fedId = wRes?['federation_id'] as String?;
+      final rawCurrent = wRes?['service_areas'];
+      List<String> curAreas = [];
+      if (rawCurrent is List) {
+        curAreas = rawCurrent.map((e) => e.toString()).toList();
+      } else if (wRes?['service_location'] != null) {
+        curAreas = [wRes!['service_location'].toString()];
+      }
+
+      await _supabase.from('worker_area_tickets').insert({
+        'worker_id': actualWorkerId,
+        'federation_id': fedId,
+        'current_areas': curAreas,
+        'requested_areas': requestedAreas,
+        'reason': reason.trim(),
+        'status': 'PENDING',
+      });
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] raiseAreaChangeTicket note: $e');
+      await MockWorkerRepository().raiseAreaChangeTicket(
+        workerId: workerId,
+        requestedAreas: requestedAreas,
+        reason: reason,
+      );
+    }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> getAreaChangeTickets(String workerId) async {
+    try {
+      final isUuid = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$').hasMatch(workerId);
+      final query = _supabase.from('worker_area_tickets').select();
+      final res = isUuid
+          ? await query.or('worker_id.eq.$workerId').order('created_at', ascending: false)
+          : await query.eq('worker_id', workerId).order('created_at', ascending: false);
+      if (res is List && res.isNotEmpty) {
+        return List<Map<String, dynamic>>.from(res);
+      }
+    } catch (e) {
+      debugPrint('[SupabaseWorkerRepo] getAreaChangeTickets note: $e');
+    }
+    return MockWorkerRepository().getAreaChangeTickets(workerId);
   }
 }

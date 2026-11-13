@@ -11,6 +11,7 @@ import 'admin_payments_screen.dart';
 import 'admin_complaints_screen.dart';
 import 'admin_bookings_screen.dart';
 import 'admin_profile_screen.dart';
+import '../../../../shared/widgets/state_views.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -160,23 +161,16 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+            body: AppLoadingView(message: 'Loading federation admin dashboard...'),
           );
         }
         if (snapshot.hasError) {
           return Scaffold(
             backgroundColor: AppColors.background,
-            body: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 48, color: AppColors.error),
-                  const SizedBox(height: 12),
-                  Text('Failed to load admin console: ${snapshot.error}'),
-                  const SizedBox(height: 16),
-                  ElevatedButton(onPressed: _refreshData, child: const Text('Retry')),
-                ],
-              ),
+            body: AppErrorView(
+              title: 'Failed to load admin console',
+              message: snapshot.error.toString(),
+              onRetry: _refreshData,
             ),
           );
         }

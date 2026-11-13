@@ -101,5 +101,50 @@ void main() {
       expect(rejected.verificationStatus, equals(VerificationStatus.rejected));
       expect(rejected.isVerified, isFalse);
     });
+
+    test('6. Admin updates document status to APPROVED, RESUBMIT, and FLAGGED', () async {
+      final workers = await adminRepo.getWorkers();
+      final wId = workers.first.id;
+      final docs = await adminRepo.getWorkerDocuments(wId);
+      final docId = docs.first['id'] as String;
+
+      // Admin approves document
+      await adminRepo.updateDocumentStatus(docId, 'APPROVED');
+      var updatedDocs = await adminRepo.getWorkerDocuments(wId);
+      expect(updatedDocs.firstWhere((d) => d['id'] == docId)['status'], equals('APPROVED'));
+
+      // Admin requests resubmission
+      await adminRepo.updateDocumentStatus(docId, 'RESUBMIT', remarks: 'Blurry photo');
+      updatedDocs = await adminRepo.getWorkerDocuments(wId);
+      expect(updatedDocs.firstWhere((d) => d['id'] == docId)['status'], equals('RESUBMIT'));
+      expect(updatedDocs.firstWhere((d) => d['id'] == docId)['admin_remarks'], equals('Blurry photo'));
+
+      // Admin flags queries
+      await adminRepo.updateDocumentStatus(docId, 'FLAGGED', remarks: 'Address mismatch');
+      updatedDocs = await adminRepo.getWorkerDocuments(wId);
+      expect(updatedDocs.firstWhere((d) => d['id'] == docId)['status'], equals('FLAGGED'));
+      expect(updatedDocs.firstWhere((d) => d['id'] == docId)['admin_remarks'], equals('Address mismatch'));
+    });
+
+    test('7. Revisiting worker file maintains document status and logs verification history', () async {
+      final workers = await adminRepo.getWorkers();
+      final wId = workers.last.id;
+      final initialDocs = await adminRepo.getWorkerDocuments(wId);
+      final idDoc = initialDocs.firstWhere((d) => d['document_type'] == 'IDENTITY');
+
+      // Admin approves IDENTITY document
+      await adminRepo.updateDocumentStatus(idDoc['id'], 'APPROVED');
+
+      // Simulate admin navigating back, and later revisiting the worker file
+      final revisitedDocs = await adminRepo.getWorkerDocuments(wId);
+      final revisitedIdDoc = revisitedDocs.firstWhere((d) => d['document_type'] == 'IDENTITY');
+
+      // Document must remain APPROVED upon revisiting
+      expect(revisitedIdDoc['status'], equals('APPROVED'));
+
+      // Verification history must capture the audit record
+      final history = await adminRepo.getVerificationHistory(wId);
+      expect(history.any((h) => h.action == 'DOCUMENT_APPROVED'), isTrue);
+    });
   });
 }

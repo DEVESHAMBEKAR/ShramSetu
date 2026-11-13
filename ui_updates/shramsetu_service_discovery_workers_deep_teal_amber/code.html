@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/><meta content="mobile_tab" name="shell-type"/><link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;family=Noto+Sans:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/><link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/><style>@layer base{html,body{width:100vw;margin:0;padding:0;}body{overscroll-behavior:none;}.pb-safe{padding-bottom:env(safe-area-inset-bottom,0px);}.pt-safe{padding-top:env(safe-area-inset-top,0px);}main>:first-child{margin-top:0!important;}main>:last-child{margin-bottom:0!important;}}::-webkit-scrollbar{display:none;}</style><script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script><script id="tailwind-config">tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        teal: {
+          primary: "#0D5C5B",
+          dark: "#004342",
+          light: "#8FD2D0",
+          surface: "#E6F3F2",
+          border: "#0D5C5B"
+        },
+        amber: {
+          highlight: "#D97706",
+          dark: "#B45309",
+          light: "#FEF3C7",
+          border: "#FDE68A"
+        },
+        trust: {
+          green: "#15803D",
+          light: "#DCFCE7",
+          border: "#BBF7D0"
+        },
+        neutral: {
+          bg: "#F8FAFA",
+          card: "#FFFFFF",
+          border: "#E2E8F0",
+          text: "#0F172A",
+          muted: "#475569"
+        }
+      },
+      fontFamily: {
+        body: ["Plus Jakarta Sans", "Noto Sans", "sans-serif"]
+      }
+    }
+  }
+};</script></head><body class="bg-[#F8FAFA] font-body text-neutral-text antialiased flex flex-col min-h-screen"><header class="fixed top-0 w-full z-40 pt-safe bg-[#F8FAFA]/95 backdrop-blur-md border-b border-neutral-border"><div class="h-16 px-4 flex items-center justify-between gap-3"><div class="flex items-center gap-3 min-w-0"><img alt="ShramSetu Emblem" class="h-8 w-auto object-contain shrink-0" src="https://lh3.googleusercontent.com/aida/AEtjO1UonDml8yjSaPo97teu8fl-dkwHpBK5Nq-vEfY5MCvzQnVHnrHaChuF6upLedT32ydFQkrki-1OTyCetRviGtnkimEBz55wQbsx1KIoqpByHA80J_cch7XHwGsk4PDrCWl_qmEyg2rgycZaZvTeBeOgUAg4sgC7C43L-RZhxS2u5PcDgaurG1QNg28CHjZAYmHyN9UIjne6Gq5RGju0GJDWrigpB2p86xEkH68DO5LGnY0VxCF7X1FXHvp6"/><div class="flex flex-col min-w-0"><div class="flex items-center gap-1.5"><span class="font-bold text-base text-teal-dark tracking-tight leading-tight">ShramSetu</span><span class="px-1.5 py-0.5 rounded text-[11px] font-semibold bg-teal-surface text-teal-dark border border-teal-light/50">DPI</span></div><div class="flex items-center gap-1 text-neutral-muted"><span class="material-symbols-outlined text-[13px] text-amber-highlight shrink-0">location_on</span><span class="text-xs truncate font-medium">Pune Cluster • Kothrud</span></div></div></div><div class="flex items-center gap-2 shrink-0"><button aria-label="Switch Language" class="min-h-[40px] px-2.5 rounded-lg bg-neutral-card text-teal-dark border border-neutral-border flex items-center justify-center gap-1 shadow-sm hover:bg-neutral-50 active:scale-95 transition-all"><span class="material-symbols-outlined text-amber-highlight text-[18px]">translate</span><span class="text-xs font-bold leading-none">अ/A</span><span class="text-[11px] text-neutral-muted">MR/EN</span><span class="material-symbols-outlined text-[15px] text-neutral-muted">expand_more</span></button><button aria-label="Notifications" class="min-h-[40px] min-w-[40px] rounded-lg border border-neutral-border bg-neutral-card flex items-center justify-center text-neutral-muted hover:text-neutral-text relative transition-all"><span class="material-symbols-outlined text-[20px]">notifications</span><span class="absolute top-2 right-2 w-2 h-2 rounded-full bg-amber-highlight ring-2 ring-white"></span></button><div class="w-8 h-8 rounded-lg bg-teal-primary text-white flex items-center justify-center shrink-0 font-medium text-xs shadow-sm"><span class="material-symbols-outlined text-[18px]">person</span></div></div></div><div class="px-4 pb-2.5 flex items-center justify-between"><h1 class="text-lg font-bold text-teal-dark tracking-tight leading-normal">सेवा आणि कारागीर <span class="text-sm font-semibold text-neutral-muted font-normal">(Services &amp; Workers)</span></h1></div></header><main class="flex flex-col relative w-full pt-[114px] pb-24 bg-[#F8FAFA] min-h-screen gap-4"><div class="flex flex-col w-full gap-4">
+<!-- Cluster Context Card -->
+<section class="px-4">
+<div class="bg-gradient-to-br from-teal-dark to-teal-primary text-white rounded-xl p-4 shadow-sm border border-teal-dark relative overflow-hidden">
+<svg class="absolute -right-8 -bottom-8 w-40 h-40 text-teal-light/10 pointer-events-none" fill="currentColor" viewbox="0 0 100 100">
+<circle cx="50" cy="50" fill="none" r="42" stroke="currentColor" stroke-dasharray="4 4" stroke-width="3"></circle>
+<circle cx="50" cy="50" fill="none" r="28" stroke="currentColor" stroke-width="2"></circle>
+<circle cx="50" cy="50" fill="currentColor" r="8"></circle>
+</svg>
+<div class="relative z-10 flex flex-col gap-2">
+<div class="flex items-center justify-between">
+<span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-highlight text-white text-xs font-bold tracking-wide shadow-sm">
+<span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+            LIVE DIRECTORY
+          </span>
+<span class="text-xs text-teal-light font-medium">DPI-NIC Registry v4.2</span>
+</div>
+<div class="mt-1">
+<h2 class="text-xl font-bold text-white leading-snug">पुणे जिल्हा कारागीर निर्देशिका</h2>
+<p class="text-xs text-teal-light/90 font-medium leading-relaxed">Pune District Certified Trade Registry</p>
+</div>
+<div class="mt-1 inline-flex items-center gap-2 bg-white/10 border border-white/15 rounded-lg px-3 py-1.5 backdrop-blur-sm">
+<span class="material-symbols-outlined text-[16px] text-amber-border">hub</span>
+<span class="text-xs text-white leading-normal truncate">Kothrud Cluster #PN-12 • Radius 3.5 km • <strong class="text-amber-light font-bold">384 Verified Artisans</strong> Online</span>
+</div>
+</div>
+</div>
+</section>
+<!-- Fair Allocation Civic Quota Banner (Warm Amber Alert) -->
+<section class="px-4">
+<div class="bg-amber-light border border-amber-border text-neutral-text rounded-xl p-3.5 shadow-sm flex items-start gap-3">
+<div class="w-8 h-8 rounded-lg bg-amber-highlight text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+<span class="material-symbols-outlined text-[19px]">balance</span>
+</div>
+<div class="flex flex-col min-w-0">
+<div class="flex items-center gap-1.5">
+<span class="text-xs font-bold text-amber-dark tracking-wide uppercase">Fair Allocation Active</span>
+<span class="text-[11px] font-semibold text-neutral-muted">• जन-समता नियम</span>
+</div>
+<p class="text-xs text-neutral-text mt-0.5 leading-relaxed">
+          Artisans capped at <strong>max 4 jobs/day</strong> to guarantee equal civic distribution, transparent gazette pricing, and strict punctual service.
+        </p>
+</div>
+</div>
+</section>
+<!-- Accessible Search Bar (Deep Teal Accents) -->
+<section class="px-4">
+<div class="relative w-full">
+<div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-teal-primary text-[20px]">search</span>
+</div>
+<input aria-label="Search artisans by name or trade" class="w-full h-12 pl-10 pr-11 rounded-xl bg-neutral-card text-neutral-text text-sm border border-neutral-border shadow-sm placeholder:text-neutral-muted focus:outline-none focus:ring-2 focus:ring-teal-primary focus:border-teal-primary transition-all leading-normal" id="workerSearch" placeholder="शोध: कारागीर नाव, ट्रेड किंवा NTC लायसन्स..." type="text"/>
+<button aria-label="Voice Search" class="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-lg flex items-center justify-center text-teal-primary hover:bg-neutral-50 active:scale-95 transition-all">
+<span class="material-symbols-outlined text-[20px]">mic</span>
+</button>
+</div>
+</section>
+<!-- Accessible Filter Bar -->
+<section class="w-full overflow-hidden">
+<div class="flex items-center gap-2 overflow-x-auto px-4 py-1 no-scrollbar" id="categoryFilterContainer" role="tablist">
+<button class="cat-pill active-pill shrink-0 min-h-[44px] px-3.5 py-1.5 rounded-xl bg-teal-primary text-white font-semibold flex items-center gap-2 shadow-sm border border-teal-primary transition-all active:scale-95" data-cat="all" role="tab"><span class="material-symbols-outlined text-[18px]">apps</span><div class="flex flex-col items-start leading-tight text-left"><span class="text-xs font-bold">सर्व व्यवसाय</span><span class="text-[10px] text-teal-light font-normal">All Trades • सभी</span></div></button>
+<button class="cat-pill shrink-0 min-h-[44px] px-3.5 py-1.5 rounded-xl bg-neutral-card text-neutral-text border border-neutral-border font-medium flex items-center gap-2 shadow-sm hover:border-teal-primary/40 active:scale-95 transition-all" data-cat="plumbing" role="tab"><span class="material-symbols-outlined text-[18px] text-teal-primary">plumbing</span><div class="flex flex-col items-start leading-tight text-left"><span class="text-xs font-bold">प्लंबिंग</span><span class="text-[10px] text-neutral-muted font-normal">Plumbing • नलसाज</span></div></button>
+<button class="cat-pill shrink-0 min-h-[44px] px-3.5 py-1.5 rounded-xl bg-neutral-card text-neutral-text border border-neutral-border font-medium flex items-center gap-2 shadow-sm hover:border-teal-primary/40 active:scale-95 transition-all" data-cat="electrical" role="tab"><span class="material-symbols-outlined text-[18px] text-teal-primary">electrical_services</span><div class="flex flex-col items-start leading-tight text-left"><span class="text-xs font-bold">इलेक्ट्रिकल</span><span class="text-[10px] text-neutral-muted font-normal">Electrical • बिजली</span></div></button>
+<button class="cat-pill shrink-0 min-h-[44px] px-3.5 py-1.5 rounded-xl bg-neutral-card text-neutral-text border border-neutral-border font-medium flex items-center gap-2 shadow-sm hover:border-teal-primary/40 active:scale-95 transition-all" data-cat="carpentry" role="tab"><span class="material-symbols-outlined text-[18px] text-teal-primary">carpenter</span><div class="flex flex-col items-start leading-tight text-left"><span class="text-xs font-bold">सुतारकाम</span><span class="text-[10px] text-neutral-muted font-normal">Carpentry • बढ़ई</span></div></button>
+<button class="cat-pill shrink-0 min-h-[44px] px-3.5 py-1.5 rounded-xl bg-neutral-card text-neutral-text border border-neutral-border font-medium flex items-center gap-2 shadow-sm hover:border-teal-primary/40 active:scale-95 transition-all" data-cat="masonry" role="tab"><span class="material-symbols-outlined text-[18px] text-teal-primary">foundation</span><div class="flex flex-col items-start leading-tight text-left"><span class="text-xs font-bold">गवंडी काम</span><span class="text-[10px] text-neutral-muted font-normal">Masonry • राजमिस्त्री</span></div></button>
+</div>
+</section>
+<!-- Worker Cards List (Accessible, 8px scale, #E2E8F0 borders) -->
+<section class="px-4 flex flex-col gap-4" id="workersList">
+<!-- Worker Card 1: Rahul Patil -->
+<article class="worker-card bg-neutral-card rounded-xl border border-neutral-border shadow-sm overflow-hidden flex flex-col transition-all hover:border-teal-light hover:shadow-md" data-category="plumbing" data-name="Rahul Patil राहुल पाटील">
+<div class="h-1 w-full bg-teal-primary"></div>
+<div class="p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<!-- Artisan Portrait with Trust Green Verified Badge -->
+<div class="relative shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover bg-neutral-100 border border-neutral-border shadow-xs" data-alt="A portrait of Rahul Patil, a confident 34-year-old Indian master plumber wearing a crisp navy-blue industrial uniform with ShramSetu embroidered badge, clear smiling face, warm sunlight, clean workshop background, documentary photo style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCVD4JmeC6SRhJW1lFT8bqE3nTTQI86pmtRBDfc4r3NtKvLZ2lqGti5y0FULytdsnXBx2MxUN6WEMoznoWLQSvdTHdVKfyEYWuDIo5YTgd2MwShyqOmM4reg2cUC7EMTEo4Sc_pq2U3AVjRNi_x1zLqDvDu86Grq-BFzDbLc0xewG8QQFmzbt50mf2DkeJRnjWEU187vyQR1z_3CZ903GAA-HOQTagNlCnMbmKqa1JTYCAP4oWhyfULnA"/>
+<div class="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-xs border border-trust-border">
+<span class="material-symbols-outlined text-[17px] text-trust-green block" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<!-- Identity & Status Details -->
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h3 class="text-base font-bold text-teal-dark truncate leading-tight">Rahul Patil</h3>
+<!-- Dispatch status badge -->
+<span class="inline-flex items-center gap-1 text-trust-green bg-trust-light border border-trust-border px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-trust-green"></span> स्लॉट उपलब्ध
+</span>
+</div>
+<p class="text-xs text-neutral-muted truncate font-medium mt-0.5 leading-normal">राहुल पाटील • ITI Grade-A Certified Plumber</p>
+<div class="flex items-center gap-3 mt-1.5 text-neutral-muted text-xs flex-wrap">
+<span class="inline-flex items-center gap-0.5 text-amber-highlight font-bold">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">star</span>
+4.9
+<span class="text-neutral-muted font-normal">(284 audits)</span>
+</span>
+<span class="inline-flex items-center gap-1 text-neutral-muted">
+<span class="material-symbols-outlined text-[14px] text-teal-primary">near_me</span>
+10 min away (1.2 km)
+</span>
+</div>
+</div>
+</div>
+<!-- Accessible Status Badges with Both Icons and Text -->
+<div class="flex items-center gap-2 flex-wrap pt-0.5">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">check_circle</span>
+<span>Aadhaar e-KYC Verified</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">shield</span>
+<span>Police NOC Cleared</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-50 border border-neutral-border text-neutral-text text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-amber-highlight">workspace_premium</span>
+<span>ITI NTC #MH-PU-8821</span>
+</div>
+</div>
+<!-- Tariff Cap Box with Amber Highlights -->
+<div class="bg-[#F8FAFA] border border-neutral-border rounded-xl p-3 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-xs text-neutral-muted leading-tight">शासकीय तपासणी शुल्क (Diagnostic Tariff)</span>
+<span class="text-base font-bold text-teal-dark mt-0.5">₹299 <span class="text-xs font-normal text-neutral-muted">/ प्रथम भेट + अहवाल</span></span>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-amber-dark bg-amber-light border border-amber-border px-2.5 py-1 rounded-md inline-block">Govt Tariff Capped</span>
+</div>
+</div>
+<!-- Action Buttons with Deep Teal Primary -->
+<div class="flex items-center gap-2 pt-1">
+<button class="dossier-btn flex-1 min-h-[44px] px-3 py-1.5 rounded-xl bg-neutral-card border border-neutral-border text-teal-dark hover:bg-neutral-50 active:scale-95 transition-all text-xs font-semibold flex flex-col items-center justify-center leading-tight shadow-xs" onclick="openDossier('Rahul Patil', 'ITI Grade-A Plumber', '4.9★', '₹299', 'MH-PU-8821', 'Pune South Division')">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px] text-teal-primary">badge</span>तपशील / Dossier</span>
+<span class="text-[10px] text-neutral-muted font-normal mt-0.5">प्रमाणपत्रे व अहवाल</span>
+</button>
+<button class="book-btn flex-[1.6] min-h-[44px] px-3 py-1.5 rounded-xl bg-teal-primary text-white hover:bg-teal-dark active:scale-95 transition-all text-xs font-bold flex flex-col items-center justify-center leading-tight shadow-sm" onclick="selectWorker('Rahul Patil', '₹299', 'Plumber')">
+<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[17px]">gavel</span>Book at Gazette Tariff</span>
+<span class="text-[10px] text-teal-light font-medium mt-0.5">₹299 Fixed • ₹0 Platform Cut</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Worker Card 2: Suresh Gaikwad -->
+<article class="worker-card bg-neutral-card rounded-xl border border-neutral-border shadow-sm overflow-hidden flex flex-col transition-all hover:border-teal-light hover:shadow-md" data-category="electrical" data-name="Suresh Gaikwad सुरेश गायकवाड">
+<div class="h-1 w-full bg-teal-primary"></div>
+<div class="p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<!-- Artisan Portrait -->
+<div class="relative shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover bg-neutral-100 border border-neutral-border shadow-xs" data-alt="Portrait of Suresh Gaikwad, a senior 46-year-old Indian licensed wireman and electrical contractor with silvering hair, focused eyes, wearing a khaki technician vest with a multimeter in pocket, warm natural lighting, professional government credential photography style." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAxyZHhAAZAy0gAkkzS4HIpLJjE-vsDgFva98wyxVjosTsQaQyEHNnspqapv3m2qoQs-MhDTDAGHzJuoNrm7ufVvUD65OzeMtClKFvq5NIejycV2EynijHdfvYKui8_8Ke2TCjA8cv8HZFaUrHbDzU9oTp2TsbwmhbqiIY8oXJ6YZSjmG9XRWYwK0rko0zY0HGlZIc7-ISrdq3SkgeOkNbsE9LErQchudSiBEhziyFK5qNTCzxexw8nEA"/>
+<div class="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-xs border border-trust-border">
+<span class="material-symbols-outlined text-[17px] text-trust-green block" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<!-- Details -->
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h3 class="text-base font-bold text-teal-dark truncate leading-tight">Suresh Gaikwad</h3>
+<!-- Urgent dispatch badge in warm amber -->
+<span class="inline-flex items-center gap-1 text-amber-dark bg-amber-light border border-amber-border px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-highlight"></span> २ स्लॉट बाकी
+</span>
+</div>
+<p class="text-xs text-neutral-muted truncate font-medium mt-0.5 leading-normal">सुरेश गायकवाड • Licensed Electrical Supervisor</p>
+<div class="flex items-center gap-3 mt-1.5 text-neutral-muted text-xs flex-wrap">
+<span class="inline-flex items-center gap-0.5 text-amber-highlight font-bold">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">star</span>
+4.8
+<span class="text-neutral-muted font-normal">(412 audits)</span>
+</span>
+<span class="inline-flex items-center gap-1 text-neutral-muted">
+<span class="material-symbols-outlined text-[14px] text-teal-primary">near_me</span>
+15 min away (2.4 km)
+</span>
+</div>
+</div>
+</div>
+<!-- Accessible Status Badges -->
+<div class="flex items-center gap-2 flex-wrap pt-0.5">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">check_circle</span>
+<span>PWD Supervisor License #EL-704</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">shield</span>
+<span>Police NOC Cleared</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-50 border border-neutral-border text-neutral-text text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-teal-primary">lock_clock</span>
+<span>Escrow Guarantee Protected</span>
+</div>
+</div>
+<!-- Tariff Box -->
+<div class="bg-[#F8FAFA] border border-neutral-border rounded-xl p-3 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-xs text-neutral-muted leading-tight">प्रमाणित दर (Standard Fixed Tariff)</span>
+<span class="text-base font-bold text-teal-dark mt-0.5">₹349 <span class="text-xs font-normal text-neutral-muted">/ सर्किट तपासणी व फॉल्ट शोध</span></span>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-amber-dark bg-amber-light border border-amber-border px-2.5 py-1 rounded-md inline-block">Govt Tariff Capped</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center gap-2 pt-1">
+<button class="dossier-btn flex-1 min-h-[44px] px-3 py-1.5 rounded-xl bg-neutral-card border border-neutral-border text-teal-dark hover:bg-neutral-50 active:scale-95 transition-all text-xs font-semibold flex flex-col items-center justify-center leading-tight shadow-xs" onclick="openDossier('Suresh Gaikwad', 'PWD Electrical Supervisor', '4.8★', '₹349', 'PWD-EL-704', 'Kothrud Industrial Sector')">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px] text-teal-primary">badge</span>तपशील / Dossier</span>
+<span class="text-[10px] text-neutral-muted font-normal mt-0.5">PWD परवाना व पडताळणी</span>
+</button>
+<button class="book-btn flex-[1.6] min-h-[44px] px-3 py-1.5 rounded-xl bg-teal-primary text-white hover:bg-teal-dark active:scale-95 transition-all text-xs font-bold flex flex-col items-center justify-center leading-tight shadow-sm" onclick="selectWorker('Suresh Gaikwad', '₹349', 'Electrical')">
+<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[17px]">gavel</span>Book at Gazette Tariff</span>
+<span class="text-[10px] text-teal-light font-medium mt-0.5">₹349 Fixed • DPMS Direct Pay</span>
+</button>
+</div>
+</div>
+</article>
+<!-- Worker Card 3: Ganesh Shinde -->
+<article class="worker-card bg-neutral-card rounded-xl border border-neutral-border shadow-sm overflow-hidden flex flex-col transition-all hover:border-teal-light hover:shadow-md" data-category="carpentry" data-name="Ganesh Shinde गणेश शिंदे">
+<div class="h-1 w-full bg-teal-primary"></div>
+<div class="p-4 flex flex-col gap-3">
+<div class="flex items-start gap-3">
+<!-- Artisan Portrait -->
+<div class="relative shrink-0">
+<img class="w-16 h-16 rounded-xl object-cover bg-neutral-100 border border-neutral-border shadow-xs" data-alt="Portrait of Ganesh Shinde, 40-year-old master Indian carpenter with skilled hands holding wooden framing chisel, gentle smile, wearing workshop apron with measuring tape, warm woodcraft studio environment, cinematic documentary lighting." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB7Ij4MeaaYz2s1przd85LK8ZbYjfsoYhKtSCZJFxNiiq2txcD4KOHtCbfEOvHyiu1NN8huPq75-tW9WZamnQCRYhoBJookeTG7noXIjTG3WXOtaVLrYrXjEon3DBn6VuCSmAH-o7Gtmbd-UOhxHDzeCVnI2RAelzt9g7BvjePVQtHDCdkowAKLMjN2uwlfhK9SkIBKyaIkSl8Xk5roXKt-rCVq2TZnAIjDfzhlO-5urYEtXmcAelrFwg"/>
+<div class="absolute -bottom-1 -right-1 bg-white p-0.5 rounded-full shadow-xs border border-trust-border">
+<span class="material-symbols-outlined text-[17px] text-trust-green block" style="font-variation-settings: 'FILL' 1;">verified</span>
+</div>
+</div>
+<!-- Details -->
+<div class="flex flex-col min-w-0 flex-1">
+<div class="flex items-center justify-between gap-1">
+<h3 class="text-base font-bold text-teal-dark truncate leading-tight">Ganesh Shinde</h3>
+<!-- Urgent badge in warm amber -->
+<span class="inline-flex items-center gap-1 text-amber-dark bg-amber-light border border-amber-border px-2 py-0.5 rounded-md text-[11px] font-semibold shrink-0">
+<span class="w-1.5 h-1.5 rounded-full bg-amber-highlight"></span> १ स्लॉट शिल्लक
+</span>
+</div>
+<p class="text-xs text-neutral-muted truncate font-medium mt-0.5 leading-normal">गणेश शिंदे • Heritage Woodwork &amp; Master Carpenter</p>
+<div class="flex items-center gap-3 mt-1.5 text-neutral-muted text-xs flex-wrap">
+<span class="inline-flex items-center gap-0.5 text-amber-highlight font-bold">
+<span class="material-symbols-outlined text-[15px]" style="font-variation-settings: 'FILL' 1;">star</span>
+5.0
+<span class="text-neutral-muted font-normal">(198 audits)</span>
+</span>
+<span class="inline-flex items-center gap-1 text-neutral-muted">
+<span class="material-symbols-outlined text-[14px] text-teal-primary">near_me</span>
+20 min away (3.1 km)
+</span>
+</div>
+</div>
+</div>
+<!-- Accessible Badges -->
+<div class="flex items-center gap-2 flex-wrap pt-0.5">
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">check_circle</span>
+<span>Aadhaar e-KYC Verified</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-trust-light border border-trust-border text-trust-green text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-trust-green">shield</span>
+<span>Police NOC Cleared</span>
+</div>
+<div class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-neutral-50 border border-neutral-border text-neutral-text text-xs font-medium">
+<span class="material-symbols-outlined text-[15px] text-amber-highlight">military_tech</span>
+<span>Skill India NSQF Level-5</span>
+</div>
+</div>
+<!-- Tariff Box -->
+<div class="bg-[#F8FAFA] border border-neutral-border rounded-xl p-3 flex items-center justify-between">
+<div class="flex flex-col">
+<span class="text-xs text-neutral-muted leading-tight">प्रमाणित दर (Standard Diagnostic Tariff)</span>
+<span class="text-base font-bold text-teal-dark mt-0.5">₹399 <span class="text-xs font-normal text-neutral-muted">/ मोजमाप व दुरुस्ती अंदाज</span></span>
+</div>
+<div class="text-right">
+<span class="text-xs font-semibold text-amber-dark bg-amber-light border border-amber-border px-2.5 py-1 rounded-md inline-block">Govt Tariff Capped</span>
+</div>
+</div>
+<!-- Action Row -->
+<div class="flex items-center gap-2 pt-1">
+<button class="dossier-btn flex-1 min-h-[44px] px-3 py-1.5 rounded-xl bg-neutral-card border border-neutral-border text-teal-dark hover:bg-neutral-50 active:scale-95 transition-all text-xs font-semibold flex flex-col items-center justify-center leading-tight shadow-xs" onclick="openDossier('Ganesh Shinde', 'Heritage Woodwork NSQF-5', '5.0★', '₹399', 'NSQF-WD-9940', 'Kothrud Ward 12')">
+<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[16px] text-teal-primary">badge</span>तपशील / Dossier</span>
+<span class="text-[10px] text-neutral-muted font-normal mt-0.5">NSQF-5 कौशल्य प्रमाणीकरण</span>
+</button>
+<button class="book-btn flex-[1.6] min-h-[44px] px-3 py-1.5 rounded-xl bg-teal-primary text-white hover:bg-teal-dark active:scale-95 transition-all text-xs font-bold flex flex-col items-center justify-center leading-tight shadow-sm" onclick="selectWorker('Ganesh Shinde', '₹399', 'Carpentry')">
+<span class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[17px]">gavel</span>Book at Gazette Tariff</span>
+<span class="text-[10px] text-teal-light font-medium mt-0.5">₹399 Fixed • Measurement</span>
+</button>
+</div>
+</div>
+</article>
+</section>
+<!-- Escrow Guarantee Section (Trust Green Highlight) -->
+<section class="px-4 pb-4">
+<div class="bg-trust-light border border-trust-border p-4 rounded-xl flex items-center gap-3.5 shadow-xs">
+<div class="w-10 h-10 rounded-xl bg-trust-green flex items-center justify-center text-white shrink-0 shadow-xs">
+<span class="material-symbols-outlined text-[22px]">verified</span>
+</div>
+<div class="flex flex-col">
+<span class="text-sm font-bold text-teal-dark leading-snug">100% Escrow Protection Guarantee</span>
+<span class="text-xs text-neutral-muted leading-relaxed mt-0.5">
+Payment is held safely in Sovereign RBI Escrow and released only after OTP validation upon work satisfaction.
+</span>
+</div>
+</div>
+</section>
+<!-- Worker Dossier Modal (Accessible Dialog) -->
+<div aria-modal="true" class="fixed inset-0 z-50 hidden bg-neutral-900/60 backdrop-blur-sm flex items-end justify-center p-0 transition-opacity" id="dossierModal" role="dialog">
+<div class="bg-white w-full max-w-lg rounded-t-2xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden border-t border-neutral-border animate-in slide-in-from-bottom duration-200">
+<div class="px-4 py-3.5 flex items-center justify-between border-b border-neutral-border bg-[#F8FAFA]">
+<div class="flex items-center gap-2.5">
+<span class="material-symbols-outlined text-teal-primary text-[22px]">badge</span>
+<div class="flex flex-col">
+<h4 class="text-sm font-bold text-teal-dark leading-tight">कारागीर डिजिटल डॉसियर (Artisan Dossier)</h4>
+<span class="text-[11px] text-neutral-muted">DigiLocker Authenticated Record</span>
+</div>
+</div>
+<button aria-label="Close Dossier" class="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-muted hover:bg-neutral-100 transition-colors" onclick="closeDossier()">
+<span class="material-symbols-outlined text-[20px]">close</span>
+</button>
+</div>
+<div class="p-4 overflow-y-auto flex flex-col gap-3">
+<div class="flex items-center justify-between p-3 rounded-xl bg-neutral-50 border border-neutral-border">
+<div class="flex flex-col">
+<span class="text-base font-bold text-teal-dark" id="dossierName">Rahul Patil</span>
+<span class="text-xs text-neutral-muted font-medium" id="dossierTrade">ITI Plumber</span>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-amber-light border border-amber-border text-amber-dark text-xs font-bold" id="dossierRating">4.9★</span>
+</div>
+<div class="flex flex-col gap-2">
+<span class="text-[11px] text-neutral-muted uppercase tracking-wider font-bold">Verification Audit Trail</span>
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-[#F8FAFA] border border-neutral-border">
+<span class="text-xs text-neutral-text flex items-center gap-2">
+<span class="material-symbols-outlined text-trust-green text-[18px]">check_circle</span>
+Aadhaar Biometric e-KYC
+</span>
+<span class="text-xs text-trust-green font-bold">UIDAI VERIFIED</span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-[#F8FAFA] border border-neutral-border">
+<span class="text-xs text-neutral-text flex items-center gap-2">
+<span class="material-symbols-outlined text-trust-green text-[18px]">shield</span>
+State Police NOC Clearance
+</span>
+<span class="text-xs text-trust-green font-bold">NOC-PUN-2024</span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-[#F8FAFA] border border-neutral-border">
+<span class="text-xs text-neutral-text flex items-center gap-2">
+<span class="material-symbols-outlined text-teal-primary text-[18px]">verified_user</span>
+Trade Certificate
+</span>
+<span class="text-xs text-teal-dark font-bold" id="dossierLicense">MH-PU-8821</span>
+</div>
+<div class="flex items-center justify-between p-2.5 rounded-lg bg-[#F8FAFA] border border-neutral-border">
+<span class="text-xs text-neutral-text flex items-center gap-2">
+<span class="material-symbols-outlined text-amber-highlight text-[18px]">gavel</span>
+Statutory Gazette Tariff
+</span>
+<span class="text-xs text-amber-dark font-bold" id="dossierRate">₹299 Standard</span>
+</div>
+</div>
+<div class="p-3 rounded-lg bg-teal-surface border border-teal-light/60 text-teal-dark text-xs leading-relaxed">
+<strong>Fair Trade Assurance:</strong> Worker maintains a 99.4% punctuality score across 200+ residential dispatches in Kothrud, Pune.
+</div>
+</div>
+<div class="p-3.5 bg-[#F8FAFA] border-t border-neutral-border flex items-center gap-2.5">
+<button class="flex-1 min-h-[44px] rounded-xl bg-white border border-neutral-border text-teal-dark font-semibold text-xs hover:bg-neutral-50 transition-colors" onclick="closeDossier()">
+बंद करा (Close)
+</button>
+<button class="flex-1 min-h-[44px] rounded-xl bg-teal-primary text-white font-bold text-xs shadow-sm hover:bg-teal-dark transition-colors" id="dossierBookBtn" onclick="selectWorkerFromDossier()">
+Book at Gazette Tariff
+</button>
+</div>
+</div>
+</div>
+<!-- Booking Toast -->
+<div aria-live="polite" class="fixed bottom-24 left-1/2 -translate-x-1/2 z-50 hidden bg-teal-dark text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 w-[92%] max-w-sm transition-all duration-300 border border-teal-light/30" id="bookingToast">
+<div class="w-8 h-8 rounded-lg bg-amber-highlight flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-[18px] text-white">done_all</span>
+</div>
+<div class="flex flex-col min-w-0 flex-1">
+<span class="text-xs font-bold truncate leading-tight" id="toastTitle">कारागीर निवड यशस्वी!</span>
+<span class="text-[11px] text-teal-light truncate mt-0.5" id="toastSub">Escrow payment authorized at Gazette rate.</span>
+</div>
+</div>
+</div>
+<script>
+  let currentDossierWorker = null;
+
+  // Accessible Category Filtering
+  const filterPills = document.querySelectorAll('.cat-pill');
+  const workerCards = document.querySelectorAll('.worker-card');
+
+  filterPills.forEach(pill => {
+    pill.addEventListener('click', () => {
+      filterPills.forEach(p => {
+        p.classList.remove('bg-teal-primary', 'text-white', 'border-teal-primary');
+        p.classList.add('bg-neutral-card', 'text-neutral-text', 'border-neutral-border');
+        const icon = p.querySelector('.material-symbols-outlined');
+        if (icon && p.getAttribute('data-cat') !== 'all') {
+          icon.classList.remove('text-white');
+          icon.classList.add('text-teal-primary');
+        }
+      });
+      pill.classList.remove('bg-neutral-card', 'text-neutral-text', 'border-neutral-border');
+      pill.classList.add('bg-teal-primary', 'text-white', 'border-teal-primary');
+
+      const selectedCat = pill.getAttribute('data-cat');
+      workerCards.forEach(card => {
+        if (selectedCat === 'all' || card.getAttribute('data-category') === selectedCat) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Search Bar Filter Logic
+  const searchInput = document.getElementById('workerSearch');
+  searchInput.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase().trim();
+    workerCards.forEach(card => {
+      const name = card.getAttribute('data-name').toLowerCase();
+      const cat = card.getAttribute('data-category').toLowerCase();
+      if (name.includes(query) || cat.includes(query)) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  });
+
+  // Dossier Modal Controllers
+  function openDossier(name, trade, rating, rate, license, cluster) {
+    currentDossierWorker = { name, rate, trade };
+    document.getElementById('dossierName').textContent = name;
+    document.getElementById('dossierTrade').textContent = trade + ' • ' + cluster;
+    document.getElementById('dossierRating').textContent = rating;
+    document.getElementById('dossierLicense').textContent = license;
+    document.getElementById('dossierRate').textContent = rate + ' (Gazette Capped)';
+    document.getElementById('dossierModal').classList.remove('hidden');
+  }
+
+  function closeDossier() {
+    document.getElementById('dossierModal').classList.add('hidden');
+  }
+
+  function selectWorker(name, rate, trade) {
+    const toast = document.getElementById('bookingToast');
+    const toastTitle = document.getElementById('toastTitle');
+    const toastSub = document.getElementById('toastSub');
+
+    toastTitle.textContent = name + ' निवडले (' + trade + ')';
+    toastSub.textContent = 'दर: ' + rate + ' • Escrow Reserve तयार केला जात आहे...';
+
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+      toast.classList.add('hidden');
+    }, 3800);
+  }
+
+  function selectWorkerFromDossier() {
+    if (currentDossierWorker) {
+      closeDossier();
+      selectWorker(currentDossierWorker.name, currentDossierWorker.rate, currentDossierWorker.trade);
+    }
+  }
+</script></main>
+<!-- Bottom Navigation with Deep Teal & Accessible States -->
+<nav class="fixed bottom-0 w-full z-40 pb-safe bg-white/95 backdrop-blur-md border-t border-neutral-border shadow-sm"><div class="flex justify-around items-center h-16 px-2"><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 text-neutral-muted hover:text-teal-dark transition-colors" data-path="home" href="#"><span class="material-symbols-outlined text-[22px]">account_balance</span><span class="text-[11px] font-medium leading-none text-center mt-1">मुख्यपृष्ठ</span></a><a aria-current="page" class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 transition-colors text-teal-primary font-bold" data-path="services-and-workers" href="#"><span class="material-symbols-outlined text-[22px]" style="font-variation-settings: 'FILL' 1;">engineering</span><span class="text-[11px] font-bold leading-none text-center mt-1">सेवा / कामगार</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 text-neutral-muted hover:text-teal-dark transition-colors" data-path="history-and-escrow" href="#"><span class="material-symbols-outlined text-[22px]">receipt_long</span><span class="text-[11px] font-medium leading-none text-center mt-1">व्यवहार / एस्क्रो</span></a><a class="flex flex-col items-center justify-center gap-0.5 min-w-[56px] min-h-[44px] px-2 py-1 text-neutral-muted hover:text-teal-dark transition-colors" data-path="profile-and-account" href="#"><span class="material-symbols-outlined text-[22px]">badge</span><span class="text-[11px] font-medium leading-none text-center mt-1">खाते व ID</span></a></div></nav>
+</body></html>
