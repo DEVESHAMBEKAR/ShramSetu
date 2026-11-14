@@ -885,7 +885,9 @@ class SupabaseUserRepository implements IUserRepository {
     }
 
     // Persist to local cache so user never has to re-enter
-    _cacheCustomerAddress(effectiveUserId, _getActiveUserPhone(), finalAddr);
+    final activePhone = _getActiveUserPhone();
+    final cleanPhone = activePhone != null ? PhoneNumberUtil.cleanIndianPhone(activePhone) : '';
+    _cacheCustomerAddress(effectiveUserId, activePhone, finalAddr);
     if (cleanPhone.isNotEmpty) {
       LocalStorageService.setBool('customer_is_complete_$cleanPhone', true);
     }
